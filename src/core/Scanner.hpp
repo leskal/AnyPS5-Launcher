@@ -40,6 +40,10 @@ inline constexpr const char* GameHomeMarker = "anyps5-launcher-install.json";
 struct GameEntry {
     std::filesystem::path location;  // the game folder, its app0\ or the .zar
     std::filesystem::path home;      // the set-up folder; empty when not set up
+    // A game folder named app0 that is alone in its parent (and the parent isn't
+    // the games folder): the parent, which already has AnyPS5's layout and
+    // becomes the set-up folder without moving anything. Empty otherwise.
+    std::filesystem::path app0Parent;
     PackageFormat format = PackageFormat::Folder;
     ZarLayout layout = ZarLayout::NotApplicable;
     std::string innerPrefix;

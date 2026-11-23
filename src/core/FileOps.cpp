@@ -30,7 +30,8 @@ void Move(const std::filesystem::path& source, const std::filesystem::path& targ
         if (error != ERROR_ACCESS_DENIED && error != ERROR_SHARING_VIOLATION) break;
         Sleep(100);
     }
-    throw std::system_error(static_cast<int>(error), std::system_category(), "cannot move " + ToUtf8(source) + " to " + ToUtf8(target));
+    const std::error_code code(static_cast<int>(error), std::system_category());
+    throw std::system_error(code, "cannot move " + ToUtf8(source) + " to " + ToUtf8(target) + ": " + ReadableError(code) + " [Windows error " + std::to_string(error) + "]");
 #else
     std::error_code error;
     if (!replace && std::filesystem::exists(target, error)) throw std::runtime_error(ToUtf8(target) + " already exists");
@@ -121,5 +122,60 @@ std::string FormatBytes(std::uint64_t bytes) {
     return text;
 }
 
+namespace {
+
+bool IsUtf8(const std::string& text) {
+    for (std::size_t index = 0; index < text.size();) {
+        const auto lead = static_cast<unsigned char>(text[index]);
+        const std::size_t length = lead < 0x80 ? 1 : (lead & 0xE0) == 0xC0 ? 2 : (lead & 0xF0) == 0xE0 ? 3 : (lead & 0xF8) == 0xF0 ? 4 : 0;
+        if (length == 0 || index + length > text.size()) return false;
+        for (std::size_t next = 1; next < length; ++next) {
+            if ((static_cast<unsigned char>(text[index + next]) & 0xC0) != 0x80) return false;
+        }
+        index += length;
+    }
+    return true;
+}
+
+}
+
+std::string ReadableText(std::string text) {
+    if (IsUtf8(text)) return text;
+#ifdef _WIN32
+    const int wide = MultiByteToWideChar(CP_ACP, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    if (wide > 0) {
+        std::wstring buffer(static_cast<std::size_t>(wide), L'\0');
+        MultiByteToWideChar(CP_ACP, 0, text.data(), static_cast<int>(text.size()), buffer.data(), wide);
+        const int bytes = WideCharToMultiByte(CP_UTF8, 0, buffer.data(), wide, nullptr, 0, nullptr, nullptr);
+        std::string result(static_cast<std::size_t>(bytes), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, buffer.data(), wide, result.data(), bytes, nullptr, nullptr);
+        return result;
+    }
+#endif
+    for (auto& c : text) {
+        if (static_cast<unsigned char>(c) >= 0x80) c = '?';
+    }
+    return text;
+}
+
+std::string ReadableError(const std::error_code& error) {
+#ifdef _WIN32
+    if (error.category() == std::system_category()) {
+        wchar_t* buffer = nullptr;
+        const DWORD length = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
+                                            static_cast<DWORD>(error.value()), 0, reinterpret_cast<wchar_t*>(&buffer), 0, nullptr);
+        if (length > 0 && buffer != nullptr) {
+            std::wstring text(buffer, length);
+            LocalFree(buffer);
+            while (!text.empty() && (text.back() == L'\r' || text.back() == L'\n' || text.back() == L' ' || text.back() == L'.')) text.pop_back();
+            const int bytes = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+            std::string result(static_cast<std::size_t>(bytes), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), bytes, nullptr, nullptr);
+            return result;
+        }
+    }
+#endif
+    return ReadableText(error.message());
+}
 
 }

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace launcher {
@@ -22,5 +23,10 @@ void MoveTree(const std::filesystem::path& source, const std::filesystem::path& 
 void RequireFreeSpace(const std::filesystem::path& folder, std::uint64_t bytes);
 
 std::string FormatBytes(std::uint64_t bytes);
+
+// Windows' own error texts arrive in the system's ANSI code page (Greek, for
+// example), not UTF-8. These give text the window can show.
+std::string ReadableText(std::string text);
+std::string ReadableError(const std::error_code& error);
 
 }

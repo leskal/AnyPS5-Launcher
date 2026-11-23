@@ -256,6 +256,7 @@ void WriteManifest(const std::filesystem::path& file, const InstallManifest& man
         {"contentVersion", manifest.contentVersion},
         {"format", manifest.format},
         {"originalName", manifest.originalName},
+        {"keptApp0", manifest.keptApp0},
         {"complete", manifest.complete},
         {"installedAt", manifest.installedAt},
         {"anyps5Root", manifest.anyps5Root},
@@ -301,7 +302,7 @@ std::filesystem::path ExecutableIn(const std::filesystem::path& home, std::strin
 
 std::filesystem::path HomeFor(const GameEntry& game) {
     if (!game.home.empty()) return game.home;
-    if (game.format == PackageFormat::Folder) return game.location;
+    if (game.format == PackageFormat::Folder) return game.app0Parent.empty() ? game.location : game.app0Parent;
     return game.location.parent_path() / game.location.stem();
 }
 
@@ -330,6 +331,8 @@ std::optional<InstallManifest> ReadHomeManifest(const std::filesystem::path& hom
     };
     manifest.modules = number("modules");
     manifest.unwrapped = number("unwrapped");
+    const auto kept = document.find("keptApp0");
+    manifest.keptApp0 = kept != document.end() && kept->is_boolean() && kept->get<bool>();
     const auto complete = document.find("complete");
     manifest.complete = complete != document.end() && complete->is_boolean() && complete->get<bool>();
     return manifest;
@@ -409,7 +412,12 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
     // 1. Set up the folder.
     if (game.format == PackageFormat::Folder) {
         manifest.modules = RequireElf(game.location, moduleFolders, executables);
-        if (game.home.empty()) {
+        if (game.home.empty() && !game.app0Parent.empty()) {
+            // Already <folder>\app0 with nothing else beside it: only the manifest is added.
+            manifest.keptApp0 = true;
+            manifest.originalName = ToUtf8(home.filename());
+            WriteManifest(home / InstallManifestName, manifest);
+        } else if (game.home.empty()) {
             const auto names = TopLevelNames(home);
             if (std::find(names.begin(), names.end(), App0) != names.end()) throw std::runtime_error("the game folder already has an app0 entry of its own");
             std::filesystem::create_directory(app0, error);
@@ -539,15 +547,20 @@ RemovedInstall RemoveInstall(const GameEntry& game) {
                 if (IsGuestModule(name)) RemoveFile(directory / FromUtf8(name));
             }
         }
-        const auto names = TopLevelNames(app0);
-        for (const auto& name : names) {
-            if (Exists(home / FromUtf8(name)) && name != App0) throw std::runtime_error(ToUtf8(home / FromUtf8(name)) + " is in the way of the game's own " + name);
+        if (manifest->keptApp0) {
+            // It was already <folder>\app0: the files stay where they were.
+            result.restored = app0;
+        } else {
+            const auto names = TopLevelNames(app0);
+            for (const auto& name : names) {
+                if (Exists(home / FromUtf8(name)) && name != App0) throw std::runtime_error(ToUtf8(home / FromUtf8(name)) + " is in the way of the game's own " + name);
+            }
+            // The game's own files are moved out first; app0 itself last, in case the game has an app0 entry.
+            for (const auto& name : names) {
+                if (name != App0) RenameNew(app0 / FromUtf8(name), home / FromUtf8(name));
+            }
+            result.restored = home;
         }
-        // The game's own files are moved out first; app0 itself last, in case the game has an app0 entry.
-        for (const auto& name : names) {
-            if (name != App0) RenameNew(app0 / FromUtf8(name), home / FromUtf8(name));
-        }
-        result.restored = home;
     }
     for (const auto& name : ours) {
         if (name == App0 || name == App0Zar) continue;
@@ -556,7 +569,7 @@ RemovedInstall RemoveInstall(const GameEntry& game) {
         else if (Exists(home / FromUtf8(name))) RemoveOwnTree(home / FromUtf8(name));
     }
     std::error_code error;
-    if (game.format == PackageFormat::Folder) std::filesystem::remove(app0, error);
+    if (game.format == PackageFormat::Folder && !manifest->keptApp0) std::filesystem::remove(app0, error);
     if (game.format == PackageFormat::Zar && result.leftovers.empty()) std::filesystem::remove(home, error);
     return result;
 }

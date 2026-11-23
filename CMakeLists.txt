@@ -38,6 +38,7 @@ add_library(launcher_core STATIC
     src/core/Unwrap.cpp
     src/core/Versions.cpp
     src/core/WinShim.cpp
+    src/core/ZipStore.cpp
 )
 target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(launcher_core PUBLIC launcher_zarchive launcher_json)

@@ -21,6 +21,7 @@
 #include "core/Profiles.hpp"
 #include "core/Unwrap.hpp"
 #include "core/Utf8.hpp"
+#include "core/ZipStore.hpp"
 
 using namespace launcher;
 
@@ -141,7 +142,7 @@ struct InstallFixture {
         const auto folder = temp.Path() / "games" / "Game";
         fixture::WriteFolder(folder, SelfGame(titleId));
         JobControl control;
-        const auto result = ConvertGameSelfFiles(folder, ModuleFolders(ModuleDirectories(title)), {}, control);
+        const auto result = ConvertGameSelfFiles(folder, folder.parent_path() / "Game.originals.zip", ModuleFolders(ModuleDirectories(title)), {}, control);
         if (!result.refused.empty()) throw std::runtime_error(result.refused.front());
         return folder;
     }
@@ -323,7 +324,7 @@ TEST(FolderInstallMovesTheGameIntoApp0AndRelinks) {
     CHECK(std::filesystem::is_regular_file(app0 / "sce_sys" / "param.json"));
     CHECK(std::filesystem::is_regular_file(app0 / "Media" / "data.bin"));
     CHECK(!std::filesystem::exists(home / "eboot.bin"));
-    CHECK(FromUtf8(relinker.arguments[relinker.arguments.size() - 2]) == app0 / "eboot.elf");
+    CHECK(FromUtf8(relinker.arguments[relinker.arguments.size() - 2]) == app0 / "eboot.bin");
     CHECK(FromUtf8(relinker.arguments.back()) == ExecutableIn(home, "PPSA00100"));
     CHECK(relinker.workingDirectory == home);
     CHECK_EQ(relinker.arguments[1], std::string("--windows"));
@@ -353,6 +354,50 @@ TEST(FolderInstallMovesTheGameIntoApp0AndRelinks) {
     CHECK(again.complete);
     CHECK(std::filesystem::is_regular_file(app0 / "eboot.bin"));
     CHECK(!std::filesystem::exists(app0 / "app0"));
+}
+
+TEST(AnApp0FolderAloneInItsParentIsUsedWhereItIs) {
+    InstallFixture fixture;
+    const auto parent = fixture.temp.Path() / "games" / "PPSA00130-dump";
+    const auto app0 = parent / "app0";
+    auto tree = fixture::Game("PPSA00130", "In app0");
+    tree["sce_module/libGame.prx"] = fixture::Elf64();
+    fixture::WriteFolder(app0, tree);
+    fixture::WriteFolder(parent, {{"desktop.ini", fixture::Bytes("[.ShellClassInfo]")}});
+    const auto game = fixture.Scan();
+    CHECK(game.location == app0);
+    CHECK(game.app0Parent == parent);
+    CHECK(HomeFor(game) == parent);
+    CHECK(OriginalsZipFor(game) == fixture.temp.Path() / "games" / "PPSA00130-01.000.000.originals.zip");
+
+    FakeRelinker relinker;
+    const auto manifest = fixture.Install(game, relinker);
+    CHECK(manifest.keptApp0);
+    CHECK(FromUtf8(relinker.arguments.back()) == ExecutableIn(parent, "PPSA00130"));
+    CHECK(std::filesystem::is_regular_file(app0 / "eboot.bin"));
+    CHECK(!std::filesystem::exists(app0 / "app0"));
+    const auto installed = fixture.Scan();
+    CHECK(installed.home == parent);
+    CHECK(installed.location == app0);
+
+    const auto removed = RemoveInstall(installed);
+    CHECK(removed.restored == app0);
+    CHECK(std::filesystem::is_regular_file(app0 / "eboot.bin"));
+    CHECK(!std::filesystem::exists(ExecutableIn(parent, "PPSA00130")));
+    CHECK(!std::filesystem::exists(parent / InstallManifestName));
+    CHECK(!std::filesystem::exists(app0 / "sce_module" / "libGame.prx.guest.prx"));
+    CHECK(fixture.Scan().app0Parent == parent);
+
+    // With anything else beside app0, the parent is left alone and app0 is the game's folder.
+    fixture::WriteFolder(parent, {{"notes.txt", fixture::Bytes("mine")}});
+    const auto crowded = fixture.Scan();
+    CHECK(crowded.app0Parent.empty());
+    CHECK(HomeFor(crowded) == app0);
+
+    // An app0 directly in the games folder never makes the games folder a game's folder.
+    InstallFixture top;
+    fixture::WriteFolder(top.temp.Path() / "games" / "app0", fixture::Game("PPSA00131", "Top"));
+    CHECK(top.Scan().app0Parent.empty());
 }
 
 TEST(FolderInstallRefusesSelfFilesWithoutMovingAnything) {
@@ -464,8 +509,8 @@ TEST(RemoveInstallPutsEverythingBack) {
     const auto removed = RemoveInstall(fixture.Scan());
     CHECK(removed.restored == home);
     CHECK(removed.leftovers == std::vector<std::string>{"notes.txt"});
-    CHECK(ReadBytes(home / "eboot.bin") == FromHex(golden::cases[0].selfHex));
-    CHECK(std::filesystem::is_regular_file(home / "sce_module" / "libSelf.sprx.self"));
+    CHECK(launcher::ModuleKindOf(ReadBytes(home / "eboot.bin")) == launcher::ModuleKind::Elf);
+    CHECK(std::filesystem::is_regular_file(home.parent_path() / "Game.originals.zip"));
     CHECK(!std::filesystem::exists(home / "sce_module" / "libGame.prx.guest.prx"));
     CHECK(!std::filesystem::exists(home / "app0"));
     CHECK(!std::filesystem::exists(ExecutableIn(home, "PPSA00107")));
@@ -620,61 +665,155 @@ TEST(RunReportsAreMovedBesideTheLogAndSummarised) {
     CHECK(!LatestRunReport(layout, "PPSA00108").has_value());
 }
 
-TEST(ConvertSelfReplacesModulesAndKeepsBackups) {
+std::string Md5Hex(const std::vector<std::uint8_t>& bytes) {
+    Md5 md5;
+    md5.Update(bytes);
+    return md5.HexDigest();
+}
+
+TEST(Md5MatchesTheReferenceValues) {
+    CHECK_EQ(Md5Hex({}), std::string("d41d8cd98f00b204e9800998ecf8427e"));
+    CHECK_EQ(Md5Hex(fixture::Bytes("abc")), std::string("900150983cd24fb0d6963f7d28e17f72"));
+    CHECK_EQ(Md5Hex(fixture::Bytes("The quick brown fox jumps over the lazy dog")), std::string("9e107d9d372bb6826bd81d3542a419d6"));
+    // Fed in uneven pieces, the result is the same.
+    const auto data = RandomBytes(100000);
+    Md5 pieces;
+    for (std::size_t at = 0; at < data.size(); at += 777) pieces.Update(std::span(data).subspan(at, std::min<std::size_t>(777, data.size() - at)));
+    CHECK_EQ(pieces.HexDigest(), Md5Hex(data));
+}
+
+TEST(ConvertSelfZipsTheOriginalsThenConvertsInPlace) {
     InstallFixture fixture;
     const auto folder = fixture.temp.Path() / "games" / "Game";
+    const auto zip = fixture.temp.Path() / "games" / "Game.originals.zip";
     auto tree = SelfGame("PPSA00110");
     tree["sce_module/libLocked.sprx"] = FromHex(golden::encrypted_load_hex);
     fixture::WriteFolder(folder, tree);
+    fixture::WriteFolder(folder, {{"eboot.elf", fixture::Bytes("left by the old converter")}});
 
     const auto before = fixture.Scan();
     CHECK_EQ(before.modules.elf, 1);
     CHECK_EQ(before.modules.self, 2);
+    CHECK(OriginalsZipFor(before) == fixture.temp.Path() / "games" / "PPSA00110-01.000.000.originals.zip");
 
     JobControl control;
-    const auto result = launcher::ConvertGameSelfFiles(folder, launcher::ModuleFolders(ModuleDirectories(fixture.title)), {}, control);
+    const auto result = ConvertGameSelfFiles(folder, zip, ModuleFolders(ModuleDirectories(fixture.title)), {}, control);
     CHECK(result.eboot);
     CHECK_EQ(result.modules, 2);
     CHECK_EQ(result.refused.size(), std::size_t{1});
     CHECK(result.refused[0].starts_with("sce_module/libLocked.sprx: "));
     CHECK_EQ(control.Done(), control.Total());
 
-    CHECK(ReadBytes(folder / "eboot.bin") == FromHex(golden::cases[0].selfHex));
-    CHECK(launcher::ModuleKindOf(ReadBytes(folder / "eboot.elf")) == launcher::ModuleKind::Elf);
-    CHECK(ReadBytes(folder / "sce_module" / "libSelf.sprx.self") == FromHex(golden::cases[1].selfHex));
-    CHECK(launcher::ModuleKindOf(ReadBytes(folder / "sce_module" / "libSelf.sprx")) == launcher::ModuleKind::Elf);
-    CHECK(ReadBytes(folder / "Media" / "Modules" / "plugin.prx.self") == FromHex(golden::cases[2].selfHex));
+    for (const auto* name : {"eboot.bin", "sce_module/libSelf.sprx", "Media/Modules/plugin.prx"}) {
+        CHECK(launcher::ModuleKindOf(ReadBytes(folder / name)) == launcher::ModuleKind::Elf);
+    }
     CHECK(ReadBytes(folder / "sce_module" / "libLocked.sprx") == FromHex(golden::encrypted_load_hex));
-    CHECK(!std::filesystem::exists(folder / "sce_module" / "libLocked.sprx.self"));
-    CHECK(!std::filesystem::exists(folder / "sce_module" / "libGame.prx.self"));
-    CHECK(!std::filesystem::exists(folder / "sce_module" / "libSelf.sprx.elf.tmp"));
+    CHECK(!std::filesystem::exists(folder / "eboot.elf"));
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(folder)) {
+        const auto name = ToUtf8(entry.path().filename());
+        CHECK(!name.ends_with(".self") && !name.ends_with(".tmp"));
+    }
+
+    {
+        // Closed before the next conversion: Windows can't replace an open file.
+        ZipReader reader(zip);
+        std::vector<std::string> names;
+        for (const auto& entry : reader.Entries()) names.push_back(entry.name);
+        CHECK(names == (std::vector<std::string>{"eboot.bin", "sce_module/libSelf.sprx", "Media/Modules/plugin.prx", "MD5SUMS"}));
+        CHECK(reader.ReadAll(*reader.Find("eboot.bin")) == FromHex(golden::cases[0].selfHex));
+        const auto sums = reader.ReadAll(*reader.Find("MD5SUMS"));
+        const std::string list(sums.begin(), sums.end());
+        CHECK(list.find(Md5Hex(FromHex(golden::cases[1].selfHex)) + "  sce_module/libSelf.sprx\n") != std::string::npos);
+        CHECK(list.find(Md5Hex(FromHex(golden::cases[0].selfHex)) + "  eboot.bin\n") != std::string::npos);
+    }
 
     const auto after = fixture.Scan();
+    CHECK(after.executable.kind == ExecutableKind::Elf);
     CHECK_EQ(after.modules.elf, 2);
     CHECK_EQ(after.modules.self, 1);
 
+    // Converting again adds only what is new; the locked module is still refused.
+    fixture::WriteFolder(folder, {{"sce_module/libLate.sprx", FromHex(golden::cases[1].selfHex)}});
+    JobControl again;
+    const auto second = ConvertGameSelfFiles(folder, zip, ModuleFolders(ModuleDirectories(fixture.title)), {}, again);
+    CHECK(!second.eboot);
+    CHECK_EQ(second.modules, 1);
+    {
+        ZipReader grown(zip);
+        CHECK_EQ(grown.Entries().size(), std::size_t{5});
+        CHECK(grown.ReadAll(*grown.Find("sce_module/libLate.sprx")) == FromHex(golden::cases[1].selfHex));
+        CHECK(grown.ReadAll(*grown.Find("eboot.bin")) == FromHex(golden::cases[0].selfHex));
+    }
+
     // Install refuses while one module is still SELF, then runs once it's gone.
     FakeRelinker relinker;
-    CHECK_THROWS(fixture.Install(after, relinker));
+    CHECK_THROWS(fixture.Install(fixture.Scan(), relinker));
     std::filesystem::remove(folder / "sce_module" / "libLocked.sprx");
     const auto manifest = fixture.Install(fixture.Scan(), relinker);
-    CHECK(relinker.modules == (std::vector<std::string>{"Media/Modules/plugin.prx", "sce_module/libGame.prx", "sce_module/libSelf.sprx"}));
-    CHECK_EQ(manifest.modules, 3);
+    CHECK_EQ(manifest.modules, 4);
 }
 
-TEST(ConvertSelfRefusesWhenABackupExists) {
+TEST(RestorePutsTheOriginalsBackOnlyWhenTheirMd5Matches) {
     fixture::TempDir temp;
-    auto tree = SelfGame("PPSA00111");
-    tree["eboot.bin"] = fixture::Elf64();
-    tree["sce_module/libSelf.sprx.self"] = fixture::Bytes("older backup");
-    fixture::WriteFolder(temp.Path(), tree);
+    const auto folder = temp.Path() / "Game";
+    const auto zip = temp.Path() / "Game.originals.zip";
+    fixture::WriteFolder(folder, SelfGame("PPSA00111"));
     JobControl control;
-    const auto result = launcher::ConvertGameSelfFiles(temp.Path(), launcher::ModuleFolders(), {}, control);
-    CHECK(!result.eboot);
+    ConvertGameSelfFiles(folder, zip, ModuleFolders({"Media/Modules"}), {}, control);
+    CHECK(launcher::ModuleKindOf(ReadBytes(folder / "eboot.bin")) == launcher::ModuleKind::Elf);
+
+    // A damaged zip restores nothing.
+    auto damaged = ReadBytes(zip);
+    const auto copy = temp.Path() / "copy.zip";
+    std::filesystem::copy_file(zip, copy);
+    damaged[200] ^= 0xFF;
+    std::ofstream(zip, std::ios::binary | std::ios::trunc).write(reinterpret_cast<const char*>(damaged.data()), static_cast<std::streamsize>(damaged.size()));
+    JobControl broken;
+    CHECK_THROWS(RestoreOriginals(folder, zip, broken));
+    CHECK(launcher::ModuleKindOf(ReadBytes(folder / "eboot.bin")) == launcher::ModuleKind::Elf);
+    CHECK(std::filesystem::exists(zip));
+
+    std::filesystem::remove(zip);
+    std::filesystem::rename(copy, zip);
+    JobControl restore;
+    CHECK_EQ(RestoreOriginals(folder, zip, restore), 3);
+    CHECK(ReadBytes(folder / "eboot.bin") == FromHex(golden::cases[0].selfHex));
+    CHECK(ReadBytes(folder / "sce_module" / "libSelf.sprx") == FromHex(golden::cases[1].selfHex));
+    CHECK(ReadBytes(folder / "Media" / "Modules" / "plugin.prx") == FromHex(golden::cases[2].selfHex));
+    CHECK(!std::filesystem::exists(zip));
+    CHECK(!std::filesystem::exists(folder / "eboot.bin.restore.tmp"));
+}
+
+TEST(OlderSelfBackupsMoveIntoTheZip) {
+    fixture::TempDir temp;
+    const auto folder = temp.Path() / "Game";
+    const auto zip = temp.Path() / "Game.originals.zip";
+    auto tree = SelfGame("PPSA00112");
+    tree["eboot.bin"] = fixture::Elf64();
+    tree["Media/Modules/plugin.prx"] = fixture::Elf64();
+    tree["sce_module/libSelf.sprx"] = fixture::Elf64();
+    tree["sce_module/libSelf.sprx.self"] = FromHex(golden::cases[1].selfHex);
+    tree["sce_module/orphan.prx.self"] = fixture::Bytes("no module beside it");
+    fixture::WriteFolder(folder, tree);
+    JobControl control;
+    const auto result = ConvertGameSelfFiles(folder, zip, ModuleFolders(), {}, control);
+    CHECK_EQ(result.migrated, 1);
     CHECK_EQ(result.modules, 0);
-    CHECK_EQ(result.refused.size(), std::size_t{1});
-    CHECK(result.refused[0].find("already exists") != std::string::npos);
-    CHECK(ReadBytes(temp.Path() / "sce_module" / "libSelf.sprx") == FromHex(golden::cases[1].selfHex));
-    CHECK(ReadBytes(temp.Path() / "sce_module" / "libSelf.sprx.self") == fixture::Bytes("older backup"));
-    CHECK(!std::filesystem::exists(temp.Path() / "eboot.elf"));
+    CHECK(!std::filesystem::exists(folder / "sce_module" / "libSelf.sprx.self"));
+    CHECK(std::filesystem::exists(folder / "sce_module" / "orphan.prx.self"));
+    {
+        ZipReader reader(zip);
+        CHECK(reader.ReadAll(*reader.Find("sce_module/libSelf.sprx")) == FromHex(golden::cases[1].selfHex));
+    }
+    JobControl restore;
+    CHECK_EQ(RestoreOriginals(folder, zip, restore), 1);
+    CHECK(ReadBytes(folder / "sce_module" / "libSelf.sprx") == FromHex(golden::cases[1].selfHex));
+
+    // Nothing to do: no zip is made.
+    fixture::TempDir clean;
+    fixture::WriteFolder(clean.Path() / "Game", fixture::Game("PPSA00113", "Plain"));
+    JobControl nothing;
+    const auto none = ConvertGameSelfFiles(clean.Path() / "Game", clean.Path() / "Game.originals.zip", ModuleFolders(), {}, nothing);
+    CHECK(!none.eboot && none.modules == 0 && none.migrated == 0);
+    CHECK(!std::filesystem::exists(clean.Path() / "Game.originals.zip"));
 }

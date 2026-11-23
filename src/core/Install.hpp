@@ -22,6 +22,7 @@ struct InstallManifest {
     std::string contentVersion;
     std::string format;                // "folder" or "zar"
     std::string originalName;          // the folder's or the .zar's name before set-up
+    bool keptApp0 = false;             // the game was already in an app0 folder; nothing was moved
     bool complete = false;             // false while set up but not (or not successfully) relinked
     std::string installedAt;
     std::string anyps5Root;
@@ -42,7 +43,8 @@ std::optional<InstallManifest> ReadInstallManifest(const std::filesystem::path& 
 
 std::filesystem::path ExecutableIn(const std::filesystem::path& home, std::string_view titleId);
 
-// Where a game is set up: its own folder, or for Games\Foo.zar the new folder Games\Foo.
+// Where a game is set up: its own folder; the parent of an app0 folder that is
+// alone in it; or for Games\Foo.zar the new folder Games\Foo.
 std::filesystem::path HomeFor(const GameEntry& game);
 
 struct InstallRequest {

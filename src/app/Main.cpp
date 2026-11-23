@@ -181,6 +181,8 @@ std::string LanguageLabel(const std::string& language) {
 }
 
 struct Message {
+    Message(ImVec4 color, std::string title, std::string text) : color(color), title(ReadableText(std::move(title))), text(ReadableText(std::move(text))) {}
+
     ImVec4 color;
     std::string title;
     std::string text;
@@ -493,22 +495,33 @@ private:
 
     void StartConvertSelf(const GameEntry& game) {
         const auto folder = game.location;
+        const auto zip = OriginalsZipFor(game);
         const auto* title = TitleFor(game.metadata.titleId);
         const auto moduleFolders = ModuleFolders(title != nullptr ? ModuleDirectories(*title) : std::vector<std::string>{});
         const auto executables = title != nullptr ? title->executables : std::vector<std::string>{};
-        job_.Start("SELF to ELF: " + game.metadata.name, true, [folder, moduleFolders, executables](JobControl& control) {
-            const auto result = ConvertGameSelfFiles(folder, moduleFolders, executables, control);
+        job_.Start("SELF to ELF: " + game.metadata.name, true, [folder, zip, moduleFolders, executables](JobControl& control) {
+            const auto result = ConvertGameSelfFiles(folder, zip, moduleFolders, executables, control);
+            std::vector<std::string> done;
+            if (result.eboot) done.push_back("eboot.bin");
+            if (result.modules > 0) done.push_back(std::to_string(result.modules) + (result.modules == 1 ? " module" : " modules"));
             std::string text;
-            if (result.eboot) text = "wrote eboot.elf";
-            if (result.modules > 0) {
-                if (!text.empty()) text += "; ";
-                text += "converted " + std::to_string(result.modules) + (result.modules == 1 ? " module" : " modules") + " in place (originals kept as <name>.self)";
-            }
+            for (const auto& part : done) text += (text.empty() ? "Converted " : " and ") + part;
+            if (result.migrated > 0) text += (text.empty() ? "Moved " : "; moved ") + std::to_string(result.migrated) + " older .self backups into the zip";
             std::string refused;
             for (const auto& item : result.refused) refused += (refused.empty() ? "" : "; ") + item;
             if (text.empty()) throw std::runtime_error(refused.empty() ? "nothing to convert" : "nothing converted: " + refused);
+            text += ". Originals with MD5 in " + ToUtf8(zip);
             if (!refused.empty()) text += ". Not converted: " + refused;
             return text;
+        });
+    }
+
+    void StartRestoreOriginals(const GameEntry& game) {
+        const auto folder = game.location;
+        const auto zip = OriginalsZipFor(game);
+        job_.Start("Restore originals: " + game.metadata.name, true, [folder, zip](JobControl& control) {
+            const int count = RestoreOriginals(folder, zip, control);
+            return "Restored " + std::to_string(count) + (count == 1 ? " file" : " files") + ", each matching its MD5; deleted " + ToUtf8(zip.filename());
         });
     }
 
@@ -708,6 +721,7 @@ private:
             const auto home = HomeFor(game);
             std::string how;
             if (!game.home.empty()) how = "Relinks the game again in " + ToUtf8(home) + ".";
+            else if (game.format == PackageFormat::Folder && !game.app0Parent.empty()) how = "The game already sits in " + ToUtf8(game.location) + "; nothing is moved.";
             else if (game.format == PackageFormat::Folder) how = "Moves the game's files into " + ToUtf8(home / "app0") + " (a rename, nothing is copied), then relinks.";
             else how = "Moves the .zar unchanged to " + ToUtf8(home / "app0.zar") + " and extracts only eboot, sce_sys and the modules into " +
                        ToUtf8(home / "app0") + ", then relinks.";
@@ -739,10 +753,19 @@ private:
             else if (game.modules.self > 0) label += " (" + std::to_string(game.modules.self) + (game.modules.self == 1 ? " module)" : " modules)");
             else if (game.executable.kind == ExecutableKind::Self) label += " (eboot.bin)";
             if (MenuAction(label.c_str(), reason,
-                           "eboot.bin: writes eboot.elf beside it and keeps eboot.bin.\n"
-                           "SELF .prx/.sprx in sce_module, sce_modules, prx and the title's module folders: replaced by the ELF, "
-                           "the original kept as <name>.self.\nSame conversion as AnyPS5's unwrap_self.py. Install needs this done first.")) {
+                           "First stores the originals in " + FileName(OriginalsZipFor(game)) + " beside the game folder, with their MD5, and checks the zip.\n"
+                           "Then replaces eboot.bin, the SELF modules (sce_module, sce_modules, prx, the title's module folders) and extra executables with their ELF.\n"
+                           "Same conversion as AnyPS5's unwrap_self.py. Install needs this done first.")) {
                 StartConvertSelf(game);
+            }
+        }
+        {
+            const auto zip = OriginalsZipFor(game);
+            std::string reason = busy;
+            if (reason.empty() && game.format != PackageFormat::Folder) reason = "Only for game folders";
+            if (reason.empty() && !PathExists(zip)) reason = "No " + FileName(zip) + " beside the game folder";
+            if (MenuAction("Restore original SELF files", reason, "Puts every file from " + FileName(zip) + " back, each checked against its MD5, then deletes the zip.")) {
+                StartRestoreOriginals(game);
             }
         }
         {

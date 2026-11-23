@@ -73,6 +73,26 @@ GameEntry ReadEntry(PackageReader& package, const ScanOptions& options) {
     return entry;
 }
 
+// Windows drops these into folders on its own; they don't count as content.
+bool IsShellClutter(const std::string& name) {
+    std::string lower = name;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower == "desktop.ini" || lower == "thumbs.db";
+}
+
+// The parent of an app0 game folder, when app0 is all it holds.
+std::filesystem::path App0Parent(const std::filesystem::path& folder, const std::filesystem::path& root) {
+    if (ToUtf8(folder.filename()) != "app0") return {};
+    const auto parent = folder.parent_path();
+    std::error_code error;
+    if (parent.empty() || std::filesystem::equivalent(parent, root, error)) return {};
+    for (std::filesystem::directory_iterator it(parent, error), end; !error && it != end; it.increment(error)) {
+        const auto name = ToUtf8(it->path().filename());
+        if (name != "app0" && !IsShellClutter(name)) return {};
+    }
+    return error ? std::filesystem::path{} : parent;
+}
+
 bool IsExcluded(const std::filesystem::path& path, const std::vector<std::filesystem::path>& excluded) {
     std::error_code error;
     for (const auto& candidate : excluded) {
@@ -102,6 +122,7 @@ private:
             return;
         }
         if (IsExcluded(root, options_.excluded)) return;
+        root_ = root;
         if (TryFolder(root)) return;
         std::filesystem::recursive_directory_iterator walker(root, std::filesystem::directory_options::skip_permission_denied, error);
         if (error) {
@@ -144,6 +165,7 @@ private:
             auto entry = ReadEntry(package, options_);
             entry.location = folder;
             entry.home = home;
+            if (home.empty()) entry.app0Parent = App0Parent(folder, root_);
             entry.format = PackageFormat::Folder;
             result_.games.push_back(std::move(entry));
         } catch (const std::exception& failure) {
@@ -190,6 +212,7 @@ private:
 
     const ScanOptions& options_;
     ScanResult result_;
+    std::filesystem::path root_;
 };
 
 }

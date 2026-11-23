@@ -12,7 +12,7 @@ A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game li
 - **Play** (double-click): moves the profile's saves, trophies, `data` and `download0` beside the exe, starts the game, and moves them back when it exits (or at the next start if the launcher was closed). Input mapping and screenshots go to the profile. **Stop** ends it.
 - **Profiles:** each has its own saves, trophies, input mapping, screenshots and console language.
 - **Conversions** (right-click): SELF to ELF, `.zar` to folder, folder to `.zar`.
-  SELF to ELF writes `eboot.elf` beside `eboot.bin`, and replaces each SELF `.prx`/`.sprx` in `sce_module`, `sce_modules`, `prx` and the title's module folders with its ELF, keeping the original as `<name>.self`. Modules that can't be unwrapped (encrypted) are left as they are and listed.
+  SELF to ELF first stores the originals in `<serial>-<version>.originals.zip` beside the game folder (for example `PPSA21567-01.018.000.originals.zip`, named from the game's `param.json`), with an `MD5SUMS` list, and checks the zip; then it replaces `eboot.bin`, each SELF `.prx`/`.sprx` in `sce_module`, `sce_modules`, `prx` and the title's module folders, and extra executables with their ELF. Files that can't be unwrapped (encrypted) are left as they are and listed. **Restore original SELF files** puts them back, each checked against its MD5.
 - The list shows each game's modules by kind, for example `modules: 12 ELF, 3 SELF`.
 - **Settings** in `anyps5-launcher.json` next to the `.exe`.
 

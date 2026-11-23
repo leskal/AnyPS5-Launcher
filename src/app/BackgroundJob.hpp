@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 
+#include "core/FileOps.hpp"
 #include "core/Job.hpp"
 
 namespace launcher {
@@ -48,8 +49,11 @@ public:
             } catch (const Cancelled&) {
                 outcome.cancelled = true;
                 outcome.message = "Cancelled; nothing was written.";
+            } catch (const std::system_error& failure) {
+                // what() ends in the code's own text, which may be in the ANSI code page.
+                outcome.message = ReadableText(failure.what());
             } catch (const std::exception& failure) {
-                outcome.message = failure.what();
+                outcome.message = ReadableText(failure.what());
             }
             std::lock_guard lock(mutex_);
             outcome_ = std::move(outcome);
