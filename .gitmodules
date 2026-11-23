@@ -1,0 +1,24 @@
+[submodule "3rdparty/SDL"]
+	path = 3rdparty/SDL
+	url = https://github.com/libsdl-org/SDL
+	shallow = true
+[submodule "3rdparty/imgui"]
+	path = 3rdparty/imgui
+	url = https://github.com/ocornut/imgui
+	shallow = true
+[submodule "3rdparty/json"]
+	path = 3rdparty/json
+	url = https://github.com/nlohmann/json
+	shallow = true
+[submodule "3rdparty/zstd"]
+	path = 3rdparty/zstd
+	url = https://github.com/facebook/zstd
+	shallow = true
+[submodule "3rdparty/ZArchive"]
+	path = 3rdparty/ZArchive
+	url = https://github.com/Exzap/ZArchive
+	shallow = true
+[submodule "3rdparty/stb"]
+	path = 3rdparty/stb
+	url = https://github.com/nothings/stb
+	shallow = true

@@ -1,0 +1,14 @@
+/build/
+/build-*/
+/out/
+.vs/
+.vscode/
+.idea/
+*.user
+CMakeUserPresets.json
+
+# The launcher's own files, in case it is run from the source folder
+/library/
+/userdata/
+/anyps5/
+anyps5-launcher.json

@@ -1,0 +1,44 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "Release (Ninja, GCC)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug (Ninja, GCC)",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "tests",
+            "displayName": "Core tests only (no SDL or ImGui)",
+            "inherits": "debug",
+            "binaryDir": "${sourceDir}/build/tests",
+            "cacheVariables": {
+                "LAUNCHER_BUILD_APP": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "release", "configurePreset": "release" },
+        { "name": "debug", "configurePreset": "debug" },
+        { "name": "tests", "configurePreset": "tests" }
+    ],
+    "testPresets": [
+        { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+        { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+        { "name": "tests", "configurePreset": "tests", "output": { "outputOnFailure": true } }
+    ]
+}
