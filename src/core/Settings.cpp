@@ -64,6 +64,8 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     ReadString(*document, "libraryFolder", result.settings.libraryFolder, result.error);
     ReadString(*document, "userdataFolder", result.settings.userdataFolder, result.error);
     ReadString(*document, "profile", result.settings.profile, result.error);
+    ReadString(*document, "theme", result.settings.theme, result.error);
+    if (result.settings.theme != "dark" && result.settings.theme != "light") result.settings.theme = "system";
     return result;
 }
 
@@ -81,6 +83,7 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["libraryFolder"] = settings.libraryFolder;
     document["userdataFolder"] = settings.userdataFolder;
     document["profile"] = settings.profile;
+    document["theme"] = settings.theme;
     document.erase("python");
     WriteFileAtomically(file, document.dump(4) + "\n");
 }

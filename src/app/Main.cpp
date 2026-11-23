@@ -44,72 +44,101 @@ namespace {
 
 using namespace launcher;
 
-constexpr ImVec4 Green{0.204f, 0.827f, 0.600f, 1.0f};   // #34D399
-constexpr ImVec4 Amber{0.984f, 0.749f, 0.141f, 1.0f};   // #FBBF24
-constexpr ImVec4 Red{0.973f, 0.443f, 0.443f, 1.0f};     // #F87171
-constexpr ImVec4 Dim{0.545f, 0.573f, 0.612f, 1.0f};     // #8B929C
-constexpr ImVec4 Accent{0.231f, 0.510f, 0.965f, 1.0f};  // #3B82F6
-constexpr ImVec4 AccentHover{0.357f, 0.608f, 1.0f, 1.0f};
-constexpr ImVec4 AccentActive{0.184f, 0.435f, 0.839f, 1.0f};
-constexpr ImVec4 Card{0.094f, 0.106f, 0.129f, 1.0f};    // #181B21
-constexpr ImVec4 CardHover{0.122f, 0.137f, 0.165f, 1.0f};
+// The palette in use; ApplyTheme sets it for dark or light.
+ImVec4 Green, Amber, Red, Dim, Accent, AccentHover, AccentActive, Card, CardHover, Placeholder, WindowColor;
 
 ImVec4 Fade(ImVec4 color, float alpha) {
     color.w = alpha;
     return color;
 }
 
-void ApplyTheme(ImGuiStyle& style) {
-    ImGui::StyleColorsDark(&style);
+ImVec4 Rgb(int value, float alpha = 1.0f) {
+    return ImVec4(static_cast<float>((value >> 16) & 0xFF) / 255.0f, static_cast<float>((value >> 8) & 0xFF) / 255.0f, static_cast<float>(value & 0xFF) / 255.0f, alpha);
+}
+
+struct Palette {
+    int text, textDisabled, background, popup, border, frame, frameHover, frameActive, title, scroll, scrollHover, scrollActive, button, buttonHover, buttonActive,
+        headerHover, card, cardHover, placeholder;
+    int green, amber, red, dim, accent, accentHover, accentActive;
+    float dimModal, rowAlt;
+};
+
+constexpr Palette DarkPalette{0xE6E8EB, 0x7C828C, 0x0F1115, 0x181B21, 0x262A31, 0x1E2228, 0x262B33, 0x2C323B, 0x14171C, 0x2A2F37, 0x353B45, 0x404754, 0x23272F,
+                              0x2C323C, 0x343B47, 0x2B3240, 0x181B21, 0x1F232A, 0x1E2638, 0x34D399, 0xFBBF24, 0xF87171, 0x8B929C, 0x3B82F6, 0x5B9BFF, 0x2F6FD6, 0.6f,
+                              0.02f};
+constexpr Palette LightPalette{0x1F2329, 0x9AA1AB, 0xF3F4F6, 0xFFFFFF, 0xDDE1E6, 0xE6E9EE, 0xDCE0E6, 0xD2D7DF, 0xE9ECF0, 0xC9CED6, 0xB5BCC6, 0xA1A9B5, 0xE6E9EE,
+                               0xDCE0E6, 0xD0D5DD, 0xDCE4F2, 0xFFFFFF, 0xF7F9FC, 0xDDE4F0, 0x059669, 0xB45309, 0xDC2626, 0x6B7280, 0x2563EB, 0x3B82F6, 0x1D4ED8, 0.35f,
+                               0.03f};
+
+// "system" follows Windows' light or dark setting; "dark" and "light" force one.
+bool WantDark(const std::string& theme) {
+    if (theme == "dark") return true;
+    if (theme == "light") return false;
+    return SDL_GetSystemTheme() != SDL_SYSTEM_THEME_LIGHT;
+}
+
+void ApplyTheme(ImGuiStyle& style, bool dark) {
+    const auto& p = dark ? DarkPalette : LightPalette;
+    Green = Rgb(p.green);
+    Amber = Rgb(p.amber);
+    Red = Rgb(p.red);
+    Dim = Rgb(p.dim);
+    Accent = Rgb(p.accent);
+    AccentHover = Rgb(p.accentHover);
+    AccentActive = Rgb(p.accentActive);
+    Card = Rgb(p.card);
+    CardHover = Rgb(p.cardHover);
+    Placeholder = Rgb(p.placeholder);
+    WindowColor = Rgb(p.background);
+
+    if (dark) ImGui::StyleColorsDark(&style);
+    else ImGui::StyleColorsLight(&style);
     auto* c = style.Colors;
-    const auto rgb = [](int value, float alpha = 1.0f) {
-        return ImVec4(static_cast<float>((value >> 16) & 0xFF) / 255.0f, static_cast<float>((value >> 8) & 0xFF) / 255.0f, static_cast<float>(value & 0xFF) / 255.0f, alpha);
-    };
-    c[ImGuiCol_Text] = rgb(0xE6E8EB);
-    c[ImGuiCol_TextDisabled] = rgb(0x7C828C);
-    c[ImGuiCol_WindowBg] = rgb(0x0F1115);
-    c[ImGuiCol_ChildBg] = rgb(0x0F1115, 0.0f);
-    c[ImGuiCol_PopupBg] = rgb(0x181B21, 0.98f);
-    c[ImGuiCol_Border] = rgb(0x262A31);
-    c[ImGuiCol_BorderShadow] = rgb(0x000000, 0.0f);
-    c[ImGuiCol_FrameBg] = rgb(0x1E2228);
-    c[ImGuiCol_FrameBgHovered] = rgb(0x262B33);
-    c[ImGuiCol_FrameBgActive] = rgb(0x2C323B);
-    c[ImGuiCol_TitleBg] = rgb(0x14171C);
-    c[ImGuiCol_TitleBgActive] = rgb(0x181B21);
-    c[ImGuiCol_TitleBgCollapsed] = rgb(0x14171C);
-    c[ImGuiCol_MenuBarBg] = rgb(0x14171C);
-    c[ImGuiCol_ScrollbarBg] = rgb(0x000000, 0.0f);
-    c[ImGuiCol_ScrollbarGrab] = rgb(0x2A2F37);
-    c[ImGuiCol_ScrollbarGrabHovered] = rgb(0x353B45);
-    c[ImGuiCol_ScrollbarGrabActive] = rgb(0x404754);
+    c[ImGuiCol_Text] = Rgb(p.text);
+    c[ImGuiCol_TextDisabled] = Rgb(p.textDisabled);
+    c[ImGuiCol_WindowBg] = Rgb(p.background);
+    c[ImGuiCol_ChildBg] = Rgb(p.background, 0.0f);
+    c[ImGuiCol_PopupBg] = Rgb(p.popup, 0.98f);
+    c[ImGuiCol_Border] = Rgb(p.border);
+    c[ImGuiCol_BorderShadow] = Rgb(0, 0.0f);
+    c[ImGuiCol_FrameBg] = Rgb(p.frame);
+    c[ImGuiCol_FrameBgHovered] = Rgb(p.frameHover);
+    c[ImGuiCol_FrameBgActive] = Rgb(p.frameActive);
+    c[ImGuiCol_TitleBg] = Rgb(p.title);
+    c[ImGuiCol_TitleBgActive] = Rgb(p.popup);
+    c[ImGuiCol_TitleBgCollapsed] = Rgb(p.title);
+    c[ImGuiCol_MenuBarBg] = Rgb(p.title);
+    c[ImGuiCol_ScrollbarBg] = Rgb(0, 0.0f);
+    c[ImGuiCol_ScrollbarGrab] = Rgb(p.scroll);
+    c[ImGuiCol_ScrollbarGrabHovered] = Rgb(p.scrollHover);
+    c[ImGuiCol_ScrollbarGrabActive] = Rgb(p.scrollActive);
     c[ImGuiCol_CheckMark] = Accent;
     c[ImGuiCol_SliderGrab] = Accent;
     c[ImGuiCol_SliderGrabActive] = AccentHover;
-    c[ImGuiCol_Button] = rgb(0x23272F);
-    c[ImGuiCol_ButtonHovered] = rgb(0x2C323C);
-    c[ImGuiCol_ButtonActive] = rgb(0x343B47);
-    c[ImGuiCol_Header] = rgb(0x23272F);
-    c[ImGuiCol_HeaderHovered] = rgb(0x2B3240);
+    c[ImGuiCol_Button] = Rgb(p.button);
+    c[ImGuiCol_ButtonHovered] = Rgb(p.buttonHover);
+    c[ImGuiCol_ButtonActive] = Rgb(p.buttonActive);
+    c[ImGuiCol_Header] = Rgb(p.button);
+    c[ImGuiCol_HeaderHovered] = Rgb(p.headerHover);
     c[ImGuiCol_HeaderActive] = Fade(Accent, 0.35f);
-    c[ImGuiCol_Separator] = rgb(0x262A31);
+    c[ImGuiCol_Separator] = Rgb(p.border);
     c[ImGuiCol_SeparatorHovered] = Accent;
     c[ImGuiCol_SeparatorActive] = AccentHover;
-    c[ImGuiCol_ResizeGrip] = rgb(0x000000, 0.0f);
+    c[ImGuiCol_ResizeGrip] = Rgb(0, 0.0f);
     c[ImGuiCol_ResizeGripHovered] = Fade(Accent, 0.6f);
     c[ImGuiCol_ResizeGripActive] = Accent;
-    c[ImGuiCol_Tab] = rgb(0x181B21);
-    c[ImGuiCol_TabHovered] = rgb(0x2B3240);
+    c[ImGuiCol_Tab] = Rgb(p.popup);
+    c[ImGuiCol_TabHovered] = Rgb(p.headerHover);
     c[ImGuiCol_PlotHistogram] = Accent;
     c[ImGuiCol_PlotHistogramHovered] = AccentHover;
-    c[ImGuiCol_TableHeaderBg] = rgb(0x181B21);
-    c[ImGuiCol_TableBorderStrong] = rgb(0x262A31);
-    c[ImGuiCol_TableBorderLight] = rgb(0x1E2228);
-    c[ImGuiCol_TableRowBg] = rgb(0x000000, 0.0f);
-    c[ImGuiCol_TableRowBgAlt] = rgb(0xFFFFFF, 0.02f);
+    c[ImGuiCol_TableHeaderBg] = Rgb(p.popup);
+    c[ImGuiCol_TableBorderStrong] = Rgb(p.border);
+    c[ImGuiCol_TableBorderLight] = Rgb(p.frame);
+    c[ImGuiCol_TableRowBg] = Rgb(0, 0.0f);
+    c[ImGuiCol_TableRowBgAlt] = dark ? Rgb(0xFFFFFF, p.rowAlt) : Rgb(0x000000, p.rowAlt);
     c[ImGuiCol_TextSelectedBg] = Fade(Accent, 0.35f);
     c[ImGuiCol_NavCursor] = Accent;
-    c[ImGuiCol_ModalWindowDimBg] = rgb(0x000000, 0.6f);
+    c[ImGuiCol_ModalWindowDimBg] = Rgb(0, p.dimModal);
     style.WindowRounding = 10.0f;
     style.ChildRounding = 10.0f;
     style.FrameRounding = 6.0f;
@@ -325,8 +354,14 @@ public:
         versions_ = LoadVersions(versionsRoot_);
         AdoptConfiguredFolder();
         ApplySettings();
+        ApplyCurrentTheme();
         if (!loaded.existed || settings_.gamesFolder.empty()) OpenSettings();
         else StartScan();
+    }
+
+    // Windows switched between light and dark.
+    void ThemeChanged() {
+        ApplyCurrentTheme();
     }
 
     ~LauncherApp() {
@@ -694,13 +729,18 @@ private:
             ImGui::EndCombo();
         }
         ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 14);
-        ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
-
+        // The search box takes the room left before the buttons, and its own row when there's too little.
         const float buttons = ImGui::CalcTextSize("AnyPS5 versions").x + ImGui::CalcTextSize("Rescan").x + ImGui::CalcTextSize("Settings").x + style.FramePadding.x * 6 +
                               style.ItemSpacing.x * 2;
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttons);
+        ImGui::SameLine();
+        const float room = ImGui::GetContentRegionMax().x - buttons - ImGui::GetCursorPosX() - style.ItemSpacing.x;
+        const bool searchInline = room >= ImGui::GetFontSize() * 7;
+        if (searchInline) {
+            ImGui::SetNextItemWidth(std::min(room, ImGui::GetFontSize() * 16));
+            ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
+            ImGui::SameLine();
+        }
+        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - buttons));
         ImGui::BeginDisabled(session_ != nullptr);
         if (ImGui::Button("AnyPS5 versions")) OpenVersions();
         ImGui::EndDisabled();
@@ -712,6 +752,10 @@ private:
         ImGui::BeginDisabled(session_ != nullptr || job_.Busy());
         if (ImGui::Button("Settings")) OpenSettings();
         ImGui::EndDisabled();
+        if (!searchInline) {
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
+        }
 
         // Status line: counts, AnyPS5, problems.
         if (scan_.Running()) {
@@ -823,13 +867,17 @@ private:
     }
 
     void DrawGrid() {
-        const float minTile = 170.0f * scale_;
-        const float gap = 18.0f * scale_;
+        // Covers follow the window: about five to a row at the default size, bigger
+        // or smaller with Ctrl + mouse wheel, and each row always filled edge to edge.
+        if (ImGui::IsWindowHovered() && ImGui::GetIO().KeyCtrl && ImGui::GetIO().MouseWheel != 0.0f) {
+            gridZoom_ = std::clamp(gridZoom_ * (ImGui::GetIO().MouseWheel > 0 ? 1.1f : 1.0f / 1.1f), 0.5f, 2.5f);
+        }
+        const float gap = 16.0f * scale_;
         const float textBlock = ImGui::GetTextLineHeightWithSpacing() * 2 + 10.0f * scale_;
         const float avail = ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ScrollbarSize;
-        const int columns = std::max(1, static_cast<int>((avail + gap) / (minTile + gap)));
-        // Tiles stretch so each row fills the width, up to a limit so few games don't get huge tiles.
-        const float tile = std::min(std::max(minTile, (avail - gap * static_cast<float>(columns - 1)) / static_cast<float>(columns)), minTile * 1.4f);
+        const float wanted = std::clamp(avail / 5.0f * gridZoom_, 96.0f * scale_, std::max(96.0f * scale_, avail));
+        const int columns = std::max(1, static_cast<int>((avail + gap) / (wanted + gap)));
+        const float tile = std::max(48.0f * scale_, (avail - gap * static_cast<float>(columns - 1)) / static_cast<float>(columns));
         const float rounding = 10.0f * scale_;
         int shown = 0;
         for (const auto& game : result_.games) {
@@ -857,8 +905,7 @@ private:
                 draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, imageEnd, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, rounding,
                                       ImDrawFlags_RoundCornersTop);
             } else {
-                draw->AddRectFilledMultiColor(at, imageEnd, ImGui::GetColorU32(ImVec4(0.16f, 0.20f, 0.30f, 1)), ImGui::GetColorU32(ImVec4(0.10f, 0.12f, 0.18f, 1)),
-                                              ImGui::GetColorU32(ImVec4(0.08f, 0.09f, 0.12f, 1)), ImGui::GetColorU32(ImVec4(0.12f, 0.15f, 0.22f, 1)));
+                draw->AddRectFilled(at, imageEnd, ImGui::GetColorU32(Placeholder), rounding, ImDrawFlags_RoundCornersTop);
                 const std::string initial = game.metadata.name.empty() ? "?" : game.metadata.name.substr(0, 1);
                 ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 3.0f);
                 const ImVec2 size = ImGui::CalcTextSize(initial.c_str());
@@ -892,6 +939,12 @@ private:
     }
 
     void DrawDetails(const GameEntry& game) {
+        ImGui::PushTextWrapPos(0.0f);  // everything in the panel wraps to its width
+        DrawDetailsBody(game);
+        ImGui::PopTextWrapPos();
+    }
+
+    void DrawDetailsBody(const GameEntry& game) {
         const auto& style = ImGui::GetStyle();
         const float width = ImGui::GetContentRegionAvail().x;
         const float art = std::min(width, 280.0f * scale_);
@@ -902,7 +955,7 @@ private:
             draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + art, at.y + art), ImVec2(0, 0), ImVec2(1, 1),
                                   IM_COL32_WHITE, 12.0f * scale_);
         } else {
-            draw->AddRectFilled(at, ImVec2(at.x + art, at.y + art), ImGui::GetColorU32(ImVec4(0.12f, 0.15f, 0.22f, 1)), 12.0f * scale_);
+            draw->AddRectFilled(at, ImVec2(at.x + art, at.y + art), ImGui::GetColorU32(Placeholder), 12.0f * scale_);
         }
         ImGui::Dummy(ImVec2(art, art));
         ImGui::Spacing();
@@ -1163,6 +1216,13 @@ private:
         ImGui::EndPopup();
     }
 
+    void ApplyCurrentTheme() {
+        auto& style = ImGui::GetStyle();
+        ApplyTheme(style, WantDark(settings_.theme));
+        style.ScaleAllSizes(scale_);
+        style.FontScaleDpi = scale_;
+    }
+
     // ---- AnyPS5 versions ----------------------------------------------------------
 
     // A folder set in an older launcher, or by hand, becomes a local version.
@@ -1285,10 +1345,10 @@ private:
             openVersions_ = false;
         }
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.8f, viewport->WorkSize.y * 0.8f), ImGuiCond_Appearing);
-        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        (void)viewport;
+        FollowWindow(0.84f, 0.86f);
         bool open = true;
-        if (!ImGui::BeginPopupModal("AnyPS5 versions", &open, ImGuiWindowFlags_NoSavedSettings)) return;
+        if (!ImGui::BeginPopupModal("AnyPS5 versions", &open, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) return;
         const bool busy = job_.Busy() || session_ != nullptr;
 
         ImGui::TextUnformatted("Installed");
@@ -1442,10 +1502,19 @@ private:
     void OpenSettings() {
         draft_ = settings_;
         draftProfile_ = profileSettings_;
-        draftProbe_ = ProbeAnyPS5(draft_.anyps5Folder);
-        draftProbeFor_ = draft_.anyps5Folder;
         saveError_.clear();
         openSettings_ = true;
+    }
+
+    // Sizes the next window to a share of the launcher's window, kept on screen and centred.
+    void FollowWindow(float widthShare, float heightShare) {
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        const float margin = 24.0f * scale_;
+        const ImVec2 room(std::max(200.0f, viewport->WorkSize.x - margin * 2), std::max(160.0f, viewport->WorkSize.y - margin * 2));
+        const ImVec2 size(std::min(room.x, std::max(viewport->WorkSize.x * widthShare, std::min(room.x, 560.0f * scale_))),
+                          std::min(room.y, std::max(viewport->WorkSize.y * heightShare, std::min(room.y, 360.0f * scale_))));
+        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     }
 
     void FolderField(const char* label, const char* id, const std::string& hint, std::string& value) {
@@ -1462,65 +1531,43 @@ private:
         ImGui::PopID();
     }
 
-    void DrawAnyPS5Status() {
-        if (draftProbeFor_ != draft_.anyps5Folder) {
-            draftProbe_ = ProbeAnyPS5(draft_.anyps5Folder);
-            draftProbeFor_ = draft_.anyps5Folder;
-        }
-        ImGui::Indent();
-        if (const auto& runtime = draftProbe_.runtime) {
-            ImGui::TextColored(Green, "Found an AnyPS5 %s", runtime->layout.c_str());
-            if (draftProbeFor_ == settings_.anyps5Folder && !anyps5_.version.empty()) {
-                ImGui::SameLine();
-                ImGui::TextColored(Dim, "relinker %s", anyps5_.version.c_str());
-            }
-            ImGui::TextColored(Dim, "relinker: %s", ToUtf8(runtime->relinker).c_str());
-            ImGui::TextColored(Dim, "%zu runtime libraries; per-title settings: %s", runtime->libraries.size(),
-                               runtime->titleCatalog ? "tools/titles.json" : "none");
-            if (draftProbeFor_ == settings_.anyps5Folder && !anyps5_.versionError.empty()) ImGui::TextColored(Amber, "%s", anyps5_.versionError.c_str());
-            if (draftProbeFor_ == settings_.anyps5Folder && !anyps5_.titlesError.empty()) ImGui::TextColored(Amber, "%s", anyps5_.titlesError.c_str());
-        } else {
-            ImGui::TextColored(Amber, "%s", draftProbe_.problem.c_str());
-            ImGui::TextColored(Dim, "Use your AnyPS5 clone after a full build (build\\core\\relinker and build\\core\\libs\\libs), or an extracted release with libs\\.");
-        }
-        ImGui::Unindent();
-    }
-
     void DrawSettings() {
         if (openSettings_) {
             ImGui::OpenPopup("Settings");
             openSettings_ = false;
         }
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.75f, 0), ImGuiCond_Appearing);
-        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        if (!ImGui::BeginPopupModal("Settings", nullptr, ImGuiWindowFlags_NoSavedSettings)) return;
+        // Follows the launcher's window every frame: resizing or maximising it resizes
+        // Settings, and the form scrolls when there isn't room.
+        FollowWindow(0.8f, 0.86f);
+        if (!ImGui::BeginPopupModal("Settings", nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) return;
+        const auto& style = ImGui::GetStyle();
+        const float footer = ImGui::GetTextLineHeightWithSpacing() * (saveError_.empty() ? 1.0f : 2.0f) + ImGui::GetFrameHeightWithSpacing() + style.ItemSpacing.y * 2;
+        ImGui::BeginChild("settings-body", ImVec2(0, -footer));
+        ImGui::PushTextWrapPos(0.0f);
 
-        ImGui::TextUnformatted("AnyPS5 version");
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 24);
-        {
-            const auto* current = FindVersion(versions_, draft_.anyps5Version);
-            const std::string preview = current != nullptr ? current->Label() : draft_.anyps5Folder.empty() ? std::string("none") : draft_.anyps5Folder;
-            if (ImGui::BeginCombo("##anyps5version", preview.c_str())) {
-                for (const auto& entry : versions_.versions) {
-                    if (ImGui::Selectable(entry.Label().c_str(), entry.id == draft_.anyps5Version)) {
-                        draft_.anyps5Version = entry.id;
-                        draft_.anyps5Folder = ToUtf8(entry.folder);
-                    }
-                }
-                ImGui::EndCombo();
-            }
-        }
-        ImGui::SameLine();
-        ImGui::TextColored(Dim, "download or add versions with \"AnyPS5 versions\" in the top bar");
-        DrawAnyPS5Status();
-        ImGui::Spacing();
         FolderField("Games folder (scanned for game folders and .zar files)", "##games", "the folder that holds your game folders and .zar files", draft_.gamesFolder);
         ImGui::Spacing();
         FolderField("Library folder (logs and shader caches; can be rebuilt)", "##library", ToUtf8(launcherFolder_ / "library"), draft_.libraryFolder);
         ImGui::Spacing();
         FolderField("Userdata folder (profiles, saves, trophies; back this up)", "##userdata", ToUtf8(launcherFolder_ / "userdata"), draft_.userdataFolder);
         ImGui::TextColored(Dim, "Keep it on the same drive as your games: saves are moved beside a game for each run, which is instant on one drive.");
+        ImGui::Spacing();
+
+        ImGui::TextUnformatted("Appearance");
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 14);
+        {
+            const char* labels[] = {"Follow Windows", "Dark", "Light"};
+            const char* values[] = {"system", "dark", "light"};
+            int current = 0;
+            for (int index = 0; index < 3; ++index) {
+                if (draft_.theme == values[index]) current = index;
+            }
+            if (ImGui::Combo("##theme", &current, labels, 3)) {
+                draft_.theme = values[current];
+                ApplyTheme(ImGui::GetStyle(), WantDark(draft_.theme));
+                ImGui::GetStyle().ScaleAllSizes(scale_);
+            }
+        }
         ImGui::Spacing();
 
         ImGui::Separator();
@@ -1537,10 +1584,11 @@ private:
             }
             ImGui::EndCombo();
         }
-        ImGui::Spacing();
-        ImGui::TextColored(Dim, "Saved to %s", ToUtf8(settingsFile_).c_str());
-        if (!saveError_.empty()) ImGui::TextColored(Red, "%s", saveError_.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndChild();
         ImGui::Separator();
+        ImGui::TextColored(Dim, "%s", Elide("Saved to " + ToUtf8(settingsFile_), ImGui::GetContentRegionAvail().x).c_str());
+        if (!saveError_.empty()) ImGui::TextColored(Red, "%s", Elide(saveError_, ImGui::GetContentRegionAvail().x).c_str());
 
         ImGui::BeginDisabled(Picker().IsOpen());
         if (ImGui::Button("Save")) {
@@ -1556,11 +1604,15 @@ private:
                         }
                     }
                 }
+                // The AnyPS5 version is chosen in "AnyPS5 versions", not here: keep whatever is current.
+                draft_.anyps5Folder = settings_.anyps5Folder;
+                draft_.anyps5Version = settings_.anyps5Version;
                 SaveSettings(settingsFile_, draft_);
                 const bool gamesChanged = draft_.gamesFolder != settings_.gamesFolder;
                 settings_ = draft_;
                 settingsError_.clear();
                 ApplySettings();
+                ApplyCurrentTheme();
                 CreateProfile(layout_);
                 SaveProfile(layout_, draftProfile_);
                 profileSettings_ = draftProfile_;
@@ -1577,7 +1629,10 @@ private:
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button("Cancel")) {
+            ApplyCurrentTheme();  // undo a previewed appearance
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::EndDisabled();
         ImGui::EndPopup();
     }
@@ -1600,11 +1655,10 @@ private:
     std::map<std::string, RunReport> lastRuns_;
     Settings draft_;
     ProfileSettings draftProfile_;
-    AnyPS5Probe draftProbe_;
-    std::string draftProbeFor_;
     std::string saveError_;
     bool openSettings_ = false;
     std::string search_;
+    float gridZoom_ = 1.0f;
     std::string selected_;
     std::filesystem::path versionsRoot_;
     VersionStore versions_;
@@ -1662,7 +1716,7 @@ int main(int, char**) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
     io.IniFilename = nullptr;
     ImGuiStyle& style = ImGui::GetStyle();
-    ApplyTheme(style);
+    ApplyTheme(style, WantDark("system"));
     style.ScaleAllSizes(scale);
     style.FontScaleDpi = scale;
     LoadFonts(io);
@@ -1677,6 +1731,7 @@ int main(int, char**) {
             while (SDL_PollEvent(&event)) {
                 ImGui_ImplSDL3_ProcessEvent(&event);
                 if (event.type == SDL_EVENT_QUIT) done = true;
+                if (event.type == SDL_EVENT_SYSTEM_THEME_CHANGED) app.ThemeChanged();
                 if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)) done = true;
             }
             if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
@@ -1689,7 +1744,7 @@ int main(int, char**) {
             app.Frame();
             ImGui::Render();
             SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-            SDL_SetRenderDrawColorFloat(renderer, 0.059f, 0.067f, 0.082f, 1.0f);
+            SDL_SetRenderDrawColorFloat(renderer, WindowColor.x, WindowColor.y, WindowColor.z, 1.0f);
             SDL_RenderClear(renderer);
             ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
             SDL_RenderPresent(renderer);

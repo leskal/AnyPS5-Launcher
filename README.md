@@ -4,7 +4,7 @@ A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game li
 
 **Status:** early, but the main loop works:
 
-- **Game list:** game folders and `.zar` archives, with icon, name, serial, version, format, ELF/SELF state, install state and the last run's result.
+- **Library:** game folders and `.zar` archives as a cover grid, with search, status badges and a details panel for the selected game. Covers resize with the window (Ctrl + mouse wheel for bigger or smaller); the look follows Windows' light or dark setting, or a choice in Settings.
 - **Install with AnyPS5** (right-click): sets the game's own folder up for AnyPS5 and runs the relinker with the game's flags from AnyPS5's `tools\titles.json`. No links of any kind are made.
   - Folder game `Games\Foo\`: its files are moved (renamed) into `Games\Foo\app0\`, and the exe goes into `Games\Foo\`. Run Convert SELF to ELF first if it still has SELF files.
   - `.zar` game `Games\Foo.zar`: the archive is moved unchanged to `Games\Foo\app0.zar`, and only eboot, `sce_sys` and the modules are extracted into `Games\Foo\app0\` (SELF files unwrapped on the way). The game reads the rest from the archive.

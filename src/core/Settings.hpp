@@ -16,6 +16,7 @@ struct Settings {
     std::string libraryFolder;
     std::string userdataFolder;
     std::string profile;
+    std::string theme = "system";  // "system" follows Windows, or "dark" / "light"
 };
 
 std::filesystem::path EffectiveLibrary(const Settings& settings, const std::filesystem::path& launcherFolder);
