@@ -44,10 +44,133 @@ namespace {
 
 using namespace launcher;
 
-constexpr ImVec4 Green{0.55f, 0.85f, 0.55f, 1.0f};
-constexpr ImVec4 Amber{0.95f, 0.80f, 0.40f, 1.0f};
-constexpr ImVec4 Red{0.95f, 0.45f, 0.45f, 1.0f};
-constexpr ImVec4 Dim{0.60f, 0.60f, 0.65f, 1.0f};
+constexpr ImVec4 Green{0.204f, 0.827f, 0.600f, 1.0f};   // #34D399
+constexpr ImVec4 Amber{0.984f, 0.749f, 0.141f, 1.0f};   // #FBBF24
+constexpr ImVec4 Red{0.973f, 0.443f, 0.443f, 1.0f};     // #F87171
+constexpr ImVec4 Dim{0.545f, 0.573f, 0.612f, 1.0f};     // #8B929C
+constexpr ImVec4 Accent{0.231f, 0.510f, 0.965f, 1.0f};  // #3B82F6
+constexpr ImVec4 AccentHover{0.357f, 0.608f, 1.0f, 1.0f};
+constexpr ImVec4 AccentActive{0.184f, 0.435f, 0.839f, 1.0f};
+constexpr ImVec4 Card{0.094f, 0.106f, 0.129f, 1.0f};    // #181B21
+constexpr ImVec4 CardHover{0.122f, 0.137f, 0.165f, 1.0f};
+
+ImVec4 Fade(ImVec4 color, float alpha) {
+    color.w = alpha;
+    return color;
+}
+
+void ApplyTheme(ImGuiStyle& style) {
+    ImGui::StyleColorsDark(&style);
+    auto* c = style.Colors;
+    const auto rgb = [](int value, float alpha = 1.0f) {
+        return ImVec4(static_cast<float>((value >> 16) & 0xFF) / 255.0f, static_cast<float>((value >> 8) & 0xFF) / 255.0f, static_cast<float>(value & 0xFF) / 255.0f, alpha);
+    };
+    c[ImGuiCol_Text] = rgb(0xE6E8EB);
+    c[ImGuiCol_TextDisabled] = rgb(0x7C828C);
+    c[ImGuiCol_WindowBg] = rgb(0x0F1115);
+    c[ImGuiCol_ChildBg] = rgb(0x0F1115, 0.0f);
+    c[ImGuiCol_PopupBg] = rgb(0x181B21, 0.98f);
+    c[ImGuiCol_Border] = rgb(0x262A31);
+    c[ImGuiCol_BorderShadow] = rgb(0x000000, 0.0f);
+    c[ImGuiCol_FrameBg] = rgb(0x1E2228);
+    c[ImGuiCol_FrameBgHovered] = rgb(0x262B33);
+    c[ImGuiCol_FrameBgActive] = rgb(0x2C323B);
+    c[ImGuiCol_TitleBg] = rgb(0x14171C);
+    c[ImGuiCol_TitleBgActive] = rgb(0x181B21);
+    c[ImGuiCol_TitleBgCollapsed] = rgb(0x14171C);
+    c[ImGuiCol_MenuBarBg] = rgb(0x14171C);
+    c[ImGuiCol_ScrollbarBg] = rgb(0x000000, 0.0f);
+    c[ImGuiCol_ScrollbarGrab] = rgb(0x2A2F37);
+    c[ImGuiCol_ScrollbarGrabHovered] = rgb(0x353B45);
+    c[ImGuiCol_ScrollbarGrabActive] = rgb(0x404754);
+    c[ImGuiCol_CheckMark] = Accent;
+    c[ImGuiCol_SliderGrab] = Accent;
+    c[ImGuiCol_SliderGrabActive] = AccentHover;
+    c[ImGuiCol_Button] = rgb(0x23272F);
+    c[ImGuiCol_ButtonHovered] = rgb(0x2C323C);
+    c[ImGuiCol_ButtonActive] = rgb(0x343B47);
+    c[ImGuiCol_Header] = rgb(0x23272F);
+    c[ImGuiCol_HeaderHovered] = rgb(0x2B3240);
+    c[ImGuiCol_HeaderActive] = Fade(Accent, 0.35f);
+    c[ImGuiCol_Separator] = rgb(0x262A31);
+    c[ImGuiCol_SeparatorHovered] = Accent;
+    c[ImGuiCol_SeparatorActive] = AccentHover;
+    c[ImGuiCol_ResizeGrip] = rgb(0x000000, 0.0f);
+    c[ImGuiCol_ResizeGripHovered] = Fade(Accent, 0.6f);
+    c[ImGuiCol_ResizeGripActive] = Accent;
+    c[ImGuiCol_Tab] = rgb(0x181B21);
+    c[ImGuiCol_TabHovered] = rgb(0x2B3240);
+    c[ImGuiCol_PlotHistogram] = Accent;
+    c[ImGuiCol_PlotHistogramHovered] = AccentHover;
+    c[ImGuiCol_TableHeaderBg] = rgb(0x181B21);
+    c[ImGuiCol_TableBorderStrong] = rgb(0x262A31);
+    c[ImGuiCol_TableBorderLight] = rgb(0x1E2228);
+    c[ImGuiCol_TableRowBg] = rgb(0x000000, 0.0f);
+    c[ImGuiCol_TableRowBgAlt] = rgb(0xFFFFFF, 0.02f);
+    c[ImGuiCol_TextSelectedBg] = Fade(Accent, 0.35f);
+    c[ImGuiCol_NavCursor] = Accent;
+    c[ImGuiCol_ModalWindowDimBg] = rgb(0x000000, 0.6f);
+    style.WindowRounding = 10.0f;
+    style.ChildRounding = 10.0f;
+    style.FrameRounding = 6.0f;
+    style.PopupRounding = 8.0f;
+    style.GrabRounding = 6.0f;
+    style.ScrollbarRounding = 8.0f;
+    style.TabRounding = 6.0f;
+    style.WindowPadding = ImVec2(16.0f, 14.0f);
+    style.FramePadding = ImVec2(10.0f, 6.0f);
+    style.ItemSpacing = ImVec2(10.0f, 8.0f);
+    style.ItemInnerSpacing = ImVec2(8.0f, 6.0f);
+    style.ScrollbarSize = 12.0f;
+    style.WindowBorderSize = 0.0f;
+    style.ChildBorderSize = 0.0f;
+    style.PopupBorderSize = 1.0f;
+    style.FrameBorderSize = 0.0f;
+    style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
+}
+
+// A filled, rounded label such as "Installed" or "SELF".
+void Pill(const char* text, ImVec4 color) {
+    const ImVec2 padding(8.0f * ImGui::GetStyle().FontScaleDpi, 2.0f * ImGui::GetStyle().FontScaleDpi);
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const ImVec2 end(at.x + size.x + padding.x * 2, at.y + size.y + padding.y * 2);
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(at, end, ImGui::GetColorU32(Fade(color, 0.16f)), (end.y - at.y) * 0.5f);
+    draw->AddText(ImVec2(at.x + padding.x, at.y + padding.y), ImGui::GetColorU32(color), text);
+    ImGui::Dummy(ImVec2(end.x - at.x, end.y - at.y));
+}
+
+bool PrimaryButton(const char* label, const ImVec2& size = ImVec2(0, 0)) {
+    ImGui::PushStyleColor(ImGuiCol_Button, Accent);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, AccentActive);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+    const bool pressed = ImGui::Button(label, size);
+    ImGui::PopStyleColor(4);
+    return pressed;
+}
+
+// Text cut to a width with an ellipsis.
+std::string Elide(const std::string& text, float width) {
+    if (ImGui::CalcTextSize(text.c_str()).x <= width) return text;
+    std::string cut = text;
+    while (!cut.empty() && ImGui::CalcTextSize((cut + "...").c_str()).x > width) {
+        cut.pop_back();
+        while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80) cut.pop_back();
+        if (!cut.empty() && static_cast<unsigned char>(cut.back()) >= 0xC0) cut.pop_back();
+    }
+    return cut + "...";
+}
+
+bool ContainsFolded(const std::string& haystack, const std::string& needle) {
+    if (needle.empty()) return true;
+    const auto fold = [](unsigned char c) { return static_cast<char>(std::tolower(c)); };
+    std::string a(haystack.size(), ' '), b(needle.size(), ' ');
+    std::transform(haystack.begin(), haystack.end(), a.begin(), fold);
+    std::transform(needle.begin(), needle.end(), b.begin(), fold);
+    return a.find(b) != std::string::npos;
+}
 
 template <typename Result>
 class Background {
@@ -289,7 +412,7 @@ public:
         ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::Begin("Games", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
         DrawTopBar();
-        DrawGameTable();
+        DrawLibrary();
         DrawFooter();
         DrawNewProfile();
         DrawMissingRelinker();
@@ -545,15 +668,17 @@ private:
     // ---- drawing -----------------------------------------------------------------
 
     void DrawTopBar() {
-        if (!settingsError_.empty()) ImGui::TextColored(Red, "Settings: %s", settingsError_.c_str());
-        if (!profileError_.empty()) ImGui::TextColored(Red, "Profile: %s", profileError_.c_str());
-
+        const auto& style = ImGui::GetStyle();
+        ImGui::PushFont(nullptr, style.FontSizeBase * 1.45f);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(Dim, "Profile");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+        ImGui::TextUnformatted("Library");
+        ImGui::PopFont();
+        ImGui::SameLine(0, style.ItemSpacing.x * 2);
+
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 11);
         ImGui::BeginDisabled(session_ != nullptr);
-        if (ImGui::BeginCombo("##profile", layout_.profile.c_str())) {
+        const std::string profileLabel = "Profile: " + layout_.profile;
+        if (ImGui::BeginCombo("##profile", profileLabel.c_str())) {
             for (const auto& name : profiles_) {
                 if (ImGui::Selectable(name.c_str(), name == layout_.profile)) SwitchProfile(name);
             }
@@ -570,11 +695,9 @@ private:
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        ImGui::TextColored(Dim, "Games");
-        ImGui::SameLine();
-        ImGui::TextUnformatted(settings_.gamesFolder.empty() ? "(not set)" : settings_.gamesFolder.c_str());
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 14);
+        ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
 
-        const auto& style = ImGui::GetStyle();
         const float buttons = ImGui::CalcTextSize("AnyPS5 versions").x + ImGui::CalcTextSize("Rescan").x + ImGui::CalcTextSize("Settings").x + style.FramePadding.x * 6 +
                               style.ItemSpacing.x * 2;
         ImGui::SameLine(ImGui::GetContentRegionMax().x - buttons);
@@ -590,23 +713,47 @@ private:
         if (ImGui::Button("Settings")) OpenSettings();
         ImGui::EndDisabled();
 
-        if (anyps5Loader_.Running() || anyps5Pending_) {
-            ImGui::TextColored(Dim, "Checking AnyPS5...");
-        } else if (!anyps5_.probe.runtime) {
-            ImGui::TextColored(Amber, "AnyPS5: %s", anyps5_.probe.problem.c_str());
-        }
+        // Status line: counts, AnyPS5, problems.
         if (scan_.Running()) {
-            ImGui::TextUnformatted("Scanning...");
+            Pill("Scanning...", Dim);
         } else if (scanned_) {
-            ImGui::Text("%zu games, %zu installed, %zu problems", result_.games.size(), installs_.size(), result_.problems.size());
+            const std::string counts = std::to_string(result_.games.size()) + (result_.games.size() == 1 ? " game" : " games") + "  \xC2\xB7  " +
+                                       std::to_string(installs_.size()) + " installed";
+            Pill(counts.c_str(), Dim);
         }
-        if (!result_.problems.empty() && ImGui::CollapsingHeader("Problems")) {
-            for (const auto& problem : result_.problems) {
-                ImGui::TextColored(Red, "%s", ToUtf8(problem.location).c_str());
-                ImGui::SameLine();
-                ImGui::TextWrapped("%s", problem.message.c_str());
+        ImGui::SameLine();
+        if (anyps5Loader_.Running() || anyps5Pending_) {
+            Pill("Checking AnyPS5...", Dim);
+        } else if (!anyps5_.probe.runtime) {
+            Pill("AnyPS5 not set up", Amber);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", anyps5_.probe.problem.c_str());
+        } else {
+            const std::string label = "AnyPS5 " + CurrentVersionLabel();
+            Pill(label.c_str(), Accent);
+            if (ImGui::IsItemHovered() && !anyps5_.version.empty()) ImGui::SetTooltip("relinker %s", anyps5_.version.c_str());
+        }
+        if (!result_.problems.empty()) {
+            ImGui::SameLine();
+            const std::string label = std::to_string(result_.problems.size()) + (result_.problems.size() == 1 ? " problem" : " problems");
+            Pill(label.c_str(), Red);
+            if (ImGui::IsItemClicked()) ImGui::OpenPopup("problems");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to see them");
+            if (ImGui::BeginPopup("problems")) {
+                for (const auto& problem : result_.problems) {
+                    ImGui::TextColored(Red, "%s", ToUtf8(problem.location).c_str());
+                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40);
+                    ImGui::TextUnformatted(problem.message.c_str());
+                    ImGui::PopTextWrapPos();
+                    ImGui::Spacing();
+                }
+                ImGui::EndPopup();
             }
         }
+        ImGui::SameLine();
+        ImGui::TextColored(Dim, "%s", settings_.gamesFolder.empty() ? "No games folder set" : settings_.gamesFolder.c_str());
+        if (!settingsError_.empty()) ImGui::TextColored(Red, "Settings: %s", settingsError_.c_str());
+        if (!profileError_.empty()) ImGui::TextColored(Red, "Profile: %s", profileError_.c_str());
+        ImGui::Spacing();
     }
 
     int FooterLines() const {
@@ -617,53 +764,208 @@ private:
         return ImGui::GetFrameHeightWithSpacing() * static_cast<float>(FooterLines()) + ImGui::GetStyle().ItemSpacing.y;
     }
 
-    void DrawGameTable() {
-        const auto groups = GroupByTitleId(result_.games);
-        const float iconSize = 64.0f * scale_;
-        constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable |
-                                          ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
-        if (!ImGui::BeginTable("games", 7, flags, ImVec2(0, -FooterHeight()))) return;
-        ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, iconSize);
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 2.6f);
-        ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn("Version", ImGuiTableColumnFlags_WidthStretch, 0.9f);
-        ImGui::TableSetupColumn("Format", ImGuiTableColumnFlags_WidthStretch, 1.1f);
-        ImGui::TableSetupColumn("eboot", ImGuiTableColumnFlags_WidthStretch, 1.2f);
-        ImGui::TableSetupColumn("AnyPS5", ImGuiTableColumnFlags_WidthStretch, 2.4f);
-        ImGui::TableHeadersRow();
+    struct Badge {
+        const char* text = nullptr;
+        ImVec4 color;
+    };
+
+    Badge BadgeFor(const GameEntry& game) const {
+        if (IsRunning(game)) return {"Running", Accent};
+        if (jobSerial_ == game.metadata.titleId && job_.Busy()) return {"Working...", Amber};
+        if (const auto* manifest = InstallFor(game)) {
+            if (!ReinstallReason(game, *manifest, anyps5_.version).empty()) return {"Reinstall", Amber};
+            return {"Installed", Green};
+        }
+        if (game.executable.kind == ExecutableKind::ElfEncrypted) return {"Encrypted", Red};
+        if (game.executable.kind == ExecutableKind::Missing || game.executable.kind == ExecutableKind::Unknown) return {"No eboot", Red};
+        if (game.format == PackageFormat::Folder && (game.executable.kind == ExecutableKind::Self || game.modules.self > 0)) return {"SELF", Amber};
+        return {};
+    }
+
+    const GameEntry* SelectedGame() const {
         for (const auto& game : result_.games) {
-            ImGui::PushID(ToUtf8(game.location).c_str());
-            ImGui::TableNextRow(ImGuiTableRowFlags_None, iconSize);
-            ImGui::TableNextColumn();
+            if (ToUtf8(game.location) == selected_) return &game;
+        }
+        return nullptr;
+    }
+
+    void ActivateGame(const GameEntry& game) {
+        if (PlayBlocker(game).empty()) Play(game);
+        else if (InstallFor(game) == nullptr && InstallBlocker(game).empty()) StartInstall(game);
+    }
+
+    void DrawLibrary() {
+        const auto& style = ImGui::GetStyle();
+        const float panelWidth = std::min(ImGui::GetContentRegionAvail().x * 0.38f, 380.0f * scale_);
+        const float height = -FooterHeight();
+        if (SelectedGame() == nullptr && !result_.games.empty()) selected_ = ToUtf8(result_.games.front().location);
+
+        ImGui::BeginChild("grid", ImVec2(-panelWidth - style.ItemSpacing.x, height));
+        DrawGrid();
+        ImGui::EndChild();
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, Card);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * scale_, 16.0f * scale_));
+        ImGui::BeginChild("details", ImVec2(0, height), ImGuiChildFlags_AlwaysUseWindowPadding);
+        if (const auto* game = SelectedGame()) DrawDetails(*game);
+        else DrawEmptyDetails();
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+    }
+
+    void DrawEmptyDetails() {
+        ImGui::Spacing();
+        ImGui::TextColored(Dim, "%s", scan_.Running() ? "Looking for games..." : settings_.gamesFolder.empty() ? "Set your games folder in Settings." : "No games found.");
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(Dim, "Game folders (with eboot.bin and sce_sys) and .zar archives in the games folder show up here.");
+        ImGui::PopTextWrapPos();
+    }
+
+    void DrawGrid() {
+        const float minTile = 170.0f * scale_;
+        const float gap = 18.0f * scale_;
+        const float textBlock = ImGui::GetTextLineHeightWithSpacing() * 2 + 10.0f * scale_;
+        const float avail = ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ScrollbarSize;
+        const int columns = std::max(1, static_cast<int>((avail + gap) / (minTile + gap)));
+        // Tiles stretch so each row fills the width, up to a limit so few games don't get huge tiles.
+        const float tile = std::min(std::max(minTile, (avail - gap * static_cast<float>(columns - 1)) / static_cast<float>(columns)), minTile * 1.4f);
+        const float rounding = 10.0f * scale_;
+        int shown = 0;
+        for (const auto& game : result_.games) {
+            if (!ContainsFolded(game.metadata.name, search_) && !ContainsFolded(game.metadata.titleId, search_)) continue;
+            if (shown % columns != 0) ImGui::SameLine(0, gap);
+            ++shown;
+            const auto key = ToUtf8(game.location);
+            ImGui::PushID(key.c_str());
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton("tile", ImVec2(tile, tile + textBlock));
+            const bool hovered = ImGui::IsItemHovered();
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right)) selected_ = key;
+            if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ActivateGame(game);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s\nDouble-click to play, right-click for all actions", key.c_str());
+            if (ImGui::BeginPopupContextItem("actions")) {
+                DrawActionItems(game);
+                ImGui::EndPopup();
+            }
+            const bool selected = selected_ == key;
+
+            auto* draw = ImGui::GetWindowDrawList();
+            const ImVec2 imageEnd(at.x + tile, at.y + tile);
+            draw->AddRectFilled(at, ImVec2(at.x + tile, at.y + tile + textBlock), ImGui::GetColorU32(hovered || selected ? CardHover : Card), rounding);
             if (auto* texture = icons_->Get(game.location, game.icon)) {
-                ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), ImVec2(iconSize, iconSize));
+                draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, imageEnd, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, rounding,
+                                      ImDrawFlags_RoundCornersTop);
             } else {
-                ImGui::Dummy(ImVec2(iconSize, iconSize));
+                draw->AddRectFilledMultiColor(at, imageEnd, ImGui::GetColorU32(ImVec4(0.16f, 0.20f, 0.30f, 1)), ImGui::GetColorU32(ImVec4(0.10f, 0.12f, 0.18f, 1)),
+                                              ImGui::GetColorU32(ImVec4(0.08f, 0.09f, 0.12f, 1)), ImGui::GetColorU32(ImVec4(0.12f, 0.15f, 0.22f, 1)));
+                const std::string initial = game.metadata.name.empty() ? "?" : game.metadata.name.substr(0, 1);
+                ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 3.0f);
+                const ImVec2 size = ImGui::CalcTextSize(initial.c_str());
+                draw->AddText(ImVec2(at.x + (tile - size.x) * 0.5f, at.y + (tile - size.y) * 0.5f), ImGui::GetColorU32(Dim), initial.c_str());
+                ImGui::PopFont();
             }
-            ImGui::TableNextColumn();
-            ImGui::Selectable(game.metadata.name.c_str(), IsRunning(game), ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, iconSize));
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                if (PlayBlocker(game).empty()) Play(game);
-                else if (InstallFor(game) == nullptr && InstallBlocker(game).empty()) StartInstall(game);
+            if (const auto badge = BadgeFor(game); badge.text != nullptr) {
+                const ImVec2 size = ImGui::CalcTextSize(badge.text);
+                const ImVec2 pad(8.0f * scale_, 3.0f * scale_);
+                const ImVec2 start(at.x + 8.0f * scale_, at.y + 8.0f * scale_);
+                const float dot = 10.0f * scale_;
+                const ImVec2 end(start.x + dot + size.x + pad.x * 2, start.y + size.y + pad.y * 2);
+                draw->AddRectFilled(start, end, ImGui::GetColorU32(ImVec4(0.06f, 0.07f, 0.08f, 0.85f)), (end.y - start.y) * 0.5f);
+                draw->AddCircleFilled(ImVec2(start.x + pad.x + 3.0f * scale_, (start.y + end.y) * 0.5f), 3.5f * scale_, ImGui::GetColorU32(badge.color));
+                draw->AddText(ImVec2(start.x + pad.x + 10.0f * scale_, start.y + pad.y), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.92f)), badge.text);
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s\nDouble-click to play, right-click for actions", ToUtf8(game.location).c_str());
-            DrawContextMenu(game);
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(game.metadata.titleId.c_str());
-            if (groups.at(game.metadata.titleId).size() > 1) ImGui::TextColored(Amber, "duplicate");
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(game.metadata.contentVersion.c_str());
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(ToString(game.format).data());
-            if (game.format == PackageFormat::Zar) ImGui::TextColored(game.layout == ZarLayout::Nested ? Amber : Dim, "%s", ToString(game.layout).data());
-            ImGui::TableNextColumn();
-            DrawExecutable(game);
-            ImGui::TableNextColumn();
-            DrawStatus(game);
+            if (selected || hovered) {
+                draw->AddRect(at, ImVec2(at.x + tile, at.y + tile + textBlock), ImGui::GetColorU32(selected ? Accent : Fade(Accent, 0.45f)), rounding, 0, 2.0f * scale_);
+            }
+            const float textX = at.x + 10.0f * scale_;
+            const float textWidth = tile - 20.0f * scale_;
+            draw->AddText(ImVec2(textX, imageEnd.y + 6.0f * scale_), ImGui::GetColorU32(ImGuiCol_Text), Elide(game.metadata.name, textWidth).c_str());
+            const std::string sub = game.metadata.titleId + "  \xC2\xB7  " + std::string(ToString(game.format));
+            draw->AddText(ImVec2(textX, imageEnd.y + 6.0f * scale_ + ImGui::GetTextLineHeightWithSpacing()), ImGui::GetColorU32(Dim), Elide(sub, textWidth).c_str());
             ImGui::PopID();
         }
-        ImGui::EndTable();
+        if (shown == 0) {
+            ImGui::Spacing();
+            ImGui::TextColored(Dim, "%s", result_.games.empty() ? (scan_.Running() ? "Scanning..." : "No games yet.") : "Nothing matches the search.");
+        }
+    }
+
+    void DrawDetails(const GameEntry& game) {
+        const auto& style = ImGui::GetStyle();
+        const float width = ImGui::GetContentRegionAvail().x;
+        const float art = std::min(width, 280.0f * scale_);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (width - art) * 0.5f);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        auto* draw = ImGui::GetWindowDrawList();
+        if (auto* texture = icons_->Get(game.location, game.icon)) {
+            draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + art, at.y + art), ImVec2(0, 0), ImVec2(1, 1),
+                                  IM_COL32_WHITE, 12.0f * scale_);
+        } else {
+            draw->AddRectFilled(at, ImVec2(at.x + art, at.y + art), ImGui::GetColorU32(ImVec4(0.12f, 0.15f, 0.22f, 1)), 12.0f * scale_);
+        }
+        ImGui::Dummy(ImVec2(art, art));
+        ImGui::Spacing();
+        ImGui::PushFont(nullptr, style.FontSizeBase * 1.35f);
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(game.metadata.name.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopFont();
+        ImGui::TextColored(Dim, "%s  \xC2\xB7  v%s  \xC2\xB7  %s", game.metadata.titleId.c_str(), game.metadata.contentVersion.c_str(), ToString(game.format).data());
+        if (GroupByTitleId(result_.games).at(game.metadata.titleId).size() > 1) {
+            Pill("Another copy of this game is in the list", Amber);
+        }
+        ImGui::Spacing();
+
+        // Primary actions.
+        const auto* manifest = InstallFor(game);
+        const float full = ImGui::GetContentRegionAvail().x;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.35f;
+        if (IsRunning(game)) {
+            if (PrimaryButton("Stop", ImVec2(full, buttonHeight))) session_->Stop();
+        } else if (manifest != nullptr) {
+            const auto reason = PlayBlocker(game);
+            ImGui::BeginDisabled(!reason.empty());
+            if (PrimaryButton("Play", ImVec2(full, buttonHeight))) Play(game);
+            ImGui::EndDisabled();
+            if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+        } else {
+            const bool needsConversion = game.format == PackageFormat::Folder && (game.executable.kind == ExecutableKind::Self || game.modules.self > 0);
+            if (needsConversion) {
+                ImGui::BeginDisabled(job_.Busy());
+                if (PrimaryButton("Convert SELF to ELF", ImVec2(full, buttonHeight))) StartConvertSelf(game);
+                ImGui::EndDisabled();
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextColored(Dim, "Needed before Install; the originals are zipped first.");
+                ImGui::PopTextWrapPos();
+            } else {
+                const auto reason = InstallBlocker(game);
+                ImGui::BeginDisabled(!reason.empty());
+                if (PrimaryButton("Install", ImVec2(full, buttonHeight))) StartInstall(game);
+                ImGui::EndDisabled();
+                if (!reason.empty()) {
+                    ImGui::PushTextWrapPos(0.0f);
+                    ImGui::TextColored(Amber, "%s", reason.c_str());
+                    ImGui::PopTextWrapPos();
+                }
+            }
+        }
+        if (ImGui::Button("All actions...", ImVec2(full, 0))) ImGui::OpenPopup("details-actions");
+        if (ImGui::BeginPopup("details-actions")) {
+            DrawActionItems(game);
+            ImGui::EndPopup();
+        }
+
+        ImGui::Spacing();
+        ImGui::SeparatorText("Status");
+        DrawStatus(game);
+        ImGui::SeparatorText("Executable");
+        DrawExecutable(game);
+        ImGui::SeparatorText("Location");
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(Dim, "%s", ToUtf8(game.home.empty() ? game.location : game.home).c_str());
+        ImGui::PopTextWrapPos();
+        if (game.format == PackageFormat::Zar && game.layout == ZarLayout::Nested) ImGui::TextColored(Amber, "The game is inside a folder of the archive");
     }
 
     static void DrawExecutable(const GameEntry& game) {
@@ -705,8 +1007,7 @@ private:
         }
     }
 
-    void DrawContextMenu(const GameEntry& game) {
-        if (!ImGui::BeginPopupContextItem("actions")) return;
+    void DrawActionItems(const GameEntry& game) {
         ImGui::TextColored(Dim, "%s", game.metadata.name.c_str());
         ImGui::Separator();
         const auto& serial = game.metadata.titleId;
@@ -784,7 +1085,6 @@ private:
             if (reason.empty() && PathExists(output)) reason = FileName(output) + " already exists next to the folder";
             if (MenuAction("Convert folder to .zar", reason, "Packs into " + ToUtf8(output) + ". The folder is kept.")) StartPack(game, output);
         }
-        ImGui::EndPopup();
     }
 
     void DrawFooter() {
@@ -821,7 +1121,7 @@ private:
             ImGui::SameLine();
             ImGui::TextColored(Dim, "profile %s", layout_.profile.c_str());
             ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Stop").x - style.FramePadding.x * 2);
-            if (ImGui::Button("Stop")) session_->Stop();
+            if (PrimaryButton("Stop")) session_->Stop();
         }
         if (!drew && message_) {
             ImGui::AlignTextToFramePadding();
@@ -832,7 +1132,7 @@ private:
             if (ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0))) message_.reset();
         } else if (!drew) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(Dim, "Double-click a game to play it; right-click for install and conversions.");
+            ImGui::TextColored(Dim, "Select a game to see it; double-click to play; right-click for every action.");
         }
     }
 
@@ -1304,6 +1604,8 @@ private:
     std::string draftProbeFor_;
     std::string saveError_;
     bool openSettings_ = false;
+    std::string search_;
+    std::string selected_;
     std::filesystem::path versionsRoot_;
     VersionStore versions_;
     Background<ReleaseList> releasesLoader_;
@@ -1359,12 +1661,8 @@ int main(int, char**) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
     io.IniFilename = nullptr;
-    ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
-    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.20f, 0.22f, 0.27f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.26f, 0.29f, 0.36f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.30f, 0.34f, 0.42f, 1.0f);
-    style.FrameRounding = 3.0f;
+    ApplyTheme(style);
     style.ScaleAllSizes(scale);
     style.FontScaleDpi = scale;
     LoadFonts(io);
@@ -1391,7 +1689,7 @@ int main(int, char**) {
             app.Frame();
             ImGui::Render();
             SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-            SDL_SetRenderDrawColorFloat(renderer, 0.08f, 0.08f, 0.10f, 1.0f);
+            SDL_SetRenderDrawColorFloat(renderer, 0.059f, 0.067f, 0.082f, 1.0f);
             SDL_RenderClear(renderer);
             ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
             SDL_RenderPresent(renderer);
