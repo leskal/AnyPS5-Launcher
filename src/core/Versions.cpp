@@ -60,6 +60,7 @@ std::optional<Release> ReleaseFrom(const nlohmann::json& item) {
     if (!IsSafeTag(release.tag)) return std::nullopt;
     release.name = Text(item, "name");
     release.publishedAt = Text(item, "published_at");
+    release.notes = Text(item, "body");
     if (const auto pre = item.find("prerelease"); pre != item.end() && pre->is_boolean()) release.prerelease = pre->get<bool>();
     if (const auto assets = item.find("assets"); assets != item.end() && assets->is_array()) {
         for (const auto& asset : *assets) {

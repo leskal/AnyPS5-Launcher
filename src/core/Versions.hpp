@@ -33,6 +33,7 @@ struct Release {
     std::string tag;
     std::string name;
     std::string publishedAt;
+    std::string notes;  // the release's text (GitHub's "body", Markdown)
     bool prerelease = false;
     std::vector<ReleaseAsset> assets;
 };

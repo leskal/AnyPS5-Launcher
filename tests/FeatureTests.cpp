@@ -207,6 +207,34 @@ TEST(SwapsTheLauncherExe) {
     CHECK(!std::filesystem::exists(temp.Path() / "update"));
 }
 
+TEST(ReleaseNotesBecomePlainLines) {
+    const auto lines = launcher::ReleaseNoteLines(
+        "## What's Changed\r\n* **Faster** Game settings by [leskal](https://github.com/leskal)\r\n- Fix uninstall\r\n\r\n\r\n"
+        "**Full Changelog**: https://github.com/x/y/compare/v0.1.3...v0.1.4\r\n");
+    CHECK_EQ(lines.size(), std::size_t{3});
+    CHECK_EQ(lines[0], std::string("What's Changed"));
+    CHECK_EQ(lines[1], std::string("\xE2\x80\xA2 Faster Game settings by leskal"));
+    CHECK_EQ(lines[2], std::string("\xE2\x80\xA2 Fix uninstall"));
+    CHECK(launcher::ReleaseNoteLines("").empty());
+    CHECK_EQ(launcher::ReleaseNoteLines("a\nb\nc\nd", 2).size(), std::size_t{2});
+}
+
+TEST(WindowPlacementRoundTrips) {
+    const launcher::WindowPlacement placement{-1200, 40, 1600, 900, true};
+    const auto argument = launcher::FormatWindowArgument(placement);
+    CHECK_EQ(argument, std::string("--window=-1200,40,1600,900,max"));
+    const auto parsed = launcher::ParseWindowArgument({"anyps5-launcher.exe", "--updated", argument});
+    CHECK(parsed.has_value());
+    CHECK_EQ(parsed->x, -1200);
+    CHECK_EQ(parsed->height, 900);
+    CHECK(parsed->maximized);
+    CHECK(!launcher::ParseWindowArgument({"--window=1,2,3"}).has_value());
+    CHECK(!launcher::ParseWindowArgument({"--window=1,2,10,10"}).has_value());
+    CHECK(!launcher::ParseWindowArgument({"--window=1,2,800,x00"}).has_value());
+    CHECK(!launcher::ParseWindowArgument({"--window=1,2,800,600,min"}).has_value());
+    CHECK(!launcher::ParseWindowArgument({"--game", "PPSA01234"}).has_value());
+}
+
 TEST(VersionPinsAreKept) {
     fixture::TempDir temp;
     launcher::VersionStore store;

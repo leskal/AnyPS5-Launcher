@@ -36,6 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0  # the earlier tags, for the release notes
 
       - name: Check that the tag matches the project version
         run: |
@@ -88,10 +89,27 @@ jobs:
           7z a -tzip "anyps5-launcher-$RELEASE_TAG-windows-x64.zip" anyps5-launcher > /dev/null
           sha256sum "anyps5-launcher-$RELEASE_TAG-windows-x64.zip" > SHA256SUMS
 
+      # The notes are the commit titles since the previous tag: the launcher shows them
+      # in its update window, and the commits here go straight to main without pull requests.
+      - name: Write the release notes
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*' "$RELEASE_TAG^" 2>/dev/null || true)
+          range="$RELEASE_TAG"
+          [ -n "$previous" ] && range="$previous..$RELEASE_TAG"
+          {
+            echo "## What's new"
+            git log --no-merges --format='- %s' "$range"
+            if [ -n "$previous" ]; then
+              echo
+              echo "**Full Changelog**: https://github.com/$GITHUB_REPOSITORY/compare/$previous...$RELEASE_TAG"
+            fi
+          } > dist/NOTES.md
+          cat dist/NOTES.md
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$RELEASE_TAG" \
             "dist/anyps5-launcher-$RELEASE_TAG-windows-x64.zip" dist/SHA256SUMS \
-            --title "AnyPS5 Launcher $RELEASE_TAG" --generate-notes
+            --title "AnyPS5 Launcher $RELEASE_TAG" --notes-file dist/NOTES.md

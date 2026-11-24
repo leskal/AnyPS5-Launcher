@@ -1,5 +1,6 @@
 #include "core/SelfUpdate.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <stdexcept>
 #include <system_error>
@@ -74,6 +75,76 @@ void SwapLauncherExe(const std::filesystem::path& current, const std::filesystem
         std::filesystem::rename(old, current, error);  // put the running one back
         throw;
     }
+}
+
+std::vector<std::string> ReleaseNoteLines(std::string_view notes, std::size_t maxLines) {
+    std::vector<std::string> lines;
+    std::size_t start = 0;
+    while (start <= notes.size() && lines.size() < maxLines) {
+        auto end = notes.find('\n', start);
+        if (end == std::string_view::npos) end = notes.size();
+        std::string line(notes.substr(start, end - start));
+        start = end + 1;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        // [text](url) -> text
+        for (auto open = line.find('['); open != std::string::npos; open = line.find('[', open + 1)) {
+            const auto close = line.find("](", open);
+            const auto paren = close == std::string::npos ? std::string::npos : line.find(')', close);
+            if (paren == std::string::npos) break;
+            line = line.substr(0, open) + line.substr(open + 1, close - open - 1) + line.substr(paren + 1);
+        }
+        for (auto bold = line.find("**"); bold != std::string::npos; bold = line.find("**")) line.erase(bold, 2);
+        std::size_t lead = line.find_first_not_of(" \t");
+        if (lead == std::string::npos) {
+            if (!lines.empty() && !lines.back().empty()) lines.emplace_back();
+            continue;
+        }
+        line.erase(0, lead);
+        while (!line.empty() && line.front() == '#') line.erase(0, 1);
+        if (line.size() > 1 && (line[0] == '*' || line[0] == '-') && line[1] == ' ') line = "\xE2\x80\xA2 " + line.substr(2);  // a bullet
+        line.erase(0, std::min(line.find_first_not_of(' '), line.size()));
+        while (!line.empty() && line.back() == ' ') line.pop_back();
+        if (line.rfind("Full Changelog", 0) == 0) continue;
+        if (line.empty()) continue;
+        lines.push_back(std::move(line));
+    }
+    while (!lines.empty() && lines.back().empty()) lines.pop_back();
+    return lines;
+}
+
+std::string FormatWindowArgument(const WindowPlacement& placement) {
+    return "--window=" + std::to_string(placement.x) + "," + std::to_string(placement.y) + "," + std::to_string(placement.width) + "," +
+           std::to_string(placement.height) + (placement.maximized ? ",max" : "");
+}
+
+std::optional<WindowPlacement> ParseWindowArgument(const std::vector<std::string>& arguments) {
+    constexpr std::string_view prefix = "--window=";
+    for (const auto& argument : arguments) {
+        if (argument.rfind(prefix, 0) != 0) continue;
+        std::vector<std::string> parts;
+        std::size_t start = prefix.size();
+        while (true) {
+            const auto comma = argument.find(',', start);
+            parts.push_back(argument.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+            if (comma == std::string::npos) break;
+            start = comma + 1;
+        }
+        if (parts.size() != 4 && !(parts.size() == 5 && parts[4] == "max")) return std::nullopt;
+        int values[4] = {};
+        for (int i = 0; i < 4; ++i) {
+            const auto& part = parts[static_cast<std::size_t>(i)];
+            if (part.empty() || part.size() > 6) return std::nullopt;
+            std::size_t digits = part[0] == '-' ? 1 : 0;
+            if (digits == part.size()) return std::nullopt;
+            for (std::size_t c = digits; c < part.size(); ++c) {
+                if (part[c] < '0' || part[c] > '9') return std::nullopt;
+            }
+            values[i] = std::stoi(part);
+        }
+        if (values[2] < 200 || values[3] < 150) return std::nullopt;  // too small to be a real window
+        return WindowPlacement{values[0], values[1], values[2], values[3], parts.size() == 5};
+    }
+    return std::nullopt;
 }
 
 void CleanUpLauncherUpdate(const std::filesystem::path& current, const std::filesystem::path& launcherFolder) {

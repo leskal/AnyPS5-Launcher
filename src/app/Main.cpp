@@ -548,6 +548,13 @@ struct ReleaseList {
     std::string error;
 };
 
+// A launcher update downloaded and unpacked in the background, waiting to be put in place.
+struct StagedLauncher {
+    std::string tag;
+    std::filesystem::path exe;  // empty when it failed
+    std::string error;
+};
+
 struct AnyPS5State {
     AnyPS5Probe probe;
     std::string version;
@@ -935,6 +942,8 @@ public:
 
     ~LauncherApp() {
         if (session_) session_->Stop();
+        // A downloaded update goes in place as the launcher closes, so the next start is the new one.
+        ApplyLauncherUpdate(false);
     }
 
     void Frame() {
@@ -1031,10 +1040,6 @@ public:
             message_ = Message{outcome->succeeded ? Green : outcome->cancelled ? Amber : Red, outcome->title, outcome->message};
             jobSerial_.clear();
             if (!settingsSerial_.empty()) RefreshGameFacts();  // a backup or restore may have just ended
-            if (restartAfterUpdate_) {
-                restartAfterUpdate_ = false;
-                if (outcome->succeeded) RestartLauncher();
-            }
             // A game waiting for its saves: start it now, synced or not (the message says which).
             if (!pendingPlay_.empty()) {
                 const auto location = pendingPlay_;
@@ -1059,7 +1064,9 @@ public:
 #endif
             launcherCheckError_ = list->error;
             launcherChecked_ = true;
+            StageLauncher();  // download it quietly; it's put in place on restart or when the launcher closes
         }
+        if (auto staged = launcherStager_.Take()) stagedLauncher_ = std::move(*staged);
         if (session_ && !session_->Running()) FinishSession();
         if (rescanWanted_ && !scan_.Running()) {
             rescanWanted_ = false;
@@ -1077,6 +1084,7 @@ public:
         DrawSetup();
         DrawNewProfile();
         DrawEditProfile();
+        DrawLauncherUpdate();
         // Options on a controller opens Settings when nothing else is open.
         if (ImGui::IsKeyPressed(ImGuiKey_GamepadStart, false) && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && !session_) OpenSettings();
         DrawGameSettings();
@@ -1764,9 +1772,20 @@ private:
         }
         if (launcherUpdate_) {
             ImGui::SameLine();
-            const std::string label = "Launcher " + launcherUpdate_->release.tag;
-            Pill(label.c_str(), Green);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("A newer launcher is out. Click to update; it restarts by itself.");
+            const auto& tag = launcherUpdate_->release.tag;
+            if (LauncherUpdateReady()) {
+                Pill(("Update ready: " + tag).c_str(), Green);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Downloaded. Click to see what's new and restart, or keep going: it's put in place when you close the launcher.");
+            } else if (launcherStager_.Running()) {
+                Pill(("Launcher " + tag + "  " + std::to_string(StagePercent()) + "%").c_str(), Dim);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Downloading the new launcher in the background.");
+            } else if (stagedLauncher_ && !stagedLauncher_->error.empty()) {
+                Pill(("Launcher " + tag).c_str(), Amber);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("The download failed: %s\nClick to see the update and try again.", stagedLauncher_->error.c_str());
+            } else {
+                Pill(("Launcher " + tag).c_str(), Green);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("A newer launcher is out. Click to see what's new.");
+            }
             if (ImGui::IsItemClicked()) StartLauncherUpdate();
         }
         ImGui::SameLine();
@@ -2394,6 +2413,14 @@ public:
 
     void SetStartRequest(std::optional<LaunchRequest> request) { pendingRequest_ = std::move(request); }
 
+    // Started by an update: say so once.
+    void SetJustUpdated() {
+#ifdef LAUNCHER_VERSION
+        message_ = Message{Green, "Launcher updated", std::string("You're on AnyPS5 Launcher ") + LAUNCHER_VERSION + "."};
+#endif
+    }
+
+
 private:
     std::filesystem::path RequestFile() const { return launcherFolder_ / "anyps5-launcher.request"; }
 
@@ -2463,25 +2490,79 @@ private:
 #endif
     }
 
+    // Opens the update dialog; the download starts (or starts again) if it isn't there yet.
     void StartLauncherUpdate() {
-        if (!launcherUpdate_ || job_.Busy() || session_) return;
-        const auto update = *launcherUpdate_;
-        const auto folder = launcherFolder_;
-        const auto exe = LauncherExe();
-        restartAfterUpdate_ = true;
-        job_.Start("Update the launcher to " + update.release.tag, true, [update, folder, exe](JobControl& control) {
-            const auto fresh = StageLauncherUpdate(update, folder, HttpDownload, RunToFile, control);
-            SwapLauncherExe(exe, fresh);
-            return "Updated to " + update.release.tag + "; starting it";
-        });
+        if (!launcherUpdate_) return;
+        if (stagedLauncher_ && !stagedLauncher_->error.empty()) stagedLauncher_.reset();
+        StageLauncher();
+        openLauncherUpdate_ = true;
     }
 
-    // Starts the (new) launcher and closes this one.
+    // Downloads and unpacks the update in the background, off the job queue, so it never
+    // gets in the way of installs or games.
+    void StageLauncher() {
+#ifdef _WIN32
+        if (!launcherUpdate_ || launcherStager_.Running() || updateApplied_) return;
+        if (stagedLauncher_ && stagedLauncher_->tag == launcherUpdate_->release.tag) return;  // done, or failed: retried on click
+        stageControl_ = std::make_shared<JobControl>();
+        launcherStager_.Start([update = *launcherUpdate_, folder = launcherFolder_, control = stageControl_] {
+            StagedLauncher staged;
+            staged.tag = update.release.tag;
+            try {
+                staged.exe = StageLauncherUpdate(update, folder, HttpDownload, RunToFile, *control);
+            } catch (const std::exception& failure) {
+                staged.error = ReadableText(failure.what());
+            }
+            return staged;
+        });
+#endif
+    }
+
+    bool LauncherUpdateReady() const {
+        return launcherUpdate_ && stagedLauncher_ && stagedLauncher_->tag == launcherUpdate_->release.tag && !stagedLauncher_->exe.empty();
+    }
+
+    int StagePercent() const {
+        if (!stageControl_ || stageControl_->Total() == 0) return 0;
+        return static_cast<int>(std::min<std::uint64_t>(100, stageControl_->Done() * 100 / stageControl_->Total()));
+    }
+
+    // Puts the downloaded exe in place of this one; with restart, starts it where this window is.
+    void ApplyLauncherUpdate(bool restart) {
+#ifdef _WIN32
+        if (updateApplied_ || !LauncherUpdateReady()) return;
+        try {
+            SwapLauncherExe(LauncherExe(), stagedLauncher_->exe);
+            updateApplied_ = true;
+        } catch (const std::exception& failure) {
+            if (restart) message_ = Message{Red, "Can't update the launcher", ReadableText(failure.what())};
+            return;
+        }
+        if (restart) RestartLauncher();
+#else
+        (void)restart;
+#endif
+    }
+
+    // Starts the (new) launcher in this window's place, on the same game, and closes this one.
     void RestartLauncher() {
-        const auto exe = ToUtf8(LauncherExe());
-        const char* arguments[] = {exe.c_str(), "--updated", nullptr};
+        std::vector<std::string> arguments{ToUtf8(LauncherExe()), "--updated"};
+        WindowPlacement placement;
+        SDL_GetWindowPosition(window_, &placement.x, &placement.y);
+        SDL_GetWindowSize(window_, &placement.width, &placement.height);
+        placement.maximized = (SDL_GetWindowFlags(window_) & SDL_WINDOW_MAXIMIZED) != 0;
+        arguments.push_back(FormatWindowArgument(placement));
+        for (const auto& game : result_.games) {
+            if (ToUtf8(game.location) == selected_ && !game.metadata.titleId.empty()) {
+                arguments.push_back("--game");
+                arguments.push_back(game.metadata.titleId);
+            }
+        }
+        std::vector<const char*> pointers;
+        for (const auto& argument : arguments) pointers.push_back(argument.c_str());
+        pointers.push_back(nullptr);
         SDL_PropertiesID properties = SDL_CreateProperties();
-        SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, const_cast<char**>(arguments));
+        SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, const_cast<char**>(pointers.data()));
         SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
         SDL_Process* process = SDL_CreateProcessWithProperties(properties);
         SDL_DestroyProperties(properties);
@@ -2491,6 +2572,79 @@ private:
         }
         SDL_DestroyProcess(process);  // it runs on by itself
         quitRequested_ = true;
+    }
+
+    void DrawLauncherUpdate() {
+        if (openLauncherUpdate_) {
+            ImGui::OpenPopup("Launcher update");
+            openLauncherUpdate_ = false;
+        }
+        FollowWindow(0.50f, 0.62f);
+        if (!BeginDialog("Launcher update")) return;
+        if (!launcherUpdate_) {
+            ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+            return;
+        }
+        const auto& release = launcherUpdate_->release;
+        const auto& style = ImGui::GetStyle();
+        std::string note = "You have ";
+#ifdef LAUNCHER_VERSION
+        note += std::string("v") + LAUNCHER_VERSION;
+#endif
+        if (release.publishedAt.size() >= 10) note += ". Released " + release.publishedAt.substr(0, 10);
+        note += ".";
+        bool close = DialogHeader(("AnyPS5 Launcher " + release.tag).c_str(), note.c_str());
+        const float footer = ImGui::GetFrameHeight() * 1.3f + style.ItemSpacing.y * 3 + ImGui::GetTextLineHeightWithSpacing();
+        ImGui::BeginChild("update-notes", ImVec2(0, -footer), ImGuiChildFlags_Borders);
+        const auto lines = ReleaseNoteLines(release.notes);
+        ImGui::PushTextWrapPos(0.0f);
+        if (lines.empty()) ImGui::TextColored(Dim, "%s", "No notes for this release.");
+        for (const auto& line : lines) {
+            if (line.empty()) ImGui::Spacing();
+            else ImGui::TextUnformatted(line.c_str());
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+        if (ImGui::SmallButton("All changes on GitHub")) {
+            SDL_OpenURL(("https://github.com/" + std::string(LauncherRepository) + "/releases/tag/" + release.tag).c_str());
+        }
+        ImGui::EndChild();
+
+        // What happens next, in one line.
+        if (LauncherUpdateReady()) {
+            ImGui::TextColored(session_ ? Amber : Green, "%s",
+                               session_ ? "Ready. Restart after the game closes, or it goes in place when you close the launcher." : "Ready. Restarting takes a second; you come back to the same game.");
+        } else if (launcherStager_.Running()) {
+            const float fraction = static_cast<float>(StagePercent()) / 100.0f;
+            ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight()), "Downloading...");
+        } else if (stagedLauncher_ && !stagedLauncher_->error.empty()) {
+            ImGui::TextColored(Red, "%s", Elide("Download failed: " + stagedLauncher_->error, ImGui::GetContentRegionAvail().x).c_str());
+        } else {
+            ImGui::TextColored(Dim, "%s", "Getting it ready...");
+        }
+        ImGui::Spacing();
+        const float buttonWidth = ImGui::GetFontSize() * 7.5f;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+        if (stagedLauncher_ && !stagedLauncher_->error.empty() && !launcherStager_.Running()) {
+            if (ImGui::Button("Try again", ImVec2(buttonWidth, buttonHeight))) {
+                stagedLauncher_.reset();
+                StageLauncher();
+            }
+            ImGui::SameLine();
+        }
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonWidth * 2 - style.ItemSpacing.x);
+        if (ImGui::Button("Later", ImVec2(buttonWidth, buttonHeight))) close = true;
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Keep going; the update goes in place when you close the launcher.");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!LauncherUpdateReady() || session_ != nullptr || job_.Busy());
+        if (PrimaryButton("Restart now", ImVec2(buttonWidth, buttonHeight))) {
+            ApplyLauncherUpdate(true);
+            close = true;
+        }
+        ImGui::EndDisabled();
+        if (close) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
     }
 
     static std::string UrlEncode(std::string_view text) {
@@ -4843,7 +4997,7 @@ private:
                 ImGui::TextColored(Dim, "Checking...");
             } else if (launcherUpdate_) {
                 ImGui::BeginDisabled(job_.Busy() || session_ != nullptr);
-                if (PrimaryButton(("Update to " + launcherUpdate_->release.tag).c_str())) StartLauncherUpdate();
+                if (PrimaryButton((LauncherUpdateReady() ? "Update to " + launcherUpdate_->release.tag + "..." : "See " + launcherUpdate_->release.tag + "...").c_str())) StartLauncherUpdate();
                 ImGui::EndDisabled();
             } else if (!launcherCheckError_.empty()) {
                 ImGui::TextColored(Amber, "%s", Elide(launcherCheckError_, ImGui::GetContentRegionAvail().x).c_str());
@@ -5000,7 +5154,11 @@ private:
     std::optional<LaunchRequest> pendingRequest_;              // from a link, handled once the games are scanned
     Background<ReleaseList> launcherReleases_;
     std::optional<LauncherUpdate> launcherUpdate_;
-    bool restartAfterUpdate_ = false;
+    Background<StagedLauncher> launcherStager_;
+    std::shared_ptr<JobControl> stageControl_;      // the background download's progress
+    std::optional<StagedLauncher> stagedLauncher_;  // ready, or failed
+    bool updateApplied_ = false;                    // the new exe is in place
+    bool openLauncherUpdate_ = false;
     bool quitRequested_ = false;
     bool launcherChecked_ = false;
     bool openSetup_ = false;
@@ -5094,7 +5252,14 @@ int main(int argc, char** argv) {
     // Rounded pictures are drawn with an anti-aliased edge whose texture coordinates go
     // a hair past 0..1; the default (wrap there) would paint the opposite edge as a thin line.
     SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    // After an update the new launcher opens where the old one was.
+    if (const auto placement = launcher::ParseWindowArgument(arguments)) {
+        SDL_SetWindowSize(window, placement->width, placement->height);
+        SDL_SetWindowPosition(window, placement->x, placement->y);
+        if (placement->maximized) SDL_MaximizeWindow(window);
+    } else {
+        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
     SDL_ShowWindow(window);
 
     IMGUI_CHECKVERSION();
@@ -5113,6 +5278,7 @@ int main(int argc, char** argv) {
     {
         LauncherApp app(window, renderer, scale);
         app.SetStartRequest(request);
+        if (std::find(arguments.begin(), arguments.end(), "--updated") != arguments.end()) app.SetJustUpdated();
         bool done = false;
         while (!done) {
             SDL_Event event;
