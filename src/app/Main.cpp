@@ -1039,6 +1039,7 @@ public:
             }
             message_ = Message{outcome->succeeded ? Green : outcome->cancelled ? Amber : Red, outcome->title, outcome->message};
             jobSerial_.clear();
+            jobLocation_.clear();
             if (!settingsSerial_.empty()) RefreshGameFacts();  // a backup or restore may have just ended
             // A game waiting for its saves: start it now, synced or not (the message says which).
             if (!pendingPlay_.empty()) {
@@ -1240,8 +1241,16 @@ private:
         return found == installs_.end() ? nullptr : &found->second;
     }
 
+    // A job on this copy of the game (install, remove, sync before play). Jobs for a
+    // title rather than a copy (a save backup) count for every copy of it.
+    bool JobOn(const GameEntry& game) const {
+        if (!job_.Busy() || jobSerial_ != game.metadata.titleId) return false;
+        return jobLocation_.empty() || jobLocation_ == ToUtf8(game.location);
+    }
+
+    // By the copy, not the title ID: two copies of a game (a .zar and a folder) share the ID.
     bool IsRunning(const GameEntry& game) const {
-        return session_ && session_->TitleId() == game.metadata.titleId;
+        return session_ && sessionLocation_ == ToUtf8(game.location);
     }
 
     // ---- actions -----------------------------------------------------------------
@@ -1265,8 +1274,8 @@ private:
     }
 
     std::string PlayBlocker(const GameEntry& game) const {
-        if (session_) return session_->TitleId() == game.metadata.titleId ? "Already running" : "Another game is running";
-        if (jobSerial_ == game.metadata.titleId) return "Being installed";
+        if (session_) return IsRunning(game) ? "Already running" : "Another game is running";
+        if (JobOn(game)) return "Being installed";
         if (InstallFor(game) == nullptr) return "Install it first";
         return {};
     }
@@ -1279,6 +1288,7 @@ private:
         std::optional<TitleEntry> titleCopy;
         if (title != nullptr) titleCopy = *title;
         jobSerial_ = game.metadata.titleId;
+        jobLocation_ = ToUtf8(game.location);
         job_.Start("Install " + game.metadata.name, true,
                    [game, runtime, layout = layout_, titleCopy, version = state.version, intel = UseIntelFlag(settings_, hostIntel_)](JobControl& control) {
                        const auto manifest = InstallGame({game, runtime, layout, titleCopy ? &*titleCopy : nullptr, version, TargetIsWindows, intel}, RunToFile, control);
@@ -1297,6 +1307,7 @@ private:
 
     void StartRemoveInstall(const GameEntry& game) {
         jobSerial_ = game.metadata.titleId;
+        jobLocation_ = ToUtf8(game.location);
         job_.Start("Remove install: " + game.metadata.name, false, [game](JobControl&) {
             const auto result = RemoveInstall(game);
             std::string text = "Restored " + ToUtf8(result.restored);
@@ -1317,6 +1328,7 @@ private:
             const auto root = FromUtf8(settings_.syncFolder);
             pendingPlay_ = ToUtf8(game.location);
             jobSerial_ = serial;
+            jobLocation_ = pendingPlay_;
             job_.Start("Sync saves: " + game.metadata.name, false, [layout, serial, root](JobControl& control) {
                 const auto result = PullSaves(layout, serial, root, control);
                 if (result.action == SyncResult::Action::Pulled) {
@@ -1333,6 +1345,7 @@ private:
         try {
             auto plan = PrepareRun(game, layout_, profileSettings_, TitleFor(game.metadata.titleId), LoadGameSettings(layout_.GameSettingsFile(game.metadata.titleId)));
             session_ = std::make_unique<GameSession>(game.metadata.titleId, game.metadata.name, std::move(plan));
+            sessionLocation_ = ToUtf8(game.location);
             message_ = Message{Green, "Playing " + game.metadata.name, "Profile " + layout_.profile};
             launching_ = true;
             launchStarted_ = SDL_GetTicks();
@@ -1810,7 +1823,7 @@ private:
 
     Badge BadgeFor(const GameEntry& game) const {
         if (IsRunning(game)) return {"Running", Accent};
-        if (jobSerial_ == game.metadata.titleId && job_.Busy()) return {"Working...", Amber};
+        if (JobOn(game)) return {"Working...", Amber};
         if (const auto* manifest = InstallFor(game)) {
             if (!ReinstallReason(game, *manifest, StateFor(game.metadata.titleId).version).empty()) return {"Reinstall", Amber};
             return {"Installed", Green};
@@ -2086,22 +2099,490 @@ private:
         setupStep_ = 0;
         setupProfile_ = layout_.profile.empty() ? std::string(DefaultProfileName) : layout_.profile;
         setupError_.clear();
+        setupCounted_.clear();
+        setupGameCount_.reset();
         missingAsked_ = true;  // the setup has its own AnyPS5 step
         openSetup_ = true;
     }
 
-    // Big step dots at the top of the setup.
-    void SetupDots(int steps) {
-        const float r = 5.0f * scale_;
-        const float gap = 14.0f * scale_;
+    // ---- first start: a sidebar with the steps, the step itself on the right -------------
+
+    static constexpr int SetupSteps = 4;
+
+    struct SetupStepText {
+        const char* title;
+        const char* subtitle;
+    };
+
+    static constexpr SetupStepText SetupStepTexts[SetupSteps] = {
+        {"Look and feel", "Theme and library view"},
+        {"Your games", "Where your dumps are"},
+        {"AnyPS5", "Relinker and libraries"},
+        {"Your profile", "Saves, trophies, controls"},
+    };
+
+    static ImU32 Col(int rgb, float alpha = 1.0f) {
+        return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, static_cast<int>(alpha * 255.0f));
+    }
+
+    // A check mark inside a box of this size.
+    static void DrawCheck(ImDrawList* draw, ImVec2 center, float size, ImU32 color, float thickness) {
+        const ImVec2 points[3] = {ImVec2(center.x - size * 0.30f, center.y + size * 0.02f), ImVec2(center.x - size * 0.08f, center.y + size * 0.24f),
+                                  ImVec2(center.x + size * 0.32f, center.y - size * 0.22f)};
+        draw->AddPolyline(points, 3, color, ImDrawFlags_None, thickness);
+    }
+
+    // The app's mark: a rounded square in the accent with a play triangle.
+    void DrawLogo(ImDrawList* draw, ImVec2 at, float size) {
+        const ImU32 top = ImGui::GetColorU32(AccentHover);
+        const ImU32 bottom = ImGui::GetColorU32(AccentActive);
+        draw->AddRectFilled(at, ImVec2(at.x + size, at.y + size), bottom, size * 0.28f);
+        draw->AddRectFilled(at, ImVec2(at.x + size, at.y + size * 0.6f), top, size * 0.28f, ImDrawFlags_RoundCornersTop);
+        draw->AddRectFilledMultiColor(ImVec2(at.x, at.y + size * 0.3f), ImVec2(at.x + size, at.y + size * 0.6f), top, top, bottom, bottom);
+        const ImVec2 c(at.x + size * 0.53f, at.y + size * 0.5f);
+        const float r = size * 0.22f;
+        draw->AddTriangleFilled(ImVec2(c.x - r * 0.75f, c.y - r), ImVec2(c.x - r * 0.75f, c.y + r), ImVec2(c.x + r, c.y), IM_COL32_WHITE);
+    }
+
+    // A card to pick: hover and selected states, a check badge when selected. paint draws inside.
+    template <typename Paint>
+    bool ChoiceCard(const char* id, ImVec2 size, bool selected, Paint paint) {
         const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool clicked = ImGui::InvisibleButton(id, size);
+        const bool hovered = ImGui::IsItemHovered();
         auto* draw = ImGui::GetWindowDrawList();
-        for (int i = 0; i < steps; ++i) {
-            const ImVec2 c(at.x + r + static_cast<float>(i) * (r * 2 + gap), at.y + r);
-            if (i == setupStep_) draw->AddRectFilled(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r * 3, c.y + r), ImGui::GetColorU32(Accent), r);
-            else draw->AddCircleFilled(c, r, ImGui::GetColorU32(i < setupStep_ ? Accent : Fade(Dim, 0.5f)));
+        const float rounding = 12.0f * scale_;
+        const ImVec2 end(at.x + size.x, at.y + size.y);
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(hovered ? CardHover : Card), rounding);
+        paint(draw, at, end);
+        if (selected) {
+            draw->AddRect(at, end, ImGui::GetColorU32(Accent), rounding, 0, 2.0f * scale_);
+            const float badge = 20.0f * scale_;
+            const ImVec2 c(end.x - badge * 0.5f - 8.0f * scale_, at.y + badge * 0.5f + 8.0f * scale_);
+            draw->AddCircleFilled(c, badge * 0.5f, ImGui::GetColorU32(Accent));
+            DrawCheck(draw, c, badge * 0.8f, IM_COL32_WHITE, 2.0f * scale_);
+        } else {
+            draw->AddRect(at, end, ImGui::GetColorU32(hovered ? Fade(Accent, 0.5f) : ImGui::GetStyle().Colors[ImGuiCol_Border]), rounding, 0, 1.0f * scale_);
         }
-        ImGui::Dummy(ImVec2(static_cast<float>(steps) * (r * 2 + gap) + r * 2, r * 2));
+        return clicked;
+    }
+
+    // A small window in a palette: title bar, a side panel and three tiles.
+    void DrawMiniWindow(ImDrawList* draw, ImVec2 at, ImVec2 end, const Palette& p) {
+        const float s = scale_;
+        draw->AddRectFilled(at, end, Col(p.background), 6.0f * s);
+        const float w = end.x - at.x;
+        const float h = end.y - at.y;
+        draw->AddRectFilled(ImVec2(at.x + 8 * s, at.y + 8 * s), ImVec2(at.x + w * 0.42f, at.y + 14 * s), Col(p.frame), 3.0f * s);
+        draw->AddCircleFilled(ImVec2(end.x - 12 * s, at.y + 11 * s), 3.5f * s, Col(p.accent));
+        const float tileTop = at.y + 22 * s;
+        const float tile = std::min((w - 8 * s * 4) / 3.0f, h - 30 * s);
+        for (int i = 0; i < 3; ++i) {
+            const float x = at.x + 8 * s + static_cast<float>(i) * (tile + 8 * s);
+            draw->AddRectFilled(ImVec2(x, tileTop), ImVec2(x + tile, tileTop + tile), Col(i == 0 ? p.accent : p.card, i == 0 ? 0.85f : 1.0f), 4.0f * s);
+        }
+    }
+
+    void DrawSetupSidebar(float width) {
+        const auto& style = ImGui::GetStyle();
+        ImGui::BeginChild("setup-side", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 origin = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        const float s = scale_;
+        const ImVec2 end(origin.x + size.x, origin.y + size.y);
+        draw->AddRectFilled(origin, end, ImGui::GetColorU32(Card), 14.0f * s);
+        // A soft wash of the accent from the top.
+        const ImU32 wash = ImGui::GetColorU32(Fade(Accent, 0.16f));
+        const ImU32 clear = ImGui::GetColorU32(Fade(Accent, 0.0f));
+        draw->AddRectFilledMultiColor(ImVec2(origin.x, origin.y + 14 * s), ImVec2(end.x, origin.y + size.y * 0.45f), wash, wash, clear, clear);
+        draw->AddRectFilled(origin, ImVec2(end.x, origin.y + 14 * s), wash, 14.0f * s, ImDrawFlags_RoundCornersTop);
+
+        const float pad = 22.0f * s;
+        const float logo = 40.0f * s;
+        DrawLogo(draw, ImVec2(origin.x + pad, origin.y + pad), logo);
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + pad + logo + 12 * s, origin.y + pad + 1 * s));
+        ImGui::PushFont(nullptr, style.FontSizeBase * 1.15f);
+        ImGui::TextUnformatted("AnyPS5 Launcher");
+        ImGui::PopFont();
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + pad + logo + 12 * s, ImGui::GetCursorScreenPos().y - 2 * s));
+        ImGui::TextColored(Dim, "%s", "First-time setup");
+
+        // The steps, one under the other, joined by a line.
+        const float radius = 14.0f * s;
+        const float rowHeight = 64.0f * s;
+        const float top = origin.y + pad + logo + 40.0f * s;
+        for (int i = 0; i < SetupSteps; ++i) {
+            const ImVec2 c(origin.x + pad + radius, top + static_cast<float>(i) * rowHeight + radius);
+            if (i + 1 < SetupSteps) {
+                draw->AddLine(ImVec2(c.x, c.y + radius + 4 * s), ImVec2(c.x, c.y + rowHeight - radius - 4 * s),
+                              ImGui::GetColorU32(i < setupStep_ ? Accent : Fade(Dim, 0.35f)), 2.0f * s);
+            }
+            const bool done = i < setupStep_;
+            const bool current = i == setupStep_;
+            if (done) {
+                draw->AddCircleFilled(c, radius, ImGui::GetColorU32(Accent));
+                DrawCheck(draw, c, radius * 1.3f, IM_COL32_WHITE, 2.2f * s);
+            } else if (current) {
+                draw->AddCircleFilled(c, radius + 4 * s, ImGui::GetColorU32(Fade(Accent, 0.22f)));
+                draw->AddCircleFilled(c, radius, ImGui::GetColorU32(Accent));
+            } else {
+                draw->AddCircle(c, radius, ImGui::GetColorU32(Fade(Dim, 0.6f)), 0, 1.6f * s);
+            }
+            if (!done) {
+                const std::string number = std::to_string(i + 1);
+                const ImVec2 text = ImGui::CalcTextSize(number.c_str());
+                draw->AddText(ImVec2(c.x - text.x * 0.5f, c.y - text.y * 0.5f), current ? IM_COL32_WHITE : ImGui::GetColorU32(Dim), number.c_str());
+            }
+            const float textX = c.x + radius + 14 * s;
+            draw->AddText(ImVec2(textX, c.y - ImGui::GetFontSize() * 0.95f), ImGui::GetColorU32(current || done ? ImGuiCol_Text : ImGuiCol_TextDisabled),
+                          SetupStepTexts[i].title);
+            draw->AddText(ImVec2(textX, c.y + 1 * s), ImGui::GetColorU32(Dim), SetupStepTexts[i].subtitle);
+            // Done steps can be clicked to go back to them.
+            if (done) {
+                ImGui::SetCursorScreenPos(ImVec2(origin.x + pad * 0.5f, c.y - rowHeight * 0.4f));
+                ImGui::PushID(i);
+                if (ImGui::InvisibleButton("step", ImVec2(size.x - pad, rowHeight * 0.8f))) setupStep_ = i;
+                if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::PopID();
+            }
+        }
+        const char* foot = "Everything here can be changed later in Settings.";
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + pad, end.y - pad - ImGui::GetTextLineHeight() * 2.2f));
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + size.x - pad * 2);
+        ImGui::TextColored(Dim, "%s", foot);
+        ImGui::PopTextWrapPos();
+        ImGui::EndChild();
+    }
+
+    // Counts the games in the chosen folder in the background, so the step can say what it found.
+    void CountSetupGames() {
+        // Wait until the path stops changing, so typing it doesn't scan every prefix.
+        if (draft_.gamesFolder != setupSeen_) {
+            setupSeen_ = draft_.gamesFolder;
+            setupSeenAt_ = SDL_GetTicks();
+        }
+        if (SDL_GetTicks() - setupSeenAt_ < 600) return;
+        if (draft_.gamesFolder == setupCounted_ || setupCounter_.Running()) return;
+        setupCounted_ = draft_.gamesFolder;
+        setupGameCount_.reset();
+        if (draft_.gamesFolder.empty()) return;
+        setupCounter_.Start([folder = FromUtf8(draft_.gamesFolder)] {
+            std::error_code error;
+            if (!std::filesystem::is_directory(folder, error)) return -1;
+            try {
+                ScanOptions options;
+                options.roots = {folder};
+                options.maxIconSize = 0;
+                return static_cast<int>(Scan(options).games.size());
+            } catch (const std::exception&) {
+                return -1;
+            }
+        });
+    }
+
+    void DrawSetupStep(float width) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const auto title = [&](const char* text, const char* note) {
+            ImGui::PushFont(nullptr, style.FontSizeBase * 1.9f);
+            ImGui::TextUnformatted(text);
+            ImGui::PopFont();
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(Dim, "%s", note);
+            ImGui::PopTextWrapPos();
+            ImGui::Dummy(ImVec2(0, 14 * s));
+        };
+        const auto label = [&](const char* text) {
+            ImGui::PushFont(nullptr, style.FontSizeBase * 1.05f);
+            ImGui::TextUnformatted(text);
+            ImGui::PopFont();
+            ImGui::Dummy(ImVec2(0, 2 * s));
+        };
+        bool canGoOn = true;
+        if (setupStep_ == 0) {
+            title("Welcome", "Your PS5 game dumps, converted with AnyPS5 and ready to play, with saves, trophies and controls per profile. Four quick steps; first, how it should look.");
+            label("Theme");
+            const float gap = 12.0f * s;
+            const float cardWidth = std::min(190.0f * s, (width - gap * 2) / 3.0f);
+            const ImVec2 card(cardWidth, cardWidth * 0.50f + ImGui::GetTextLineHeight() + 20 * s);
+            const char* names[] = {"Follow Windows", "Dark", "Light"};
+            const char* values[] = {"system", "dark", "light"};
+            for (int i = 0; i < 3; ++i) {
+                if (i > 0) ImGui::SameLine(0, gap);
+                ImGui::PushID(i);
+                const bool picked = draft_.theme == values[i];
+                if (ChoiceCard("theme", card, picked, [&](ImDrawList* draw, ImVec2 at, ImVec2 end) {
+                        const ImVec2 previewAt(at.x + 10 * s, at.y + 10 * s);
+                        const ImVec2 previewEnd(end.x - 10 * s, at.y + 10 * s + cardWidth * 0.50f - 10 * s);
+                        if (i == 0) {
+                            // Half dark, half light.
+                            const float mid = (previewAt.x + previewEnd.x) * 0.5f;
+                            draw->PushClipRect(previewAt, ImVec2(mid, previewEnd.y), true);
+                            DrawMiniWindow(draw, previewAt, previewEnd, DarkPalette);
+                            draw->PopClipRect();
+                            draw->PushClipRect(ImVec2(mid, previewAt.y), previewEnd, true);
+                            DrawMiniWindow(draw, previewAt, previewEnd, LightPalette);
+                            draw->PopClipRect();
+                        } else {
+                            DrawMiniWindow(draw, previewAt, previewEnd, i == 1 ? DarkPalette : LightPalette);
+                        }
+                        draw->AddText(ImVec2(at.x + 12 * s, end.y - ImGui::GetTextLineHeight() - 9 * s), ImGui::GetColorU32(ImGuiCol_Text), names[i]);
+                    })) {
+                    draft_.theme = values[i];
+                    auto& imguiStyle = ImGui::GetStyle();
+                    ApplyTheme(imguiStyle, WantDark(draft_.theme));
+                    imguiStyle.ScaleAllSizes(scale_);
+                    imguiStyle.FontScaleDpi = scale_;
+                }
+                ImGui::PopID();
+            }
+            ImGui::Dummy(ImVec2(0, 14 * s));
+            label("Library");
+            const float viewWidth = std::min(290.0f * s, (width - gap) / 2.0f);
+            const float previewHeight = 72.0f * s;
+            const ImVec2 viewCard(viewWidth, previewHeight + 20 * s + ImGui::GetTextLineHeightWithSpacing() * 2 + 8 * s);
+            const char* viewNames[] = {"Grid", "Home row"};
+            const char* viewNotes[] = {"Covers in a grid, details on the side", "Big artwork, one game at a time"};
+            for (int i = 0; i < 2; ++i) {
+                if (i > 0) ImGui::SameLine(0, gap);
+                ImGui::PushID(10 + i);
+                const bool picked = (draft_.view == "home") == (i == 1);
+                if (ChoiceCard("view", viewCard, picked, [&](ImDrawList* draw, ImVec2 at, ImVec2 end) {
+                        const ImU32 tileColor = ImGui::GetColorU32(Fade(Accent, 0.75f));
+                        const ImU32 faint = ImGui::GetColorU32(Fade(Dim, 0.30f));
+                        const ImVec2 art(at.x + 10 * s, at.y + 10 * s);
+                        const ImVec2 artEnd(end.x - 10 * s, at.y + 10 * s + previewHeight - 10 * s);
+                        const float w = artEnd.x - art.x;
+                        const float h = artEnd.y - art.y;
+                        draw->AddRectFilled(art, artEnd, ImGui::GetColorU32(Fade(WindowColor, 0.9f)), 6 * s);
+                        const float m = 7 * s;  // margin inside the preview
+                        if (i == 0) {
+                            const float panel = w * 0.28f;
+                            const float t = std::min((h - m * 3) / 2.0f, (w - panel - m * 5) / 3.0f);
+                            for (int r = 0; r < 2; ++r) {
+                                for (int c = 0; c < 3; ++c) {
+                                    const ImVec2 a(art.x + m + static_cast<float>(c) * (t + m), art.y + m + static_cast<float>(r) * (t + m));
+                                    draw->AddRectFilled(a, ImVec2(a.x + t, a.y + t), r == 0 && c == 0 ? tileColor : faint, 4 * s);
+                                }
+                            }
+                            draw->AddRectFilled(ImVec2(artEnd.x - m - panel, art.y + m), ImVec2(artEnd.x - m, artEnd.y - m), faint, 4 * s);
+                        } else {
+                            draw->AddRectFilledMultiColor(art, artEnd, ImGui::GetColorU32(Fade(Accent, 0.35f)), ImGui::GetColorU32(Fade(Accent, 0.10f)),
+                                                          ImGui::GetColorU32(Fade(Accent, 0.02f)), ImGui::GetColorU32(Fade(Accent, 0.20f)));
+                            const float big = (h - m * 2) * 0.72f;
+                            const float small = big * 0.62f;
+                            draw->AddRectFilled(ImVec2(art.x + m, art.y + m), ImVec2(art.x + m + big, art.y + m + big), tileColor, 5 * s);
+                            for (int c = 0; c < 4; ++c) {
+                                const float x = art.x + m * 2 + big + static_cast<float>(c) * (small + 5 * s);
+                                if (x + small > artEnd.x - m) break;
+                                draw->AddRectFilled(ImVec2(x, art.y + m + big - small), ImVec2(x + small, art.y + m + big), faint, 4 * s);
+                            }
+                            draw->AddRectFilled(ImVec2(art.x + m, artEnd.y - m - 5 * s), ImVec2(art.x + m + big * 1.3f, artEnd.y - m), faint, 3 * s);
+                        }
+                        const float textY = at.y + previewHeight + 10 * s;
+                        draw->AddText(ImVec2(at.x + 12 * s, textY), ImGui::GetColorU32(ImGuiCol_Text), viewNames[i]);
+                        draw->AddText(ImVec2(at.x + 12 * s, textY + ImGui::GetTextLineHeightWithSpacing()), ImGui::GetColorU32(Dim), viewNotes[i]);
+                    })) {
+                    draft_.view = i == 1 ? "home" : "grid";
+                }
+                ImGui::PopID();
+            }
+        } else if (setupStep_ == 1) {
+            title("Your games", "The folder with your game dumps: game folders and .zar archives, in it or in its subfolders. Nothing is copied, and .zar files stay as they are.");
+            CountSetupGames();
+            if (auto counted = setupCounter_.Take()) setupGameCount_ = *counted;
+            // A large drop-zone-like card with the folder field inside.
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const float cardHeight = 150.0f * s;
+            auto* draw = ImGui::GetWindowDrawList();
+            const ImVec2 end(at.x + width, at.y + cardHeight);
+            draw->AddRectFilled(at, end, ImGui::GetColorU32(Card), 12 * s);
+            // Dashed outline.
+            const ImU32 dash = ImGui::GetColorU32(Fade(Dim, 0.45f));
+            for (float x = at.x + 14 * s; x < end.x - 14 * s; x += 14 * s) {
+                draw->AddLine(ImVec2(x, at.y), ImVec2(std::min(x + 7 * s, end.x - 14 * s), at.y), dash, 1.2f * s);
+                draw->AddLine(ImVec2(x, end.y), ImVec2(std::min(x + 7 * s, end.x - 14 * s), end.y), dash, 1.2f * s);
+            }
+            for (float y = at.y + 14 * s; y < end.y - 14 * s; y += 14 * s) {
+                draw->AddLine(ImVec2(at.x, y), ImVec2(at.x, std::min(y + 7 * s, end.y - 14 * s)), dash, 1.2f * s);
+                draw->AddLine(ImVec2(end.x, y), ImVec2(end.x, std::min(y + 7 * s, end.y - 14 * s)), dash, 1.2f * s);
+            }
+            // A folder.
+            const float fw = 46 * s;
+            const float fh = 34 * s;
+            const ImVec2 f(at.x + 24 * s, at.y + 24 * s);
+            draw->AddRectFilled(f, ImVec2(f.x + fw * 0.45f, f.y + fh * 0.3f), ImGui::GetColorU32(AccentActive), 4 * s);
+            draw->AddRectFilled(ImVec2(f.x, f.y + fh * 0.18f), ImVec2(f.x + fw, f.y + fh), ImGui::GetColorU32(Accent), 5 * s);
+            ImGui::SetCursorScreenPos(ImVec2(f.x + fw + 16 * s, at.y + 22 * s));
+            ImGui::BeginGroup();
+            ImGui::TextUnformatted("Games folder");
+            ImGui::TextColored(Dim, "%s", "For example D:\\Games\\PS5");
+            ImGui::EndGroup();
+            ImGui::SetCursorScreenPos(ImVec2(at.x + 24 * s, f.y + fh + 22 * s));
+            const float browse = ImGui::CalcTextSize("Browse...").x + style.FramePadding.x * 2;
+            ImGui::SetNextItemWidth(width - 48 * s - browse - style.ItemSpacing.x);
+            ImGui::InputTextWithHint("##setup-games", "Paste a path or choose one", &draft_.gamesFolder);
+            ImGui::SameLine();
+            ImGui::BeginDisabled(Picker().IsOpen());
+            if (PrimaryButton("Browse...")) Picker().Open(window_, &draft_.gamesFolder);
+            ImGui::EndDisabled();
+            ImGui::SetCursorScreenPos(ImVec2(at.x, end.y + 14 * s));
+            // What's in it.
+            if (draft_.gamesFolder.empty()) {
+                ImGui::TextColored(Dim, "%s", "Choose a folder to go on.");
+            } else if (setupCounter_.Running() || draft_.gamesFolder != setupCounted_) {
+                ImGui::TextColored(Dim, "%s", "Looking for games...");
+            } else if (setupGameCount_ && *setupGameCount_ > 0) {
+                ImGui::TextColored(Green, "Found %d game%s", *setupGameCount_, *setupGameCount_ == 1 ? "" : "s");
+            } else if (setupGameCount_ && *setupGameCount_ < 0) {
+                ImGui::TextColored(Red, "%s", "That folder can't be read.");
+            } else {
+                ImGui::TextColored(Amber, "%s", "No games there yet. You can still go on and add them later.");
+            }
+            canGoOn = !draft_.gamesFolder.empty();
+        } else if (setupStep_ == 2) {
+            title("AnyPS5", "The relinker that converts games, and the libraries they run on. Get the official release, or point to a build of your own. More versions can be added later.");
+            const bool busy = job_.Busy() || releasesLoader_.Running();
+            canGoOn = !busy;  // a download started here finishes before the setup goes on
+            // Where things stand, in one row.
+            {
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                const float h = ImGui::GetFrameHeight() + 18 * s;
+                auto* draw = ImGui::GetWindowDrawList();
+                const ImVec4 tone = anyps5_.probe.runtime ? Green : busy ? Accent : Dim;
+                draw->AddRectFilled(at, ImVec2(at.x + width, at.y + h), ImGui::GetColorU32(Fade(tone, 0.12f)), 10 * s);
+                const ImVec2 c(at.x + 20 * s, at.y + h * 0.5f);
+                draw->AddCircleFilled(c, 9 * s, ImGui::GetColorU32(tone));
+                if (anyps5_.probe.runtime) DrawCheck(draw, c, 12 * s, IM_COL32_WHITE, 2.0f * s);
+                ImGui::SetCursorScreenPos(ImVec2(at.x + 38 * s, at.y + (h - ImGui::GetTextLineHeight()) * 0.5f));
+                if (anyps5_.probe.runtime) ImGui::TextColored(Green, "Ready: AnyPS5 %s", CurrentVersionLabel().c_str());
+                else if (busy) ImGui::TextUnformatted(job_.Busy() ? job_.Title().c_str() : "Looking up the latest release...");
+                else ImGui::TextColored(Dim, "%s", "Not set up yet. You can skip this and do it later.");
+                if (job_.Busy()) {
+                    const auto& control = job_.Control();
+                    const float fraction = control.Total() == 0 ? 0.0f : static_cast<float>(control.Done()) / static_cast<float>(control.Total());
+                    ImGui::SetCursorScreenPos(ImVec2(at.x + width * 0.55f, at.y + (h - ImGui::GetTextLineHeight()) * 0.5f));
+                    ImGui::ProgressBar(fraction, ImVec2(width * 0.42f, ImGui::GetTextLineHeight()));
+                }
+                ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 14 * s));
+            }
+            // Two ways, as cards.
+            const float gap = 12.0f * s;
+            const float cardWidth = (width - gap) / 2.0f;
+            const struct {
+                const char* title;
+                const char* text;
+                const char* button;
+                bool primary;
+            } ways[2] = {{"Official release", "Downloads the newest AnyPS5 from github.com/boykopovar/AnyPS5 and checks it.", "Download", true},
+                         {"My own build", "An AnyPS5 folder you built or unpacked, with the relinker and its libs folder.", "Choose a folder...", false}};
+            float textHeight = 0.0f;
+            for (const auto& way : ways) textHeight = std::max(textHeight, ImGui::CalcTextSize(way.text, nullptr, false, cardWidth - 32 * s).y);
+            const float cardHeight = 14 * s + ImGui::GetFrameHeight() + 2 * s + textHeight + 14 * s + ImGui::GetFrameHeight() * 1.2f + 14 * s;
+            for (int i = 0; i < 2; ++i) {
+                if (i > 0) ImGui::SameLine(0, gap);
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                auto* draw = ImGui::GetWindowDrawList();
+                draw->AddRectFilled(at, ImVec2(at.x + cardWidth, at.y + cardHeight), ImGui::GetColorU32(Card), 12 * s);
+                draw->AddRect(at, ImVec2(at.x + cardWidth, at.y + cardHeight), ImGui::GetColorU32(ways[i].primary ? Fade(Accent, 0.6f) : style.Colors[ImGuiCol_Border]),
+                              12 * s, 0, 1.0f * s);
+                ImGui::BeginGroup();
+                ImGui::SetCursorScreenPos(ImVec2(at.x + 16 * s, at.y + 14 * s));
+                ImGui::TextUnformatted(ways[i].title);
+                if (ways[i].primary) {
+                    ImGui::SameLine();
+                    Pill("Recommended", Accent);
+                }
+                ImGui::SetCursorScreenPos(ImVec2(at.x + 16 * s, ImGui::GetCursorScreenPos().y + 2 * s));
+                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cardWidth - 32 * s);
+                ImGui::TextColored(Dim, "%s", ways[i].text);
+                ImGui::PopTextWrapPos();
+                ImGui::SetCursorScreenPos(ImVec2(at.x + 16 * s, at.y + cardHeight - ImGui::GetFrameHeight() * 1.2f - 14 * s));
+                ImGui::BeginDisabled(busy || Picker().IsOpen());
+                ImGui::PushID(i);
+                const ImVec2 buttonSize(cardWidth - 32 * s, ImGui::GetFrameHeight() * 1.2f);
+                if (i == 0 ? PrimaryButton(ways[i].button, buttonSize) : ImGui::Button(ways[i].button, buttonSize)) {
+                    if (i == 0) LoadReleases(OfficialRepository, true);
+                    else Picker().Open(window_, &localPick_);
+                }
+                ImGui::PopID();
+                ImGui::EndDisabled();
+                ImGui::SetCursorScreenPos(at);
+                ImGui::Dummy(ImVec2(cardWidth, cardHeight));
+                ImGui::EndGroup();
+            }
+            if (hostIntel_) {
+                // Only for Intel: an AMD PC needs nothing here.
+                ImGui::Dummy(ImVec2(0, 8 * s));
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                auto* draw = ImGui::GetWindowDrawList();
+                const std::string head = cpuName_.empty() ? std::string("Intel CPU") : cpuName_;
+                const char* text = "Games will be converted with the Intel flag (--to-intel), which Intel CPUs need. You can turn it off in Settings under Converting games.";
+                const float wrap = width - 56 * s;
+                const float h = ImGui::GetTextLineHeightWithSpacing() + ImGui::CalcTextSize(text, nullptr, false, wrap).y + 24 * s;
+                draw->AddRectFilled(at, ImVec2(at.x + width, at.y + h), ImGui::GetColorU32(Fade(Accent, 0.12f)), 10 * s);
+                draw->AddRectFilled(at, ImVec2(at.x + 4 * s, at.y + h), ImGui::GetColorU32(Accent), 2 * s);
+                const ImVec2 c(at.x + 24 * s, at.y + 12 * s + ImGui::GetTextLineHeight() * 0.5f);
+                draw->AddCircleFilled(c, 9 * s, ImGui::GetColorU32(Accent));
+                draw->AddText(ImVec2(c.x - ImGui::CalcTextSize("i").x * 0.5f, c.y - ImGui::GetTextLineHeight() * 0.5f), IM_COL32_WHITE, "i");
+                ImGui::SetCursorScreenPos(ImVec2(at.x + 42 * s, at.y + 12 * s));
+                ImGui::BeginGroup();
+                ImGui::TextUnformatted(head.c_str());
+                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap);
+                ImGui::TextColored(Dim, "%s", text);
+                ImGui::PopTextWrapPos();
+                ImGui::EndGroup();
+                ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h));
+                ImGui::Dummy(ImVec2(width, 0));
+            }
+        } else {
+            title("Your profile", "A profile keeps its own saves, trophies, controls, screenshots and console language. Add more later from the profile button in the top bar.");
+            const float avatar = 72.0f * s;
+            DrawProfileAvatar(setupProfile_.empty() ? std::string("?") : setupProfile_, ImGui::GetCursorScreenPos(), avatar);
+            ImGui::Dummy(ImVec2(avatar, avatar));
+            ImGui::SameLine(0, 18.0f * s);
+            ImGui::BeginGroup();
+            ImGui::Dummy(ImVec2(0, 6 * s));
+            ImGui::TextUnformatted("Name");
+            ImGui::SetNextItemWidth(std::min(width - avatar - 18 * s, 320.0f * s));
+            if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+            ImGui::InputText("##setup-profile", &setupProfile_);
+            ImGui::EndGroup();
+            canGoOn = IsValidProfileName(setupProfile_);
+            if (!canGoOn) ImGui::TextColored(Red, "%s", "Use a name that can be a folder name (no \\ / : * ? \" < > |)");
+            // What was chosen, to check at a glance.
+            ImGui::Dummy(ImVec2(0, 14 * s));
+            label("Ready to go");
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const float row = ImGui::GetTextLineHeightWithSpacing() + 10 * s;
+            const std::string games = draft_.gamesFolder.empty() ? std::string("not set") : draft_.gamesFolder;
+            const std::string found = setupGameCount_ && *setupGameCount_ >= 0 && setupCounted_ == draft_.gamesFolder
+                                          ? " (" + std::to_string(*setupGameCount_) + (*setupGameCount_ == 1 ? " game)" : " games)")
+                                          : std::string();
+            const std::string version = anyps5_.probe.runtime ? CurrentVersionLabel() : std::string("not yet, set it up later under AnyPS5 versions");
+            const std::string look = std::string(draft_.theme == "dark" ? "Dark" : draft_.theme == "light" ? "Light" : "Follows Windows") + ", " +
+                                     (draft_.view == "home" ? "home row" : "grid");
+            const std::pair<const char*, std::string> rows[] = {{"Games", games + found}, {"AnyPS5", version}, {"Look", look}};
+            auto* draw = ImGui::GetWindowDrawList();
+            draw->AddRectFilled(at, ImVec2(at.x + width, at.y + row * 3 + 12 * s), ImGui::GetColorU32(Card), 12 * s);
+            for (int i = 0; i < 3; ++i) {
+                const float y = at.y + 6 * s + static_cast<float>(i) * row;
+                const bool ok = i != 1 || anyps5_.probe.runtime;
+                const ImVec2 c(at.x + 22 * s, y + row * 0.5f);
+                draw->AddCircleFilled(c, 8 * s, ImGui::GetColorU32(ok ? Fade(Green, 0.9f) : Fade(Amber, 0.9f)));
+                if (ok) DrawCheck(draw, c, 11 * s, IM_COL32_WHITE, 1.8f * s);
+                else draw->AddText(ImVec2(c.x - ImGui::CalcTextSize("!").x * 0.5f, c.y - ImGui::GetTextLineHeight() * 0.5f), IM_COL32_WHITE, "!");
+                const float textY = y + (row - ImGui::GetTextLineHeight()) * 0.5f;
+                draw->AddText(ImVec2(at.x + 40 * s, textY), ImGui::GetColorU32(Dim), rows[i].first);
+                const float valueX = at.x + 120 * s;
+                draw->PushClipRect(ImVec2(valueX, y), ImVec2(at.x + width - 12 * s, y + row), true);
+                draw->AddText(ImVec2(valueX, textY), ImGui::GetColorU32(ImGuiCol_Text), rows[i].second.c_str());
+                draw->PopClipRect();
+            }
+            ImGui::Dummy(ImVec2(width, row * 3 + 12 * s));
+        }
+        setupCanGoOn_ = canGoOn;
     }
 
     void DrawSetup() {
@@ -2109,106 +2590,45 @@ private:
             ImGui::OpenPopup("Welcome");
             openSetup_ = false;
         }
-        FollowWindow(0.62f, 0.72f);
+        FollowWindow(0.76f, 0.86f);
         if (!BeginDialog("Welcome")) return;
         const auto& style = ImGui::GetStyle();
-        constexpr int Steps = 4;
-        SetupDots(Steps);
-        ImGui::Spacing();
-        const float footer = ImGui::GetFrameHeight() * 1.3f + style.ItemSpacing.y * 3 + ImGui::GetTextLineHeightWithSpacing();
-        ImGui::BeginChild("setup-body", ImVec2(0, -footer));
-        const auto title = [&](const char* text, const char* note) {
-            ImGui::PushFont(nullptr, style.FontSizeBase * 1.7f);
-            ImGui::TextUnformatted(text);
-            ImGui::PopFont();
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextColored(Dim, "%s", note);
-            ImGui::PopTextWrapPos();
-            ImGui::Spacing();
-            ImGui::Spacing();
-        };
-        bool canGoOn = true;
-        if (setupStep_ == 0) {
-            title("Welcome to AnyPS5 Launcher", "It finds your PS5 game dumps, converts them with AnyPS5, starts them, and keeps saves, trophies and controls per profile. Four quick steps.");
-            ImGui::TextUnformatted("Appearance");
-            int current = draft_.theme == "dark" ? 1 : draft_.theme == "light" ? 2 : 0;
-            const char* labels[] = {"Follow Windows", "Dark", "Light"};
-            if (Segmented("setup-theme", labels, 3, current)) {
-                draft_.theme = current == 1 ? "dark" : current == 2 ? "light" : "system";
-                auto& imguiStyle = ImGui::GetStyle();
-                ApplyTheme(imguiStyle, WantDark(draft_.theme));
-                imguiStyle.ScaleAllSizes(scale_);
-                imguiStyle.FontScaleDpi = scale_;
-            }
-            ImGui::Spacing();
-            ImGui::TextUnformatted("Library view");
-            int view = draft_.view == "home" ? 1 : 0;
-            const char* views[] = {"Grid", "Home row"};
-            if (Segmented("setup-view", views, 2, view)) draft_.view = view == 1 ? "home" : "grid";
-        } else if (setupStep_ == 1) {
-            title("Your games", "The folder with your game dumps: game folders and .zar archives, in it or in its subfolders. Nothing is copied; .zar files stay as they are.");
-            FolderField("Games folder", nullptr, "##setup-games", "e.g. D:\\Games\\PS5", draft_.gamesFolder);
-            canGoOn = !draft_.gamesFolder.empty();
-            if (!canGoOn) ImGui::TextColored(Dim, "Choose one to go on.");
-        } else if (setupStep_ == 2) {
-            title("AnyPS5", "The relinker that converts games and the libraries they run on. Download the official release, or use a build of your own; you can add more later under AnyPS5 versions.");
-            const bool busy = job_.Busy() || releasesLoader_.Running();
-            if (anyps5_.probe.runtime) {
-                ImGui::TextColored(Green, "Ready: AnyPS5 %s", CurrentVersionLabel().c_str());
-            } else if (busy) {
-                ImGui::TextColored(Amber, "%s", job_.Busy() ? job_.Title().c_str() : "Looking up the latest release...");
-            } else {
-                ImGui::TextColored(Dim, "No AnyPS5 yet.");
-            }
-            ImGui::Spacing();
-            ImGui::BeginDisabled(busy);
-            if (PrimaryButton("Download the latest official release")) LoadReleases(OfficialRepository, true);
-            ImGui::SameLine();
-            ImGui::BeginDisabled(Picker().IsOpen());
-            if (ImGui::Button("Use my own build...")) Picker().Open(window_, &localPick_);
-            ImGui::EndDisabled();
-            ImGui::EndDisabled();
-            if (job_.Busy()) {
-                const auto& control = job_.Control();
-                const float fraction = control.Total() == 0 ? 0.0f : static_cast<float>(control.Done()) / static_cast<float>(control.Total());
-                ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0));
-            }
-            ImGui::TextColored(Dim, "%s", "You can skip this and do it later.");
-            if (hostIntel_) {
-                // Only for Intel: an AMD PC needs nothing here.
-                ImGui::Spacing();
-                ImGui::Spacing();
-                ImGui::PushTextWrapPos(0.0f);
-                ImGui::TextColored(Accent, "Intel CPU%s%s", cpuName_.empty() ? "" : ": ", cpuName_.c_str());
-                ImGui::TextUnformatted("The relinker will convert your games with the Intel flag (--to-intel), which this kind of CPU needs. You can turn it off in Settings under Converting games.");
-                ImGui::PopTextWrapPos();
-            }
-        } else {
-            title("Your profile", "A profile keeps its own saves, trophies, controls, screenshots and console language. Add more later from the profile button.");
-            const float avatar = ImGui::GetFontSize() * 3.6f;
-            DrawProfileAvatar(setupProfile_.empty() ? std::string("?") : setupProfile_, ImGui::GetCursorScreenPos(), avatar);
-            ImGui::Dummy(ImVec2(avatar, avatar));
-            ImGui::SameLine(0, 16.0f * scale_);
-            ImGui::BeginGroup();
-            ImGui::TextUnformatted("Name");
-            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 18);
-            ImGui::InputText("##setup-profile", &setupProfile_);
-            ImGui::EndGroup();
-            canGoOn = IsValidProfileName(setupProfile_);
-            if (!canGoOn) ImGui::TextColored(Red, "Use a name that can be a folder name (no \\ / : * ? \" < > |)");
-        }
+        const float s = scale_;
+        const float side = std::clamp(ImGui::GetContentRegionAvail().x * 0.30f, 220.0f * s, 300.0f * s);
+        DrawSetupSidebar(side);
+        ImGui::SameLine(0, 26.0f * s);
+
+        ImGui::BeginGroup();
+        const float width = ImGui::GetContentRegionAvail().x;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.35f;
+        const float footer = buttonHeight + 10.0f * s + ImGui::GetTextLineHeight() + style.ItemSpacing.y * 4 + 2.0f;
+        ImGui::BeginChild("setup-body", ImVec2(width, -footer), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        DrawSetupStep(ImGui::GetContentRegionAvail().x - style.ScrollbarSize * 0.5f);
         ImGui::EndChild();
 
-        if (!setupError_.empty()) ImGui::TextColored(Red, "%s", Elide(setupError_, ImGui::GetContentRegionAvail().x).c_str());
-        else ImGui::TextColored(Dim, "Step %d of %d", setupStep_ + 1, Steps);
-        ImGui::Spacing();
-        const float buttonWidth = ImGui::GetFontSize() * 6.5f;
-        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
-        if (setupStep_ > 0 && ImGui::Button("Back", ImVec2(buttonWidth, buttonHeight))) --setupStep_;
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonWidth);
-        ImGui::BeginDisabled(!canGoOn || Picker().IsOpen());
-        const bool last = setupStep_ == Steps - 1;
-        if (PrimaryButton(last ? "Start" : "Next", ImVec2(buttonWidth, buttonHeight))) {
+        // A thin progress bar over the buttons.
+        {
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            auto* draw = ImGui::GetWindowDrawList();
+            const float h = 4.0f * s;
+            draw->AddRectFilled(at, ImVec2(at.x + width, at.y + h), ImGui::GetColorU32(Fade(Dim, 0.2f)), h);
+            const float done = static_cast<float>(setupStep_ + 1) / static_cast<float>(SetupSteps);
+            draw->AddRectFilled(at, ImVec2(at.x + width * done, at.y + h), ImGui::GetColorU32(Accent), h);
+            ImGui::Dummy(ImVec2(width, h + 6 * s));
+        }
+        if (!setupError_.empty()) ImGui::TextColored(Red, "%s", Elide(setupError_, width).c_str());
+        else if (setupStep_ == 2 && (job_.Busy() || releasesLoader_.Running())) ImGui::TextColored(Dim, "%s", "Downloading AnyPS5; Continue unlocks when it's done.");
+        else ImGui::TextColored(Dim, "Step %d of %d", setupStep_ + 1, SetupSteps);
+        const float buttonWidth = ImGui::GetFontSize() * 7.0f;
+        if (setupStep_ > 0) {
+            if (ImGui::Button("Back", ImVec2(buttonWidth, buttonHeight))) --setupStep_;
+            ImGui::SameLine();
+        }
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, width - buttonWidth - (setupStep_ > 0 ? buttonWidth + style.ItemSpacing.x : 0.0f)));
+        ImGui::BeginDisabled(!setupCanGoOn_ || Picker().IsOpen());
+        const bool last = setupStep_ == SetupSteps - 1;
+        const bool enter = !last && setupCanGoOn_ && !ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+        if (PrimaryButton(last ? "Start playing" : "Continue", ImVec2(buttonWidth, buttonHeight)) || enter) {
             if (!last) {
                 ++setupStep_;
             } else {
@@ -2238,6 +2658,7 @@ private:
             }
         }
         ImGui::EndDisabled();
+        ImGui::EndGroup();
         ImGui::EndPopup();
     }
 
@@ -3283,7 +3704,7 @@ private:
         if (!open) return;
         const GameEntry* game = nullptr;
         for (const auto& entry : result_.games) {
-            if (entry.metadata.titleId == session_->TitleId() && !entry.home.empty()) game = &entry;
+            if (IsRunning(entry)) game = &entry;
         }
         const float art = ImGui::GetFontSize() * 9;
         if (game != nullptr) {
@@ -4181,7 +4602,7 @@ private:
         const auto& serial = game.metadata.titleId;
         if (IsRunning(game)) {
             ImGui::TextColored(Green, "Running");
-        } else if (jobSerial_ == serial && job_.Busy()) {
+        } else if (JobOn(game)) {
             ImGui::TextColored(Amber, "Installing...");
         } else if (const auto* manifest = InstallFor(game)) {
             const auto reason = ReinstallReason(game, *manifest, StateFor(serial).version);
@@ -5165,6 +5586,12 @@ private:
     int setupStep_ = 0;
     std::string setupProfile_;
     std::string setupError_;
+    bool setupCanGoOn_ = true;
+    Background<int> setupCounter_;     // games found in the chosen folder; -1: can't read it
+    std::string setupCounted_;         // the folder it counted
+    std::optional<int> setupGameCount_;
+    std::string setupSeen_;            // the path as last typed, and when
+    std::uint64_t setupSeenAt_ = 0;
     std::string launcherCheckError_;
     Uint64 nextRequestCheck_ = 0;  // the last run of each game, by serial
     // Game settings window.
@@ -5202,7 +5629,9 @@ private:
     Background<ScanResult> scan_;
     BackgroundJob job_;
     std::string jobSerial_;
+    std::string jobLocation_;  // the copy the job works on; empty: every copy of jobSerial_
     std::unique_ptr<GameSession> session_;
+    std::string sessionLocation_;  // the copy that runs (its location), as two copies share a title ID
     ScanResult result_;
     bool scanned_ = false;
     bool rescanWanted_ = false;
