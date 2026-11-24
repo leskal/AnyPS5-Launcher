@@ -70,7 +70,8 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     if (result.settings.theme != "dark" && result.settings.theme != "light") result.settings.theme = "system";
     for (const auto& [key, target] : {std::pair<const char*, bool*>{"onlineInfo", &result.settings.onlineInfo},
                                       std::pair<const char*, bool*>{"trophyPopups", &result.settings.trophyPopups},
-                                      std::pair<const char*, bool*>{"trophySound", &result.settings.trophySound}}) {
+                                      std::pair<const char*, bool*>{"trophySound", &result.settings.trophySound},
+                                      std::pair<const char*, bool*>{"hideWhilePlaying", &result.settings.hideWhilePlaying}}) {
         const auto found = document->find(key);
         if (found == document->end()) continue;
         if (found->is_boolean()) *target = found->get<bool>();
@@ -97,6 +98,7 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["onlineInfo"] = settings.onlineInfo;
     document["trophyPopups"] = settings.trophyPopups;
     document["trophySound"] = settings.trophySound;
+    document["hideWhilePlaying"] = settings.hideWhilePlaying;
     document.erase("python");
     WriteFileAtomically(file, document.dump(4) + "\n");
 }

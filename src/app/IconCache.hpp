@@ -20,6 +20,8 @@ public:
 
     SDL_Texture* Get(const std::filesystem::path& key, const std::vector<std::uint8_t>& png);
     void Clear();
+    // Frees one texture (a big picture no longer shown).
+    void Forget(const std::filesystem::path& key);
 
 private:
     SDL_Renderer* renderer_;

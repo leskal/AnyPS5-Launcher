@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <winioctl.h>
 #include <shellapi.h>
+#include <tlhelp32.h>
 
 namespace launcher::win {
 
@@ -181,6 +182,51 @@ BOOL CALLBACK VisitWindow(HWND window, LPARAM parameter) {
     return TRUE;
 }
 
+}
+
+bool ProcessRunning(const wchar_t* exeName) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return false;
+    PROCESSENTRY32W entry{};
+    entry.dwSize = sizeof(entry);
+    bool found = false;
+    for (BOOL more = Process32FirstW(snapshot, &entry); more && !found; more = Process32NextW(snapshot, &entry)) {
+        found = lstrcmpiW(entry.szExeFile, exeName) == 0;
+    }
+    CloseHandle(snapshot);
+    return found;
+}
+
+void WindowsVersion(wchar_t* text, unsigned long capacity) {
+    if (capacity == 0) return;
+    text[0] = 0;
+    const wchar_t* key = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+    wchar_t product[128] = L"Windows";
+    wchar_t display[64] = L"";
+    wchar_t build[32] = L"";
+    DWORD size = sizeof(product);
+    RegGetValueW(HKEY_LOCAL_MACHINE, key, L"ProductName", RRF_RT_REG_SZ, nullptr, product, &size);
+    size = sizeof(display);
+    RegGetValueW(HKEY_LOCAL_MACHINE, key, L"DisplayVersion", RRF_RT_REG_SZ, nullptr, display, &size);
+    size = sizeof(build);
+    RegGetValueW(HKEY_LOCAL_MACHINE, key, L"CurrentBuild", RRF_RT_REG_SZ, nullptr, build, &size);
+    // Windows 11 still says "Windows 10" in ProductName; the build tells them apart.
+    long number = 0;
+    for (const wchar_t* c = build; *c >= L'0' && *c <= L'9'; ++c) number = number * 10 + (*c - L'0');
+    if (number >= 22000 && product[8] == L'1' && product[9] == L'0') product[9] = L'1';
+    unsigned long used = 0;
+    const auto append = [&](const wchar_t* part) {
+        for (const wchar_t* c = part; *c != 0 && used + 1 < capacity; ++c) text[used++] = *c;
+        text[used] = 0;
+    };
+    append(product);
+    if (display[0] != 0) {
+        append(L" ");
+        append(display);
+    }
+    append(L" (build ");
+    append(build);
+    append(L")");
 }
 
 unsigned long RecycleItem(const wchar_t* path) {

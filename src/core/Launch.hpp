@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/AnyPS5.hpp"
+#include "core/GameSettings.hpp"
 #include "core/Install.hpp"
 #include "core/Session.hpp"
 #include "core/Profiles.hpp"
@@ -30,7 +31,8 @@ struct RunPlan {
 //   profiles/<profile>/_trophy/<serial>        -> <game>/_trophy
 //   games/<serial>/data, download0             -> <game>/data, download0
 // Nothing is linked. FinishRun moves them back.
-RunPlan PrepareRun(const GameEntry& game, const Layout& layout, const ProfileSettings& profile, const TitleEntry* title);
+// The game's own settings come last, so they win over the profile's language.
+RunPlan PrepareRun(const GameEntry& game, const Layout& layout, const ProfileSettings& profile, const TitleEntry* title, const GameSettings& settings = {});
 
 struct RunReport {
     std::string exit;
@@ -38,6 +40,7 @@ struct RunReport {
     double seconds = 0;
     std::string stopKind;
     std::string stopMessage;
+    std::string missingFunction;  // "libSceFoo::sceFooBar", the first one the run called
     std::string summary;
 };
 

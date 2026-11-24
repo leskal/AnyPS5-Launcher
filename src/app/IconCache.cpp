@@ -35,6 +35,13 @@ SDL_Texture* IconCache::Get(const std::filesystem::path& key, const std::vector<
     return texture;
 }
 
+void IconCache::Forget(const std::filesystem::path& key) {
+    if (const auto found = textures_.find(key); found != textures_.end()) {
+        if (found->second != nullptr) SDL_DestroyTexture(found->second);
+        textures_.erase(found);
+    }
+}
+
 void IconCache::Clear() {
     for (auto& [key, texture] : textures_) {
         if (texture != nullptr) SDL_DestroyTexture(texture);

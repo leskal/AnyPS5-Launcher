@@ -7,6 +7,8 @@
 #include <mutex>
 #include <cmath>
 #include <ctime>
+#include <fstream>
+#include <iterator>
 #include <deque>
 #include <optional>
 #include <set>
@@ -23,19 +25,24 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <imgui_stdlib.h>
 
+#include <nlohmann/json.hpp>
+
 #include "app/BackgroundJob.hpp"
 #include "app/FolderPicker.hpp"
 #include "app/IconCache.hpp"
 #include "app/Processes.hpp"
 #include "core/AnyPS5.hpp"
 #include "core/Archive.hpp"
+#include "core/Diagnosis.hpp"
 #include "core/FileOps.hpp"
+#include "core/GameSettings.hpp"
 #include "core/InputMapping.hpp"
 #include "core/Install.hpp"
 #include "core/Launch.hpp"
 #include "core/Modules.hpp"
 #include "core/PatchInfo.hpp"
 #include "core/Profiles.hpp"
+#include "core/SaveBackup.hpp"
 #include "core/Scanner.hpp"
 #include "core/Session.hpp"
 #include "core/Settings.hpp"
@@ -802,6 +809,34 @@ void OpenFolder(const std::filesystem::path& folder) {
 #endif
 }
 
+// Opens a file with its program (a log in the text editor, a picture in the viewer).
+void OpenPath(const std::filesystem::path& file) {
+#ifdef _WIN32
+    win::OpenFolder(file.c_str());
+#else
+    SDL_OpenURL(("file://" + ToUtf8(std::filesystem::absolute(file))).c_str());
+#endif
+}
+
+// Deletes a file or folder: to the Recycle Bin on Windows, for good elsewhere.
+void MoveToBin(const std::filesystem::path& path) {
+#ifdef _WIN32
+    if (const auto code = win::RecycleItem(path.c_str()); code != 0) throw std::runtime_error("couldn't move " + ToUtf8(path) + " to the Recycle Bin (error " + std::to_string(code) + ")");
+#else
+    std::filesystem::remove_all(path);
+#endif
+}
+
+std::string SystemDescription() {
+#ifdef _WIN32
+    wchar_t version[256];
+    win::WindowsVersion(version, 256);
+    return ToUtf8(std::filesystem::path(version));
+#else
+    return SDL_GetPlatform();
+#endif
+}
+
 FolderPicker& Picker() {
     static FolderPicker picker;
     return picker;
@@ -909,6 +944,14 @@ public:
                 message_ = Message{Red, "Can't add that AnyPS5", failure.what()};
             }
         }
+        if (!exportPick_.empty() && !Picker().IsOpen()) {
+            ExportGameSettings(FromUtf8(exportPick_));
+            exportPick_.clear();
+        }
+        if (!importPick_.empty() && !Picker().IsOpen()) {
+            ImportGameSettings(FromUtf8(importPick_));
+            importPick_.clear();
+        }
         if (auto load = trophyLoader_.Take()) trophies_[load->key] = std::move(load->set);
         if (auto load = artLoader_.Take()) art_[load->key] = std::move(load->png);
         StartGameLoads();
@@ -956,6 +999,11 @@ public:
         DrawFooter();
         DrawNewProfile();
         DrawEditProfile();
+        // Options on a controller opens Settings when nothing else is open.
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadStart, false) && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && !session_) OpenSettings();
+        DrawGameSettings();
+        DrawScreenshots();
+        DrawLaunchScreen();
         DrawMissingRelinker();
         DrawVersions();
         DrawSettings();
@@ -1020,6 +1068,7 @@ private:
                 if (auto manifest = ReadInstallManifest(game.home)) installs_.emplace(ToUtf8(game.location), std::move(*manifest));
             }
             if (!lastRuns_.count(serial)) {
+                Diagnose(serial);
                 if (auto report = LatestRunReport(layout_, serial)) lastRuns_.emplace(serial, std::move(*report));
             }
         }
@@ -1136,9 +1185,11 @@ private:
 
     void Play(const GameEntry& game) {
         try {
-            auto plan = PrepareRun(game, layout_, profileSettings_, TitleFor(game.metadata.titleId));
+            auto plan = PrepareRun(game, layout_, profileSettings_, TitleFor(game.metadata.titleId), LoadGameSettings(layout_.GameSettingsFile(game.metadata.titleId)));
             session_ = std::make_unique<GameSession>(game.metadata.titleId, game.metadata.name, std::move(plan));
             message_ = Message{Green, "Playing " + game.metadata.name, "Profile " + layout_.profile};
+            launching_ = true;
+            launchStarted_ = SDL_GetTicks();
         } catch (const std::exception& failure) {
             message_ = Message{Red, "Can't start " + game.metadata.name, failure.what()};
         }
@@ -1156,6 +1207,19 @@ private:
             return;
         }
         const auto& serial = session_->TitleId();
+        diagnoses_[serial] = DiagnoseRun(report, ReadLogTail(session_->Plan().logFile, 128 * 1024), session_->ExitCode(), session_->StopRequested());
+        launching_ = false;
+        if (minimizedForGame_) {
+            SDL_RestoreWindow(window_);
+            SDL_RaiseWindow(window_);
+            minimizedForGame_ = false;
+        }
+        if (const auto& diagnosis = diagnoses_[serial]; diagnosis.level == RunDiagnosis::Level::Problem) {
+            message_ = Message{Red, session_->Name(), diagnosis.headline + (diagnosis.detail.empty() ? std::string() : ": " + diagnosis.detail)};
+            session_.reset();
+            trophyAsked_.clear();
+            return;
+        }
         if (report) {
             lastRuns_[serial] = *report;
             message_ = Message{report->exit == "clean" ? Green : Amber, session_->Name(), report->summary};
@@ -1172,7 +1236,7 @@ private:
 
     void StartConvertSelf(const GameEntry& game) {
         const auto folder = game.location;
-        const auto zip = OriginalsZipFor(game);
+        const auto zip = OriginalsZipFor(game, layout_.library);
         const auto* title = TitleFor(game.metadata.titleId);
         const auto moduleFolders = ModuleFolders(title != nullptr ? ModuleDirectories(*title) : std::vector<std::string>{});
         const auto executables = title != nullptr ? title->executables : std::vector<std::string>{};
@@ -1195,7 +1259,7 @@ private:
 
     void StartRestoreOriginals(const GameEntry& game) {
         const auto folder = game.location;
-        const auto zip = OriginalsZipFor(game);
+        const auto zip = OriginalsZipFor(game, layout_.library);
         job_.Start("Restore originals: " + game.metadata.name, true, [folder, zip](JobControl& control) {
             const int count = RestoreOriginals(folder, zip, control);
             return "Restored " + std::to_string(count) + (count == 1 ? " file" : " files") + ", each matching its MD5; deleted " + ToUtf8(zip.filename());
@@ -1222,6 +1286,144 @@ private:
     // ---- drawing -----------------------------------------------------------------
 
     // The profile as a pill: avatar, name and a chevron; a menu lists the others.
+    static const char* PadTypeName(SDL_GamepadType type) {
+        switch (type) {
+        case SDL_GAMEPAD_TYPE_PS5: return "DualSense";
+        case SDL_GAMEPAD_TYPE_PS4: return "DualShock 4";
+        case SDL_GAMEPAD_TYPE_PS3: return "DualShock 3";
+        case SDL_GAMEPAD_TYPE_XBOX360: return "Xbox 360";
+        case SDL_GAMEPAD_TYPE_XBOXONE: return "Xbox";
+        case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO: return "Switch Pro";
+        case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR: return "Joy-Con pair";
+        default: return "Gamepad";
+        }
+    }
+
+    // The connected pads with their kind, connection and battery; a live test and vibration.
+    void DrawControllers() {
+        int count = 0;
+        SDL_JoystickID* ids = SDL_GetGamepads(&count);
+        std::set<SDL_JoystickID> present;
+        for (int i = 0; i < count; ++i) {
+            present.insert(ids[i]);
+            if (pads_.count(ids[i]) == 0) {
+                if (SDL_Gamepad* pad = SDL_OpenGamepad(ids[i])) pads_[ids[i]] = pad;
+            }
+        }
+        SDL_free(ids);
+        for (auto it = pads_.begin(); it != pads_.end();) {
+            if (present.count(it->first) == 0) {
+                SDL_CloseGamepad(it->second);
+                it = pads_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        if (pads_.empty()) {
+            ImGui::TextColored(Amber, "No controller found.");
+            ImGui::TextColored(Dim, "USB: use a cable that carries data, not only charge. Bluetooth: pair it in Windows first (DualSense and DualShock 4: hold Create/Share and PS until the light flashes).");
+        }
+        int player = 1;
+        for (const auto& [id, pad] : pads_) {
+            ImGui::PushID(static_cast<int>(id));
+            const char* name = SDL_GetGamepadName(pad);
+            const auto type = SDL_GetGamepadType(pad);
+            const auto connection = SDL_GetGamepadConnectionState(pad);
+            int percent = -1;
+            const auto power = SDL_GetGamepadPowerInfo(pad, &percent);
+            std::string facts = PadTypeName(type);
+            facts += connection == SDL_JOYSTICK_CONNECTION_WIRELESS ? "  \xC2\xB7  Bluetooth" : connection == SDL_JOYSTICK_CONNECTION_WIRED ? "  \xC2\xB7  USB" : "";
+            if (power == SDL_POWERSTATE_CHARGING) facts += "  \xC2\xB7  charging";
+            if (percent >= 0) facts += "  \xC2\xB7  battery " + std::to_string(percent) + "%";
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("%d. %s", player++, name != nullptr ? name : "Gamepad");
+            ImGui::SameLine();
+            ImGui::TextColored(percent >= 0 && percent <= 15 && power != SDL_POWERSTATE_CHARGING ? Amber : Dim, "%s", facts.c_str());
+            if (ImGui::SmallButton(padTest_ == id ? "Hide test" : "Test buttons and sticks")) padTest_ = padTest_ == id ? 0 : id;
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Vibrate")) SDL_RumbleGamepad(pad, 0xC000, 0xC000, 500);
+            if (padTest_ == id) DrawPadTest(pad);
+            ImGui::Spacing();
+            ImGui::PopID();
+        }
+#ifdef _WIN32
+        // Programs that take pads away from games, or change what they look like.
+        struct Taker {
+            const wchar_t* exe;
+            const char* text;
+        };
+        static const Taker takers[] = {
+            {L"steam.exe", "Steam is running: Steam Input can turn a pad into a mouse or an Xbox pad. Turn it off for PlayStation pads (Steam > Settings > Controller), or close Steam before playing."},
+            {L"DS4Windows.exe", "DS4Windows is running: it can hide the DualShock or DualSense behind a virtual Xbox pad. Close it, or turn off its 'Hide DS4 controller' option."},
+            {L"DSX.exe", "DualSenseX is running: it can hide the DualSense behind a virtual pad. Close it before playing."},
+            {L"DualSenseX.exe", "DualSenseX is running: it can hide the DualSense behind a virtual pad. Close it before playing."},
+            {L"HidHideClient.exe", "HidHide's client is open: if the pad is hidden there, add the game's exe to its allowed programs."},
+        };
+        for (const auto& taker : takers) {
+            if (win::ProcessRunning(taker.exe)) {
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextColored(Amber, "%s", taker.text);
+                ImGui::PopTextWrapPos();
+            }
+        }
+#endif
+    }
+
+    // A live picture of the pad: face buttons, shoulders, d-pad, both sticks and the triggers.
+    void DrawPadTest(SDL_Gamepad* pad) {
+        const float scale = scale_;
+        const float width = std::min(ImGui::GetContentRegionAvail().x, 440.0f * scale);
+        const float height = width * 0.5f;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(ImVec2(width, height));
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(WindowColor), 16.0f * scale);
+        const ImU32 off = ImGui::GetColorU32(Fade(ImGui::GetStyle().Colors[ImGuiCol_Text], 0.25f));
+        const ImU32 on = ImGui::GetColorU32(Accent);
+        const auto pressed = [&](SDL_GamepadButton button) { return SDL_GetGamepadButton(pad, button); };
+        const auto button = [&](ImVec2 c, float r, SDL_GamepadButton which) { draw->AddCircleFilled(c, r, pressed(which) ? on : off); };
+        const float u = width / 22.0f;
+        // Face buttons on the right, d-pad on the left.
+        const ImVec2 face(at.x + u * 17, at.y + u * 4.2f);
+        button(ImVec2(face.x, face.y - u * 1.3f), u * 0.6f, SDL_GAMEPAD_BUTTON_NORTH);
+        button(ImVec2(face.x, face.y + u * 1.3f), u * 0.6f, SDL_GAMEPAD_BUTTON_SOUTH);
+        button(ImVec2(face.x - u * 1.3f, face.y), u * 0.6f, SDL_GAMEPAD_BUTTON_WEST);
+        button(ImVec2(face.x + u * 1.3f, face.y), u * 0.6f, SDL_GAMEPAD_BUTTON_EAST);
+        const ImVec2 dpad(at.x + u * 5, at.y + u * 4.2f);
+        const auto arm = [&](float dx, float dy, SDL_GamepadButton which) {
+            const ImVec2 c(dpad.x + dx * u * 1.2f, dpad.y + dy * u * 1.2f);
+            draw->AddRectFilled(ImVec2(c.x - u * 0.55f, c.y - u * 0.55f), ImVec2(c.x + u * 0.55f, c.y + u * 0.55f), pressed(which) ? on : off, u * 0.15f);
+        };
+        arm(0, -1, SDL_GAMEPAD_BUTTON_DPAD_UP);
+        arm(0, 1, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+        arm(-1, 0, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+        arm(1, 0, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+        // Shoulders and triggers along the top.
+        const auto bar = [&](float x, SDL_GamepadButton bumper, SDL_GamepadAxis trigger) {
+            draw->AddRectFilled(ImVec2(at.x + x, at.y + u * 0.5f), ImVec2(at.x + x + u * 3, at.y + u * 1.1f), pressed(bumper) ? on : off, u * 0.3f);
+            const float t = static_cast<float>(SDL_GetGamepadAxis(pad, trigger)) / 32767.0f;
+            draw->AddRect(ImVec2(at.x + x + u * 3.4f, at.y + u * 0.3f), ImVec2(at.x + x + u * 3.9f, at.y + u * 1.6f), off, u * 0.1f);
+            draw->AddRectFilled(ImVec2(at.x + x + u * 3.4f, at.y + u * 1.6f - u * 1.3f * std::clamp(t, 0.0f, 1.0f)), ImVec2(at.x + x + u * 3.9f, at.y + u * 1.6f), on, u * 0.1f);
+        };
+        bar(u * 2.5f, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+        bar(u * 15.5f, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
+        // Sticks, with AnyPS5's default dead zone of 0 shown as the centre dot.
+        const auto stick = [&](ImVec2 c, SDL_GamepadAxis ax, SDL_GamepadAxis ay, SDL_GamepadButton click) {
+            const float r = u * 1.6f;
+            draw->AddCircle(c, r, off, 0, 1.5f * scale);
+            const float x = static_cast<float>(SDL_GetGamepadAxis(pad, ax)) / 32767.0f;
+            const float y = static_cast<float>(SDL_GetGamepadAxis(pad, ay)) / 32767.0f;
+            draw->AddCircleFilled(ImVec2(c.x + std::clamp(x, -1.0f, 1.0f) * r, c.y + std::clamp(y, -1.0f, 1.0f) * r), u * 0.55f, pressed(click) ? on : ImGui::GetColorU32(ImGuiCol_Text));
+        };
+        stick(ImVec2(at.x + u * 8, at.y + u * 8.2f), SDL_GAMEPAD_AXIS_LEFTX, SDL_GAMEPAD_AXIS_LEFTY, SDL_GAMEPAD_BUTTON_LEFT_STICK);
+        stick(ImVec2(at.x + u * 14, at.y + u * 8.2f), SDL_GAMEPAD_AXIS_RIGHTX, SDL_GAMEPAD_AXIS_RIGHTY, SDL_GAMEPAD_BUTTON_RIGHT_STICK);
+        // Options, Create and the touchpad in the middle.
+        button(ImVec2(at.x + u * 9, at.y + u * 3), u * 0.35f, SDL_GAMEPAD_BUTTON_BACK);
+        button(ImVec2(at.x + u * 13, at.y + u * 3), u * 0.35f, SDL_GAMEPAD_BUTTON_START);
+        draw->AddRectFilled(ImVec2(at.x + u * 9.6f, at.y + u * 2), ImVec2(at.x + u * 12.4f, at.y + u * 4.6f), pressed(SDL_GAMEPAD_BUTTON_TOUCHPAD) ? on : off, u * 0.3f);
+        button(ImVec2(at.x + u * 11, at.y + u * 5.6f), u * 0.4f, SDL_GAMEPAD_BUTTON_GUIDE);
+    }
+
     void DrawProfileSelector() {
         const auto& style = ImGui::GetStyle();
         const float scale = style.FontScaleDpi;
@@ -1482,6 +1684,12 @@ private:
             ImGui::InvisibleButton("tile", ImVec2(tile, tile + textBlock));
             const bool hovered = ImGui::IsItemHovered();
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right)) selected_ = key;
+            // With a controller or the arrow keys: moving onto a tile selects it, ✕ (or Enter) plays it, △ opens its actions.
+            if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible) {
+                if (selected_ != key) selected_ = key;
+                if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown, false) || ImGui::IsKeyPressed(ImGuiKey_Enter, false)) ActivateGame(game);
+                if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) ImGui::OpenPopup("actions");
+            }
             if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ActivateGame(game);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s\nDouble-click to play, right-click for all actions", key.c_str());
             if (ImGui::BeginPopupContextItem("actions")) {
@@ -1667,6 +1875,578 @@ private:
                 ImGui::Spacing();
             }
         }
+    }
+
+    // ---- game settings, saves, screenshots, reports ---------------------------------
+
+    void StartBackUpSaves(const std::string& serial) {
+        if (session_ || job_.Busy()) return;
+        const auto layout = layout_;
+        job_.Start("Back up saves: " + serial, false, [layout, serial](JobControl& control) {
+            const auto zip = BackUpSaves(layout, serial, control);
+            return "Saves and trophies of profile " + layout.profile + " are in " + ToUtf8(zip);
+        });
+    }
+
+    void StartRestoreSaves(const std::string& serial, const std::filesystem::path& backup) {
+        if (session_ || job_.Busy()) return;
+        const auto layout = layout_;
+        job_.Start("Restore saves: " + serial, false, [layout, serial, backup](JobControl& control) {
+            const auto kept = RestoreSaves(layout, serial, backup, control);
+            return "Restored " + ToUtf8(backup.filename()) + (kept ? "; the saves you had are kept in " + ToUtf8(kept->filename()) : std::string());
+        });
+    }
+
+    void ClearShaderCache(const std::string& serial) {
+        try {
+            std::filesystem::remove_all(layout_.ShaderCache(serial));  // rebuilt by AnyPS5; can be gigabytes, so not to the Recycle Bin
+            message_ = Message{Green, "Shader cache cleared", serial + " builds it again at its next start."};
+        } catch (const std::exception& failure) {
+            message_ = Message{Red, "Can't clear the shader cache", ReadableText(failure.what())};
+        }
+    }
+
+    static std::string FolderSize(const std::filesystem::path& folder) {
+        std::uint64_t total = 0;
+        std::error_code error;
+        for (std::filesystem::recursive_directory_iterator it(folder, error), end; !error && it != end; it.increment(error)) {
+            if (it->is_regular_file(error)) total += it->file_size(error);
+        }
+        return FormatBytes(total);
+    }
+
+    // One text file with what a bug report needs, in <library>\reports.
+    void MakeReport(const GameEntry& game) {
+        const auto& serial = game.metadata.titleId;
+        std::string text = "AnyPS5 Launcher report\n======================\n\n";
+        const auto now = std::time(nullptr);
+        char stamp[32];
+        std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        text += "Created:   " + std::string(stamp) + "\n";
+#ifdef LAUNCHER_VERSION
+        text += "Launcher:  " + std::string(LAUNCHER_VERSION) + "\n";
+#endif
+        text += "System:    " + SystemDescription() + ", " + std::to_string(SDL_GetNumLogicalCPUCores()) + " CPU threads, " + std::to_string(SDL_GetSystemRAM()) + " MiB RAM\n";
+        text += "AnyPS5:    " + CurrentVersionLabel() + (anyps5_.version.empty() ? std::string() : " (relinker " + anyps5_.version + ")") + "\n\n";
+        text += "Game:      " + game.metadata.name + " (" + serial + ") v" + game.metadata.contentVersion + ", " + std::string(ToString(game.format)) + "\n";
+        if (const auto* manifest = InstallFor(game)) {
+            text += "Installed: " + manifest->installedAt + " with relinker " + manifest->relinkerVersion + "\n";
+            std::string arguments;
+            for (const auto& argument : manifest->arguments) arguments += " " + argument;
+            text += "Relinker arguments:" + arguments + "\n";
+        } else {
+            text += "Installed: no\n";
+        }
+        text += "eboot.bin: " + std::string(ToString(game.executable.kind)) + "; modules: " + std::to_string(game.modules.elf) + " ELF, " + std::to_string(game.modules.self) + " SELF\n";
+        text += "Profile language: " + LanguageLabel(profileSettings_.language) + "\n";
+        const auto settings = LoadGameSettings(layout_.GameSettingsFile(serial));
+        text += "Game settings:";
+        const auto env = GameSettingsEnvironment(settings);
+        if (env.empty()) text += " AnyPS5's defaults";
+        for (const auto& [name, value] : env) text += " " + name + "=" + value;
+        text += "\n";
+        text += "Controllers:";
+        int count = 0;
+        if (SDL_JoystickID* pads = SDL_GetGamepads(&count)) {
+            for (int i = 0; i < count; ++i) {
+                const char* name = SDL_GetGamepadNameForID(pads[i]);
+                text += std::string(i == 0 ? " " : ", ") + (name != nullptr ? name : "a gamepad");
+            }
+            SDL_free(pads);
+        }
+        if (count == 0) text += " none";
+        text += "\n\n";
+        if (const auto found = diagnoses_.find(serial); found != diagnoses_.end()) {
+            text += "Last run:  " + found->second.headline + "\n";
+            if (!found->second.detail.empty()) text += "           " + found->second.detail + "\n";
+        }
+        const auto log = LatestRunLog(layout_, serial);
+        if (log) {
+            auto reportFile = *log;
+            reportFile.replace_extension(".report.json");
+            std::ifstream report(reportFile, std::ios::binary);
+            if (report) {
+                text += "\n--- " + ToUtf8(reportFile.filename()) + " ---\n";
+                text += std::string(std::istreambuf_iterator<char>(report), std::istreambuf_iterator<char>()) + "\n";
+            }
+        }
+        for (const auto& file : {layout_.InputConfig(), layout_.GameInputConfig(serial)}) {
+            std::ifstream input(file, std::ios::binary);
+            if (!input) continue;
+            text += "\n--- " + ToUtf8(file.filename()) + " ---\n" + std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()) + "\n";
+        }
+        if (log) {
+            text += "\n--- end of " + ToUtf8(log->filename()) + " ---\n" + ReadLogTail(*log, 96 * 1024) + "\n";
+        }
+        try {
+            const auto folder = layout_.library / "reports";
+            std::filesystem::create_directories(folder);
+            std::string name = serial + "-" + std::string(stamp) + ".txt";
+            std::replace(name.begin(), name.end(), ':', '-');
+            std::replace(name.begin(), name.end(), ' ', '_');
+            const auto file = folder / FromUtf8(name);
+            WriteFileAtomically(file, RedactPersonal(text));
+            message_ = Message{Green, "Report saved", ToUtf8(file) + " (read it before you share it)"};
+            OpenPath(file);
+        } catch (const std::exception& failure) {
+            message_ = Message{Red, "Can't write the report", ReadableText(failure.what())};
+        }
+    }
+
+    void OpenGameSettings(const GameEntry& game) {
+        settingsSerial_ = game.metadata.titleId;
+        settingsName_ = game.metadata.name;
+        gameSettings_ = LoadGameSettings(layout_.GameSettingsFile(settingsSerial_));
+        backups_ = ListSaveBackups(layout_, settingsSerial_);
+        gameSettingsError_.clear();
+        openGameSettings_ = true;
+    }
+
+    // A labelled row of the game settings: the label and its note on the left, the control on the right.
+    template <typename Control>
+    void SettingRow(const char* label, const char* note, Control control) {
+        ImGui::PushID(label);
+        const float split = ImGui::GetContentRegionAvail().x * 0.42f;
+        const float top = ImGui::GetCursorPosY();
+        ImGui::BeginGroup();
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + split - ImGui::GetFontSize());
+        ImGui::TextUnformatted(label);
+        if (note != nullptr && note[0] != 0) ImGui::TextColored(Dim, "%s", note);
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        const float bottom = ImGui::GetCursorPosY();
+        ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + split, top));
+        ImGui::BeginGroup();
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        control();
+        ImGui::EndGroup();
+        ImGui::SetCursorPosY(std::max(bottom, ImGui::GetCursorPosY()));
+        ImGui::Spacing();
+        ImGui::PopID();
+    }
+
+    // A choice from a few values, stored as AnyPS5 wants it.
+    static void ChoiceCombo(const char* id, std::string& value, std::initializer_list<std::pair<const char*, const char*>> choices) {
+        const char* shown = choices.begin()->second;
+        for (const auto& [stored, label] : choices) {
+            if (value == stored) shown = label;
+        }
+        if (ImGui::BeginCombo(id, shown)) {
+            for (const auto& [stored, label] : choices) {
+                if (ImGui::Selectable(label, value == stored)) value = stored;
+            }
+            ImGui::EndCombo();
+        }
+    }
+
+    void DrawGameSettings() {
+        if (openGameSettings_) {
+            ImGui::OpenPopup("Game settings");
+            openGameSettings_ = false;
+        }
+        FollowWindow(0.70f, 0.88f);
+        if (!BeginDialog("Game settings")) return;
+        const auto& style = ImGui::GetStyle();
+        auto& g = gameSettings_;
+        const std::string title = "Game settings: " + settingsName_;
+        const std::string note = "Applied at each start of " + settingsSerial_ + " in profile " + layout_.profile + ". Unchanged settings use AnyPS5's defaults.";
+        bool close = DialogHeader(title.c_str(), note.c_str());
+        const float footer = ImGui::GetFrameHeight() * 1.3f + style.ItemSpacing.y * 3 + ImGui::GetTextLineHeightWithSpacing();
+        ImGui::BeginChild("game-settings-body", ImVec2(0, -footer));
+
+        Section("display", "Display", nullptr, [&] {
+            SettingRow("Screen", "F11 switches while playing.", [&] {
+                int screen = g.screen.empty() ? 0 : 1;
+                const char* labels[] = {"Window", "Full screen"};
+                if (Segmented("screen", labels, 2, screen)) g.screen = screen == 0 ? "" : "borderless";
+            });
+            int displays = 0;
+            SDL_DisplayID* ids = SDL_GetDisplays(&displays);
+            if (displays > 1) {
+                SettingRow("Display", "Where the window opens.", [&] {
+                    std::string shown = g.displayIndex.empty() ? std::string("First display") : "Display " + g.displayIndex;
+                    if (ImGui::BeginCombo("##display", shown.c_str())) {
+                        if (ImGui::Selectable("First display", g.displayIndex.empty())) g.displayIndex.clear();
+                        for (int i = 0; i < displays; ++i) {
+                            const char* name = SDL_GetDisplayName(ids[i]);
+                            const std::string label = std::to_string(i) + ": " + (name != nullptr ? name : "display");
+                            if (ImGui::Selectable(label.c_str(), g.displayIndex == std::to_string(i))) g.displayIndex = std::to_string(i);
+                        }
+                        ImGui::EndCombo();
+                    }
+                });
+            }
+            SDL_free(ids);
+            SettingRow("Resolution class the game sees", "Some games pick their render size from it. The window size never changes it.", [&] {
+                ChoiceCombo("##resolution", g.outputResolution, {{"", "The display's"}, {"1920x1080", "1080p"}, {"3840x2160", "2160p (4K)"}});
+            });
+            SettingRow("Vertical sync", "Off can tear; the two middle ones keep whole frames without waiting.", [&] {
+                ChoiceCombo("##present", g.presentMode, {{"", "On"}, {"fifo_latest_ready", "Latest frame, no wait"}, {"mailbox", "Mailbox, no wait"}, {"immediate", "Off"}});
+            });
+            SettingRow("Frame rate limit", "Frames per second, like 30 or 59.94. Empty: no limit.", [&] {
+                ImGui::InputTextWithHint("##fps", "no limit", &g.fpsLimit, ImGuiInputTextFlags_CharsDecimal);
+                if (!ValidFpsLimit(g.fpsLimit)) ImGui::TextColored(Red, "From 0.5 to 1000000, at most three decimals");
+            });
+            SettingRow("Upscaling", "FSR 1 sharpens a picture smaller than the window; otherwise it does nothing.", [&] {
+                int fsr = g.upscale == "fsr" ? 1 : 0;
+                const char* labels[] = {"Bilinear", "FSR 1"};
+                if (Segmented("upscale", labels, 2, fsr)) g.upscale = fsr == 1 ? "fsr" : "";
+                if (fsr == 1) {
+                    float sharpness = g.fsrSharpness.empty() ? 0.2f : static_cast<float>(std::atof(g.fsrSharpness.c_str()));
+                    ImGui::SetNextItemWidth(-FLT_MIN);
+                    if (ImGui::SliderFloat("##sharpness", &sharpness, 0.0f, 2.0f, "sharpness %.1f (0 sharpest)")) {
+                        char text[16];
+                        std::snprintf(text, sizeof(text), "%.1f", sharpness);
+                        g.fsrSharpness = text;
+                    }
+                }
+            });
+        });
+
+        Section("overlay", "Performance overlay", "Frames per second, frame times, memory; F10 cycles it while playing.", [&] {
+            SettingRow("At start", nullptr, [&] {
+                int page = g.overlay.empty() ? 0 : g.overlay == "1" ? 1 : 2;
+                const char* labels[] = {"Off", "Page 1", "Page 2"};
+                if (Segmented("overlay", labels, 3, page)) g.overlay = page == 0 ? "" : std::to_string(page);
+            });
+            SettingRow("Corner", nullptr, [&] {
+                ChoiceCombo("##corner", g.overlayPosition, {{"", "Top left"}, {"tr", "Top right"}, {"bl", "Bottom left"}, {"br", "Bottom right"}});
+            });
+        });
+
+        Section("sound", "Sound, vibration and language", nullptr, [&] {
+            SettingRow("Volume", "F5 and F6 change it while playing.", [&] {
+                int volume = g.volume.empty() ? 100 : std::atoi(g.volume.c_str());
+                if (ImGui::SliderInt("##volume", &volume, 0, 100, "%d%%")) g.volume = volume == 100 ? "" : std::to_string(volume / 5 * 5);
+            });
+            SettingRow("Mute when the game isn't in front", nullptr, [&] { ImGui::Checkbox("##mute", &g.muteOnFocusLoss); });
+            SettingRow("Controller vibration", "0 turns it off.", [&] {
+                int rumble = g.rumble.empty() ? 100 : std::atoi(g.rumble.c_str());
+                if (ImGui::SliderInt("##rumble", &rumble, 0, 100, "%d%%")) g.rumble = rumble == 100 ? "" : std::to_string(rumble);
+            });
+            SettingRow("Game language", "Instead of the profile's console language.", [&] {
+                const std::string shown = g.language.empty() ? "Profile's (" + LanguageLabel(profileSettings_.language) + ")" : LanguageLabel(g.language);
+                if (ImGui::BeginCombo("##language", shown.c_str())) {
+                    if (ImGui::Selectable("Profile's", g.language.empty())) g.language.clear();
+                    if (ImGui::Selectable(LanguageLabel("auto").c_str(), g.language == "auto")) g.language = "auto";
+                    for (const auto& item : ConsoleLanguages()) {
+                        const auto value = std::to_string(item.number);
+                        if (ImGui::Selectable(LanguageLabel(value).c_str(), g.language == value)) g.language = value;
+                    }
+                    ImGui::EndCombo();
+                }
+            });
+        });
+
+        Section("cache", "Shader cache", "Compiled shaders, so later starts don't stutter. Safe to clear; it's rebuilt.", [&] {
+            SettingRow("Keep a shader cache", nullptr, [&] { ImGui::Checkbox("##cache", &g.shaderCache); });
+            const auto cache = layout_.ShaderCache(settingsSerial_);
+            const bool exists = PathExists(cache);
+            ImGui::BeginDisabled(!exists || session_ != nullptr);
+            if (ImGui::Button("Clear shader cache")) ClearShaderCache(settingsSerial_);
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::TextColored(Dim, "%s", exists ? FolderSize(cache).c_str() : "empty");
+        });
+
+        Section("saves", "Saves and trophies", nullptr, [&] {
+            const bool busy = session_ != nullptr || job_.Busy();
+            ImGui::BeginDisabled(busy || !HasSaves(layout_, settingsSerial_));
+            if (ImGui::Button("Back up now")) StartBackUpSaves(settingsSerial_);
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Open backups folder")) OpenFolder(SaveBackupFolder(layout_, settingsSerial_));
+            ImGui::SameLine();
+            if (ImGui::Button("Refresh")) backups_ = ListSaveBackups(layout_, settingsSerial_);
+            if (backups_.empty()) ImGui::TextColored(Dim, "No backups yet.");
+            for (const auto& backup : backups_) {
+                ImGui::PushID(ToUtf8(backup.file).c_str());
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("%s", backup.created.c_str());
+                ImGui::SameLine();
+                ImGui::TextColored(Dim, "%s", FormatBytes(backup.size).c_str());
+                ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Restore").x - ImGui::GetStyle().FramePadding.x * 2);
+                ImGui::BeginDisabled(busy);
+                if (ImGui::SmallButton("Restore")) ImGui::OpenPopup("restore?");
+                ImGui::EndDisabled();
+                if (ImGui::BeginPopup("restore?")) {
+                    ImGui::Text("Put the saves and trophies of %s back?", backup.created.c_str());
+                    ImGui::TextColored(Dim, "What the profile has now is backed up first.");
+                    if (PrimaryButton("Restore")) {
+                        StartRestoreSaves(settingsSerial_, backup.file);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
+                }
+                ImGui::PopID();
+            }
+        });
+
+        Section("share", "Share", "One file with this game's settings and its own controls, to keep or give to someone.", [&] {
+            ImGui::BeginDisabled(Picker().IsOpen());
+            if (ImGui::Button("Export...")) {
+                exportPick_ = settingsSerial_ + ".anyps5game";
+                Picker().SaveFile(window_, &exportPick_, "AnyPS5 Launcher game settings", "anyps5game");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Import...")) Picker().OpenFile(window_, &importPick_, "AnyPS5 Launcher game settings", "anyps5game");
+            ImGui::EndDisabled();
+        });
+        ImGui::EndChild();
+
+        if (!gameSettingsError_.empty()) ImGui::TextColored(Red, "%s", Elide(gameSettingsError_, ImGui::GetContentRegionAvail().x).c_str());
+        else ImGui::TextColored(Dim, "%s", Elide(ToUtf8(layout_.GameSettingsFile(settingsSerial_)), ImGui::GetContentRegionAvail().x).c_str());
+        ImGui::Spacing();
+        if (ImGui::Button("Reset all")) {
+            const bool cache = g.shaderCache;
+            g = {};
+            g.shaderCache = cache;
+        }
+        const float buttonWidth = ImGui::GetFontSize() * 5.5f;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonWidth * 2 - style.ItemSpacing.x);
+        if (ImGui::Button("Cancel", ImVec2(buttonWidth, buttonHeight))) close = true;
+        ImGui::SameLine();
+        if (PrimaryButton("Save", ImVec2(buttonWidth, buttonHeight))) {
+            try {
+                if (!ValidFpsLimit(g.fpsLimit)) throw std::runtime_error("the frame rate limit isn't a number AnyPS5 takes");
+                SaveGameSettings(layout_.GameSettingsFile(settingsSerial_), g);
+                message_ = Message{Green, "Game settings saved", settingsName_ + " uses them from its next start."};
+                close = true;
+            } catch (const std::exception& failure) {
+                gameSettingsError_ = ReadableText(failure.what());
+            }
+        }
+        if (close) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    // Writes the game's settings and own controls as one JSON file.
+    void ExportGameSettings(const std::filesystem::path& file) {
+        try {
+            auto target = file;
+            if (target.extension() != ".anyps5game") target += ".anyps5game";
+            std::ifstream controls(layout_.GameInputConfig(settingsSerial_), std::ios::binary);
+            const std::string controlsText{std::istreambuf_iterator<char>(controls), std::istreambuf_iterator<char>()};
+            const auto settingsFile = layout_.library / "export.tmp.json";
+            SaveGameSettings(settingsFile, gameSettings_);
+            std::ifstream settingsStream(settingsFile, std::ios::binary);
+            const auto settings = nlohmann::json::parse(std::string(std::istreambuf_iterator<char>(settingsStream), std::istreambuf_iterator<char>()));
+            settingsStream.close();
+            std::error_code error;
+            std::filesystem::remove(settingsFile, error);
+            const nlohmann::json document = {{"format", "anyps5-launcher-game"}, {"version", 1}, {"titleId", settingsSerial_}, {"name", settingsName_},
+                                             {"settings", settings}, {"controls", controlsText}};
+            WriteFileAtomically(target, document.dump(2) + "\n");
+            message_ = Message{Green, "Exported", ToUtf8(target)};
+        } catch (const std::exception& failure) {
+            gameSettingsError_ = "Can't export: " + ReadableText(failure.what());
+        }
+    }
+
+    // Reads an exported file into the open window (Save keeps it) and the game's controls.
+    void ImportGameSettings(const std::filesystem::path& file) {
+        try {
+            std::ifstream stream(file, std::ios::binary);
+            const auto document = nlohmann::json::parse(std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()), nullptr, false);
+            if (document.is_discarded() || !document.is_object() || document.value("format", "") != "anyps5-launcher-game") {
+                throw std::runtime_error(ToUtf8(file.filename()) + " isn't an AnyPS5 Launcher game settings file");
+            }
+            const auto from = document.value("titleId", "");
+            if (document.contains("settings") && document["settings"].is_object()) {
+                const auto temp = layout_.library / "import.tmp.json";
+                WriteFileAtomically(temp, document["settings"].dump());
+                gameSettings_ = LoadGameSettings(temp);
+                std::error_code error;
+                std::filesystem::remove(temp, error);
+            }
+            if (document.contains("controls") && document["controls"].is_string() && !document["controls"].get<std::string>().empty()) {
+                const auto parsed = ParseInputFile(document["controls"].get<std::string>());
+                controlsName_ = settingsName_;
+                controlsSerial_ = settingsSerial_;
+                WriteInputFile(layout_.GameInputConfig(settingsSerial_), parsed, GameInputHeader());
+            }
+            gameSettingsError_.clear();
+            message_ = Message{Green, "Imported", (from.empty() || from == settingsSerial_ ? std::string() : "From " + from + ". ") + "The controls are saved; press Save to keep the settings."};
+        } catch (const std::exception& failure) {
+            gameSettingsError_ = "Can't import: " + ReadableText(failure.what());
+        }
+    }
+
+    void OpenScreenshots(const GameEntry& game) {
+        settingsSerial_ = game.metadata.titleId;
+        settingsName_ = game.metadata.name;
+        shots_.clear();
+        std::error_code error;
+        for (std::filesystem::directory_iterator it(layout_.Screenshots(settingsSerial_), error), end; !error && it != end; it.increment(error)) {
+            if (it->is_regular_file(error) && it->path().extension() == ".png") shots_.push_back(it->path());
+        }
+        std::sort(shots_.begin(), shots_.end(), [](const auto& a, const auto& b) { return a.filename() > b.filename(); });
+        shotViewed_ = -1;
+        openScreenshots_ = true;
+    }
+
+    // A screenshot as a texture, read from disk the first time it's needed (at most a few per frame).
+    SDL_Texture* ShotTexture(const std::filesystem::path& file, int& budget) {
+        static const std::vector<std::uint8_t> none;
+        if (shotLoaded_.count(file) == 0) {
+            if (budget <= 0) return nullptr;
+            --budget;
+            std::ifstream stream(file, std::ios::binary);
+            const std::vector<std::uint8_t> png{std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
+            shotLoaded_.insert(file);
+            return icons_->Get(file, png);
+        }
+        return icons_->Get(file, none);
+    }
+
+    void DrawScreenshots() {
+        if (openScreenshots_) {
+            ImGui::OpenPopup("Screenshots");
+            openScreenshots_ = false;
+        }
+        FollowWindow(0.86f, 0.90f);
+        if (!BeginDialog("Screenshots")) return;
+        const std::string title = "Screenshots: " + settingsName_;
+        const std::string note = "F12 while playing saves one. " + std::to_string(shots_.size()) + (shots_.size() == 1 ? " picture" : " pictures") + " in profile " + layout_.profile + ".";
+        bool close = DialogHeader(title.c_str(), note.c_str());
+        if (ImGui::Button("Open folder")) OpenFolder(layout_.Screenshots(settingsSerial_));
+        ImGui::Spacing();
+        int budget = 2;
+        if (shotViewed_ >= 0 && shotViewed_ < static_cast<int>(shots_.size())) {
+            // One picture, as large as fits; arrows (or the d-pad) move, Esc goes back.
+            const auto& file = shots_[static_cast<std::size_t>(shotViewed_)];
+            ImGui::TextUnformatted(ToUtf8(file.filename()).c_str());
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFontSize() * 16);
+            if (ImGui::Button("<")) shotViewed_ = std::max(0, shotViewed_ - 1);
+            ImGui::SameLine();
+            if (ImGui::Button(">")) shotViewed_ = std::min(static_cast<int>(shots_.size()) - 1, shotViewed_ + 1);
+            ImGui::SameLine();
+            if (ImGui::Button("Open")) OpenPath(file);
+            ImGui::SameLine();
+            if (ImGui::Button("Delete")) {
+                try {
+                    MoveToBin(file);
+                    shots_.erase(shots_.begin() + shotViewed_);
+                    if (shotViewed_ >= static_cast<int>(shots_.size())) shotViewed_ = static_cast<int>(shots_.size()) - 1;
+                } catch (const std::exception& failure) {
+                    message_ = Message{Red, "Can't delete", ReadableText(failure.what())};
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("All")) shotViewed_ = -1;
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_GamepadDpadLeft)) shotViewed_ = std::max(0, shotViewed_ - 1);
+            if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_GamepadDpadRight)) shotViewed_ = std::min(static_cast<int>(shots_.size()) - 1, shotViewed_ + 1);
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight)) shotViewed_ = -1;
+            if (shotViewed_ >= 0 && shotViewed_ < static_cast<int>(shots_.size())) {
+                const ImVec2 room = ImGui::GetContentRegionAvail();
+                budget = 1;
+                if (auto* texture = ShotTexture(shots_[static_cast<std::size_t>(shotViewed_)], budget)) {
+                    float w = 0;
+                    float h = 0;
+                    SDL_GetTextureSize(texture, &w, &h);
+                    const float fit = std::min(room.x / std::max(w, 1.0f), room.y / std::max(h, 1.0f));
+                    const ImVec2 size(w * fit, h * fit);
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (room.x - size.x) * 0.5f);
+                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), size);
+                } else {
+                    ImGui::TextColored(Dim, "Loading...");
+                }
+            }
+        } else if (shots_.empty()) {
+            ImGui::TextColored(Dim, "No screenshots yet. Press F12 while the game plays.");
+        } else {
+            ImGui::BeginChild("shots");
+            const float gap = 10.0f * scale_;
+            const float avail = ImGui::GetContentRegionAvail().x;
+            const int columns = std::max(1, static_cast<int>((avail + gap) / (240.0f * scale_ + gap)));
+            const float width = (avail - gap * static_cast<float>(columns - 1)) / static_cast<float>(columns);
+            const float height = width * 9.0f / 16.0f;
+            for (std::size_t i = 0; i < shots_.size(); ++i) {
+                if (i % static_cast<std::size_t>(columns) != 0) ImGui::SameLine(0, gap);
+                ImGui::PushID(static_cast<int>(i));
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                // Only pictures on screen are read.
+                const bool visible = ImGui::IsRectVisible(ImVec2(width, height));
+                if (ImGui::InvisibleButton("shot", ImVec2(width, height))) shotViewed_ = static_cast<int>(i);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ToUtf8(shots_[i].filename()).c_str());
+                auto* draw = ImGui::GetWindowDrawList();
+                SDL_Texture* texture = visible ? ShotTexture(shots_[i], budget) : nullptr;
+                if (texture != nullptr) {
+                    draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + width, at.y + height), ImVec2(0, 0), ImVec2(1, 1),
+                                          IM_COL32_WHITE, 8.0f * scale_);
+                } else {
+                    draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(Placeholder), 8.0f * scale_);
+                }
+                if (ImGui::IsItemHovered() || ImGui::IsItemFocused()) draw->AddRect(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(Accent), 8.0f * scale_, 0, 2.0f * scale_);
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+        if (close) {
+            for (const auto& file : shotLoaded_) icons_->Forget(file);
+            shotLoaded_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // "Starting <game>" until its window shows (or 25 s, where the window can't be found).
+    void DrawLaunchScreen() {
+        if (!launching_) return;
+        if (!session_) {
+            launching_ = false;
+            return;
+        }
+        const float elapsed = static_cast<float>(SDL_GetTicks() - launchStarted_) / 1000.0f;
+        int x = 0;
+        int y = 0;
+        int w = 0;
+        int h = 0;
+        const bool shown = session_->WindowRect(x, y, w, h) && w > 0;
+        if (shown || elapsed > 25.0f) {
+            launching_ = false;
+            if (shown && settings_.hideWhilePlaying) {
+                SDL_MinimizeWindow(window_);
+                minimizedForGame_ = true;
+            }
+            return;
+        }
+        if (!ImGui::IsPopupOpen("Starting")) ImGui::OpenPopup("Starting");
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28.0f * scale_, 24.0f * scale_));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 16.0f * scale_);
+        const bool open = ImGui::BeginPopupModal("Starting", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+        ImGui::PopStyleVar(2);
+        if (!open) return;
+        const GameEntry* game = nullptr;
+        for (const auto& entry : result_.games) {
+            if (entry.metadata.titleId == session_->TitleId() && !entry.home.empty()) game = &entry;
+        }
+        const float art = ImGui::GetFontSize() * 9;
+        if (game != nullptr) {
+            if (auto* texture = icons_->Get(game->location, game->icon)) {
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                ImGui::GetWindowDrawList()->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + art, at.y + art), ImVec2(0, 0),
+                                                            ImVec2(1, 1), IM_COL32_WHITE, 14.0f * scale_);
+                ImGui::Dummy(ImVec2(art, art));
+            }
+        }
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.3f);
+        ImGui::TextUnformatted(session_->Name().c_str());
+        ImGui::PopFont();
+        // Three dots that take turns.
+        const int dots = static_cast<int>(elapsed * 3.0f) % 4;
+        ImGui::TextColored(Dim, "Starting%s  %.0f s", std::string(static_cast<std::size_t>(dots), '.').c_str(), static_cast<double>(elapsed));
+        ImGui::TextColored(Dim, "%s", "The first start of a game takes longest: shaders are compiled.");
+        ImGui::Spacing();
+        if (ImGui::Button("Hide")) launching_ = false;
+        ImGui::SameLine();
+        if (ImGui::Button("Stop")) session_->Stop();
+        if (!launching_) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
     }
 
     // ---- trophies while playing ---------------------------------------------------
@@ -2488,7 +3268,10 @@ private:
         const float half = (full - style.ItemSpacing.x) * 0.5f;
         if (ImGui::Button("Trophies", ImVec2(half, 0))) OpenTrophies();
         ImGui::SameLine();
+        if (ImGui::Button("Screenshots", ImVec2(half, 0))) OpenScreenshots(game);
         if (ImGui::Button("Controls", ImVec2(half, 0))) OpenControls(game);
+        ImGui::SameLine();
+        if (ImGui::Button("Game settings", ImVec2(half, 0))) OpenGameSettings(game);
         if (ImGui::Button("All actions...", ImVec2(full, 0))) ImGui::OpenPopup("details-actions");
         if (ImGui::BeginPopup("details-actions")) {
             DrawActionItems(game);
@@ -2547,11 +3330,38 @@ private:
         } else {
             ImGui::TextColored(Dim, "Not installed");
         }
-        if (const auto run = lastRuns_.find(serial); run != lastRuns_.end() && !IsRunning(game)) {
+        if (const auto found = diagnoses_.find(serial); found != diagnoses_.end() && !IsRunning(game)) {
+            const auto& diagnosis = found->second;
             ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextColored(run->second.exit == "clean" ? Dim : Amber, "Last run: %s", run->second.summary.c_str());
+            const bool problem = diagnosis.level == RunDiagnosis::Level::Problem;
+            ImGui::TextColored(problem ? Red : Dim, "Last run: %s", diagnosis.headline.c_str());
+            if (problem && !diagnosis.detail.empty()) ImGui::TextColored(Dim, "%s", diagnosis.detail.c_str());
+            if (problem && !diagnosis.hint.empty()) ImGui::TextColored(Amber, "%s", diagnosis.hint.c_str());
             ImGui::PopTextWrapPos();
+            if (problem) {
+                if (ImGui::SmallButton("Make a report")) MakeReport(game);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)");
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Open log")) OpenLatestLog(serial);
+            }
         }
+    }
+
+    // The last run of a game, from its newest log and that run's report.
+    void Diagnose(const std::string& serial) {
+        const auto log = LatestRunLog(layout_, serial);
+        if (!log) {
+            diagnoses_.erase(serial);
+            return;
+        }
+        auto reportFile = *log;
+        reportFile.replace_extension(".report.json");
+        diagnoses_[serial] = DiagnoseRun(ReadRunReport(reportFile), ReadLogTail(*log, 128 * 1024), std::nullopt, false);
+    }
+
+    void OpenLatestLog(const std::string& serial) {
+        if (const auto log = LatestRunLog(layout_, serial)) OpenPath(*log);
+        else OpenFolder(layout_.Logs(serial));
     }
 
     void DrawActionItems(const GameEntry& game) {
@@ -2567,6 +3377,24 @@ private:
         }
         if (ImGui::MenuItem("Trophies...")) OpenTrophies();
         if (ImGui::MenuItem("Controls...")) OpenControls(game);
+        if (ImGui::MenuItem("Game settings...")) OpenGameSettings(game);
+        if (ImGui::MenuItem("Screenshots...")) OpenScreenshots(game);
+        {
+            const bool hasSaves = HasSaves(layout_, serial);
+            if (MenuAction("Back up saves", hasSaves ? (session_ ? "Not while a game runs" : "") : "No saves or trophies of this game in profile " + layout_.profile + " yet",
+                           "Zips the saves and trophies of profile " + layout_.profile + " into " + ToUtf8(SaveBackupFolder(layout_, serial)))) {
+                StartBackUpSaves(serial);
+            }
+        }
+        if (MenuAction("Open last log", PathExists(layout_.Logs(serial)) ? "" : "No logs yet", ToUtf8(layout_.Logs(serial)))) OpenLatestLog(serial);
+        if (MenuAction("Make a report", PathExists(layout_.Logs(serial)) ? "" : "Run the game once first",
+                       "One text file for a GitHub issue: system, versions, settings, the last run's reason and the end of its log, with your user name and home folder removed")) {
+            MakeReport(game);
+        }
+        if (MenuAction("Clear shader cache", PathExists(layout_.ShaderCache(serial)) ? (IsRunning(game) ? "Not while the game runs" : "") : "No shader cache",
+                       "Deletes " + ToUtf8(layout_.ShaderCache(serial)) + "; AnyPS5 builds it again (the next start is slower)")) {
+            ClearShaderCache(serial);
+        }
         {
             const auto home = HomeFor(game);
             std::string how;
@@ -2603,17 +3431,17 @@ private:
             else if (game.modules.self > 0) label += " (" + std::to_string(game.modules.self) + (game.modules.self == 1 ? " module)" : " modules)");
             else if (game.executable.kind == ExecutableKind::Self) label += " (eboot.bin)";
             if (MenuAction(label.c_str(), reason,
-                           "First stores the originals in " + FileName(OriginalsZipFor(game)) + " beside the game folder, with their MD5, and checks the zip.\n"
+                           "First stores the originals in " + ToUtf8(OriginalsZipFor(game, layout_.library)) + ", with their MD5, and checks the zip.\n"
                            "Then replaces eboot.bin, the SELF modules (sce_module, sce_modules, prx, the title's module folders) and extra executables with their ELF.\n"
                            "Same conversion as AnyPS5's unwrap_self.py. Install needs this done first.")) {
                 StartConvertSelf(game);
             }
         }
         {
-            const auto zip = OriginalsZipFor(game);
+            const auto zip = OriginalsZipFor(game, layout_.library);
             std::string reason = busy;
             if (reason.empty() && game.format != PackageFormat::Folder) reason = "Only for game folders";
-            if (reason.empty() && !PathExists(zip)) reason = "No " + FileName(zip) + " beside the game folder";
+            if (reason.empty() && !PathExists(zip)) reason = "No " + FileName(zip) + " in " + ToUtf8(zip.parent_path());
             if (MenuAction("Restore original SELF files", reason, "Puts every file from " + FileName(zip) + " back, each checked against its MD5, then deletes the zip.")) {
                 StartRestoreOriginals(game);
             }
@@ -3256,7 +4084,12 @@ private:
             ImGui::TextColored(Dim, "%s", ToUtf8(layout_.InputConfig()).c_str());
         });
 
-        Section("trophy-cards", "Trophies while playing", "A card at the top of the game's window for each trophy it earns. It never takes the keyboard or the mouse from the game.", [&] {
+        Section("controllers", "Controllers", "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (✕ plays, △ opens a game's actions).", [&] {
+            DrawControllers();
+        });
+
+        Section("trophy-cards", "While playing", "The trophy card shows at the top of the game's window and never takes the keyboard or the mouse from the game.", [&] {
+            ImGui::Checkbox("Minimize the launcher once the game's window shows", &draft_.hideWhilePlaying);
             ImGui::Checkbox("Show a card when a trophy is earned", &draft_.trophyPopups);
             ImGui::BeginDisabled(!draft_.trophyPopups);
             ImGui::Checkbox("Play a sound with it", &draft_.trophySound);
@@ -3393,6 +4226,28 @@ private:
     bool captureReplace_ = false;
     std::string captureNote_;
     std::string controlsError_;
+    std::map<std::string, RunDiagnosis> diagnoses_;  // the last run of each game, by serial
+    // Game settings window.
+    bool openGameSettings_ = false;
+    std::string settingsSerial_;
+    std::string settingsName_;
+    GameSettings gameSettings_;
+    std::vector<SaveBackup> backups_;
+    std::string gameSettingsError_;
+    std::string exportPick_;
+    std::string importPick_;
+    // Screenshots window.
+    bool openScreenshots_ = false;
+    std::vector<std::filesystem::path> shots_;
+    std::set<std::filesystem::path> shotLoaded_;
+    int shotViewed_ = -1;
+    // The launch screen, until the game's window shows.
+    bool launching_ = false;
+    Uint64 launchStarted_ = 0;
+    bool minimizedForGame_ = false;
+    // Controllers in Settings.
+    std::map<SDL_JoystickID, SDL_Gamepad*> pads_;
+    SDL_JoystickID padTest_ = 0;
     Background<OnlineLookup> onlineLoader_;
     std::map<std::string, TitleOnlineInfo> online_;
     std::map<std::string, std::string> onlineErrors_;

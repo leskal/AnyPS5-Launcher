@@ -31,6 +31,12 @@ void RoundWindowCorners(void* window);
 // Moves a file or folder to the Recycle Bin, without asking.
 unsigned long RecycleItem(const wchar_t* path);
 
+// True when a process with this executable name (like L"steam.exe", any case) runs.
+bool ProcessRunning(const wchar_t* exeName);
+
+// "Windows 11 Pro 24H2 (build 26100)" from the registry, into text.
+void WindowsVersion(wchar_t* text, unsigned long capacity);
+
 // Opens a folder in Explorer.
 unsigned long OpenFolder(const wchar_t* path);
 

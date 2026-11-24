@@ -22,7 +22,9 @@ add_library(launcher_core STATIC
     src/core/Archive.cpp
     src/core/Encryption.cpp
     src/core/Executable.cpp
+    src/core/Diagnosis.cpp
     src/core/FileOps.cpp
+    src/core/GameSettings.cpp
     src/core/Http.cpp
     src/core/Install.cpp
     src/core/Launch.cpp
@@ -34,6 +36,7 @@ add_library(launcher_core STATIC
     src/core/Trophies.cpp
     src/core/PatchInfo.cpp
     src/core/Profiles.cpp
+    src/core/SaveBackup.cpp
     src/core/Scanner.cpp
     src/core/Session.cpp
     src/core/SelfUnwrap.cpp
@@ -47,7 +50,7 @@ target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(launcher_core PUBLIC launcher_zarchive launcher_json)
 target_include_directories(launcher_core PRIVATE ${LAUNCHER_3RDPARTY}/ZArchive/src)
 if(WIN32)
-    target_link_libraries(launcher_core PUBLIC shell32 winhttp)
+    target_link_libraries(launcher_core PUBLIC shell32 winhttp advapi32)
 endif()
 target_compile_options(launcher_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Wconversion -Wno-sign-conversion>
@@ -77,6 +80,7 @@ if(LAUNCHER_BUILD_TESTS)
         tests/MetadataTests.cpp
         tests/PatchInfoTests.cpp
         tests/TrophyInputTests.cpp
+        tests/FeatureTests.cpp
         tests/ScannerTests.cpp
         tests/SettingsTests.cpp
         tests/UnwrapTests.cpp

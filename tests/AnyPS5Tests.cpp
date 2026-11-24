@@ -391,7 +391,7 @@ TEST(AnApp0FolderAloneInItsParentIsUsedWhereItIs) {
     CHECK(game.location == app0);
     CHECK(game.app0Parent == parent);
     CHECK(HomeFor(game) == parent);
-    CHECK(OriginalsZipFor(game) == fixture.temp.Path() / "games" / "PPSA00130-01.000.000.originals.zip");
+    CHECK(OriginalsZipFor(game, fixture.temp.Path() / "library") == fixture.temp.Path() / "library" / "originals" / "PPSA00130-01.000.000.originals.zip");
 
     FakeRelinker relinker;
     const auto manifest = fixture.Install(game, relinker);
@@ -717,7 +717,13 @@ TEST(ConvertSelfZipsTheOriginalsThenConvertsInPlace) {
     const auto before = fixture.Scan();
     CHECK_EQ(before.modules.elf, 1);
     CHECK_EQ(before.modules.self, 2);
-    CHECK(OriginalsZipFor(before) == fixture.temp.Path() / "games" / "PPSA00110-01.000.000.originals.zip");
+    {
+        // Only the library's originals folder counts; a zip beside the game is ignored.
+        const auto library = fixture.temp.Path() / "library";
+        fixture::WriteFolder(fixture.temp.Path() / "games", {{"PPSA00110-01.000.000.originals.zip", fixture::Bytes("old")}});
+        CHECK(OriginalsZipFor(before, library) == library / "originals" / "PPSA00110-01.000.000.originals.zip");
+        std::filesystem::remove(fixture.temp.Path() / "games" / "PPSA00110-01.000.000.originals.zip");
+    }
 
     JobControl control;
     const auto result = ConvertGameSelfFiles(folder, zip, ModuleFolders(ModuleDirectories(fixture.title)), {}, control);

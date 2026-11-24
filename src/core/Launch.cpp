@@ -44,7 +44,7 @@ std::string ReadText(const std::filesystem::path& file) {
 
 }
 
-RunPlan PrepareRun(const GameEntry& game, const Layout& layout, const ProfileSettings& profile, const TitleEntry* title) {
+RunPlan PrepareRun(const GameEntry& game, const Layout& layout, const ProfileSettings& profile, const TitleEntry* title, const GameSettings& settings) {
     const auto& serial = game.metadata.titleId;
     const auto install = game.home;
     RunPlan plan;
@@ -94,6 +94,10 @@ RunPlan PrepareRun(const GameEntry& game, const Layout& layout, const ProfileSet
     if (title != nullptr) {
         for (const auto& [name, value] : title->env) env.emplace_back(name, value);
     }
+    for (auto& [name, value] : GameSettingsEnvironment(settings)) {
+        std::erase_if(env, [&](const auto& entry) { return entry.first == name; });
+        env.emplace_back(std::move(name), std::move(value));
+    }
     return plan;
 }
 
@@ -111,6 +115,15 @@ std::optional<RunReport> ReadRunReport(const std::filesystem::path& file) {
     if (stop.is_object()) {
         if (stop.contains("kind") && stop["kind"].is_string()) report.stopKind = stop["kind"].get<std::string>();
         if (stop.contains("message") && stop["message"].is_string()) report.stopMessage = stop["message"].get<std::string>();
+    }
+    if (const auto missing = document.find("missing"); missing != document.end() && missing->is_object()) {
+        if (const auto functions = missing->find("functions"); functions != missing->end() && functions->is_array() && !functions->empty()) {
+            const auto& first = functions->front();
+            if (first.is_object() && first.contains("name") && first["name"].is_string()) {
+                const auto library = first.contains("library") && first["library"].is_string() ? first["library"].get<std::string>() : std::string();
+                report.missingFunction = (library.empty() ? std::string() : library + "::") + first["name"].get<std::string>();
+            }
+        }
     }
     char seconds[32];
     std::snprintf(seconds, sizeof(seconds), "%.0f s", report.seconds);

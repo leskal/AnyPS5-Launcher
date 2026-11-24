@@ -1,5 +1,7 @@
 #include "app/FolderPicker.hpp"
 
+#include <string>
+
 #include <SDL3/SDL.h>
 
 namespace launcher {
@@ -27,6 +29,21 @@ void FolderPicker::OpenFile(SDL_Window* window, std::string* target, const char*
     filter = SDL_DialogFileFilter{filterName, pattern};
     SDL_ShowOpenFileDialog(&FolderPicker::Callback, this, window, pattern != nullptr && pattern[0] != 0 ? &filter : nullptr, pattern != nullptr && pattern[0] != 0 ? 1 : 0,
                            target->empty() ? nullptr : target->c_str(), false);
+}
+
+void FolderPicker::SaveFile(SDL_Window* window, std::string* target, const char* filterName, const char* pattern) {
+    if (target_ != nullptr || target == nullptr) return;
+    target_ = target;
+    {
+        std::lock_guard lock(mutex_);
+        finished_ = false;
+        chosen_.reset();
+    }
+    static SDL_DialogFileFilter filter;
+    filter = SDL_DialogFileFilter{filterName, pattern};
+    const std::string suggested = *target;
+    target->clear();  // stays empty when the dialog is cancelled
+    SDL_ShowSaveFileDialog(&FolderPicker::Callback, this, window, &filter, 1, suggested.empty() ? nullptr : suggested.c_str());
 }
 
 void FolderPicker::Poll() {

@@ -37,6 +37,8 @@ struct Layout {
     std::filesystem::path InputConfig() const { return Profile() / "input" / "anyps5-input.ini"; }
     // AnyPS5 reads it after InputConfig() for that title only.
     std::filesystem::path GameInputConfig(std::string_view serial) const { return Profile() / "input" / ("anyps5-input." + std::string(serial) + ".ini"); }
+    // One game's own settings (window, frame rate, overlay, language, ...).
+    std::filesystem::path GameSettingsFile(std::string_view serial) const { return Profile() / "settings" / (std::string(serial) + ".json"); }
     std::filesystem::path Screenshots(std::string_view serial) const { return Profile() / "screenshots" / std::string(serial); }
     std::filesystem::path GameData(std::string_view serial) const { return userdata / "games" / std::string(serial); }
     std::filesystem::path Logs(std::string_view serial) const { return library / "logs" / std::string(serial); }

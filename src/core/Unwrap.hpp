@@ -15,13 +15,15 @@ std::filesystem::path UnwrappedEbootFor(const GameEntry& game);
 
 void UnwrapSelf(const std::filesystem::path& input, const std::filesystem::path& output);
 
-// Convert SELF to ELF keeps every original it replaces in one zip beside the
-// game folder, named from param.json (Games\PPSA21567-01.018.000.originals.zip),
-// with an MD5SUMS list (md5sum format).
+// Convert SELF to ELF keeps every original it replaces in one zip, named from
+// param.json (PPSA21567-01.018.000.originals.zip), with an MD5SUMS list (md5sum
+// format), in <library>\originals\.
 inline constexpr const char* OriginalsChecksums = "MD5SUMS";
 
-// The zip for a game: beside its folder (the set-up folder once installed).
-std::filesystem::path OriginalsZipFor(const GameEntry& game);
+// The zip's name, from the game's title ID and version.
+std::string OriginalsZipName(const GameEntry& game);
+// <library>\originals\<name>.
+std::filesystem::path OriginalsZipFor(const GameEntry& game, const std::filesystem::path& library);
 
 struct SelfConversion {
     bool eboot = false;

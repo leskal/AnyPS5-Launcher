@@ -112,7 +112,7 @@ void UnwrapSelf(const std::filesystem::path& input, const std::filesystem::path&
     WriteFileAtomically(output, std::string_view(reinterpret_cast<const char*>(image.data()), image.size()));
 }
 
-std::filesystem::path OriginalsZipFor(const GameEntry& game) {
+std::string OriginalsZipName(const GameEntry& game) {
     const auto base = !game.home.empty() ? game.home : !game.app0Parent.empty() ? game.app0Parent : game.location;
     // Named from param.json, so folder names don't matter: PPSA21567-01.018.000.originals.zip.
     const auto safe = [](std::string text) {
@@ -123,7 +123,11 @@ std::filesystem::path OriginalsZipFor(const GameEntry& game) {
     };
     auto name = safe(game.metadata.titleId.empty() ? ToUtf8(base.filename()) : game.metadata.titleId);
     if (!game.metadata.contentVersion.empty()) name += "-" + safe(game.metadata.contentVersion);
-    return base.parent_path() / FromUtf8(name + ".originals.zip");
+    return name + ".originals.zip";
+}
+
+std::filesystem::path OriginalsZipFor(const GameEntry& game, const std::filesystem::path& library) {
+    return library / "originals" / FromUtf8(OriginalsZipName(game));
 }
 
 SelfConversion ConvertGameSelfFiles(const std::filesystem::path& game, const std::filesystem::path& zip, const std::vector<std::string>& moduleFolders,
@@ -207,6 +211,7 @@ SelfConversion ConvertGameSelfFiles(const std::filesystem::path& game, const std
             for (const auto& entry : existing->Entries()) total += entry.size * 2;
         }
         control.SetTotal(total + 1);
+        std::filesystem::create_directories(zip.parent_path(), error);
         auto partial = zip;
         partial += ".partial";
         std::filesystem::remove(partial, error);

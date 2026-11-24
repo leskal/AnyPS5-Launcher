@@ -13,6 +13,8 @@ public:
     void Open(SDL_Window* window, std::string* target);
     // A file instead of a folder; filterName/pattern like "Relinker" / "exe".
     void OpenFile(SDL_Window* window, std::string* target, const char* filterName, const char* pattern);
+    // Where to save a file; target's text is the suggested name or path.
+    void SaveFile(SDL_Window* window, std::string* target, const char* filterName, const char* pattern);
     void Poll();
     bool IsOpen() const { return target_ != nullptr; }
 
