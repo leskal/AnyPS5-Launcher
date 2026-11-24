@@ -21,6 +21,13 @@ unsigned long JobActiveProcesses(void* job, unsigned long* count);
 unsigned long TerminateJob(void* job, unsigned int exitCode);
 void CloseJob(void* job);
 
+// The largest visible top-level window of a process in the job, in screen pixels.
+// Returns ERROR_NOT_FOUND (1168) when there is none.
+unsigned long JobWindowRect(void* job, long* x, long* y, long* width, long* height);
+
+// Asks Windows 11 to round the window's corners; does nothing on older Windows.
+void RoundWindowCorners(void* window);
+
 // Opens a folder in Explorer.
 unsigned long OpenFolder(const wchar_t* path);
 

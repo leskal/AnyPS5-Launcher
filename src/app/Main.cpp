@@ -5,7 +5,11 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <cmath>
+#include <ctime>
+#include <deque>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -26,12 +30,16 @@
 #include "core/AnyPS5.hpp"
 #include "core/Archive.hpp"
 #include "core/FileOps.hpp"
+#include "core/InputMapping.hpp"
 #include "core/Install.hpp"
 #include "core/Launch.hpp"
 #include "core/Modules.hpp"
+#include "core/PatchInfo.hpp"
 #include "core/Profiles.hpp"
 #include "core/Scanner.hpp"
+#include "core/Session.hpp"
 #include "core/Settings.hpp"
+#include "core/Trophies.hpp"
 #include "core/Unwrap.hpp"
 #include "core/Utf8.hpp"
 #include "core/Versions.hpp"
@@ -332,6 +340,70 @@ private:
     std::optional<Result> finished_;
 };
 
+// A game's trophies as read in the background; set is empty when it has none.
+struct TrophyLoad {
+    std::string key;
+    std::optional<TrophySet> set;
+};
+
+// A game's sce_sys/pic0.png, read in the background; empty when it has none.
+struct ArtLoad {
+    std::string key;
+    std::vector<std::uint8_t> png;
+};
+
+ImVec4 GradeColor(TrophyGrade grade) {
+    switch (grade) {
+    case TrophyGrade::Platinum: return ImVec4(0.55f, 0.68f, 0.90f, 1.0f);
+    case TrophyGrade::Gold: return ImVec4(0.89f, 0.70f, 0.25f, 1.0f);
+    case TrophyGrade::Silver: return ImVec4(0.66f, 0.70f, 0.75f, 1.0f);
+    case TrophyGrade::Bronze: return ImVec4(0.78f, 0.50f, 0.29f, 1.0f);
+    }
+    return ImVec4(1, 1, 1, 1);
+}
+
+// A trophy cup in the grade's colour, size by size, at the cursor. Hovering it names the grade.
+void TrophyIcon(TrophyGrade grade, float size) {
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    auto* draw = ImGui::GetWindowDrawList();
+    const ImU32 color = ImGui::GetColorU32(GradeColor(grade));
+    const auto point = [&](float x, float y) { return ImVec2(at.x + x * size, at.y + y * size); };
+    // Handles, then the bowl over them, the stem and a two-step base.
+    draw->AddCircle(point(0.25f, 0.27f), size * 0.13f, color, 0, size * 0.075f);
+    draw->AddCircle(point(0.75f, 0.27f), size * 0.13f, color, 0, size * 0.075f);
+    draw->AddRectFilled(point(0.24f, 0.06f), point(0.76f, 0.50f), color, size * 0.26f, ImDrawFlags_RoundCornersBottom);
+    draw->AddRectFilled(point(0.45f, 0.48f), point(0.55f, 0.70f), color);
+    draw->AddRectFilled(point(0.33f, 0.68f), point(0.67f, 0.78f), color, size * 0.03f);
+    draw->AddRectFilled(point(0.24f, 0.80f), point(0.76f, 0.93f), color, size * 0.03f);
+    // A soft shine on the bowl.
+    draw->AddRectFilled(point(0.33f, 0.12f), point(0.40f, 0.36f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.35f)), size * 0.035f);
+    ImGui::Dummy(ImVec2(size, size));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TrophyGradeName(grade));
+}
+
+std::string LocalDate(std::int64_t seconds) {
+    const std::time_t time = static_cast<std::time_t>(seconds);
+    std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &time);
+#else
+    localtime_r(&time, &local);
+#endif
+    char text[32];
+    std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M", &local);
+    return text;
+}
+
+// The answer for one title from PROSPEROPatches, or why there is none.
+struct OnlineLookup {
+    std::string titleId;
+    std::optional<TitleOnlineInfo> info;
+    std::string error;
+};
+
+// Answers are kept for a day; a refresh asks again at once.
+constexpr std::int64_t OnlineCacheAge = 24 * 60 * 60;
+
 struct ReleaseList {
     std::string repository;
     std::vector<Release> releases;
@@ -384,6 +456,233 @@ void LoadFonts(ImGuiIO& io) {
     }
     if (!loaded) io.Fonts->AddFontDefault();
 }
+
+// One "trophy earned" card.
+struct ToastItem {
+    TrophyGrade grade = TrophyGrade::Bronze;
+    std::string name;
+    std::string detail;
+    std::string game;
+    std::vector<std::uint8_t> icon;
+};
+
+// A small always-on-top window that shows earned trophies over the game, one at a
+// time, without taking the keyboard or the mouse from it. It has its own ImGui
+// context and renderer; Frame() switches to them and back.
+class TrophyToast {
+public:
+    explicit TrophyToast(float scale) : scale_(scale) {}
+
+    ~TrophyToast() { Close(); }
+
+    TrophyToast(const TrophyToast&) = delete;
+    TrophyToast& operator=(const TrophyToast&) = delete;
+
+    // area: the game's window, or empty for the primary display.
+    void Push(ToastItem item, std::optional<SDL_Rect> area, bool sound) {
+        queue_.push_back(std::move(item));
+        if (area) area_ = area;
+        if (queue_.size() == 1) shownAt_ = 0;
+        if (sound) Chime();
+    }
+
+    void Frame() {
+        if (queue_.empty()) {
+            if (window_ != nullptr && visible_) {
+                SDL_HideWindow(window_);
+                visible_ = false;
+            }
+            return;
+        }
+        if (!Open()) {
+            queue_.clear();
+            return;
+        }
+        const Uint64 now = SDL_GetTicks();
+        if (shownAt_ == 0) {
+            shownAt_ = now;
+            icons_->Clear();
+        }
+        const float elapsed = static_cast<float>(now - shownAt_) / 1000.0f;
+        if (elapsed > Duration) {
+            queue_.pop_front();
+            shownAt_ = 0;
+            return;
+        }
+        // Slide down from above, stay, slide back up.
+        const float in = std::clamp(elapsed / Slide, 0.0f, 1.0f);
+        const float out = std::clamp((Duration - elapsed) / Slide, 0.0f, 1.0f);
+        const float shown = 1.0f - std::pow(1.0f - std::min(in, out), 3.0f);
+
+        SDL_Rect area{};
+        if (area_) {
+            area = *area_;
+        } else if (!SDL_GetDisplayUsableBounds(SDL_GetPrimaryDisplay(), &area)) {
+            area = SDL_Rect{0, 0, 1280, 720};
+        }
+        const int width = static_cast<int>(440 * scale_);
+        const int height = static_cast<int>(96 * scale_);
+        const int margin = static_cast<int>(28 * scale_);
+        const int x = area.x + (area.w - width) / 2;
+        const int y = area.y + margin - static_cast<int>((1.0f - shown) * static_cast<float>(height + margin));
+        SDL_SetWindowSize(window_, width, height);
+        SDL_SetWindowPosition(window_, x, y);
+        if (!visible_) {
+            SDL_ShowWindow(window_);
+            visible_ = true;
+        }
+        Draw(queue_.front(), elapsed);
+    }
+
+private:
+    static constexpr float Duration = 6.0f;
+    static constexpr float Slide = 0.35f;
+
+    bool Open() {
+        if (window_ != nullptr) return true;
+        if (failed_) return false;
+        SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
+        window_ = SDL_CreateWindow("Trophy", static_cast<int>(440 * scale_), static_cast<int>(96 * scale_),
+                                   SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_UTILITY | SDL_WINDOW_NOT_FOCUSABLE | SDL_WINDOW_HIDDEN |
+                                       SDL_WINDOW_HIGH_PIXEL_DENSITY);
+        if (window_ != nullptr) renderer_ = SDL_CreateRenderer(window_, nullptr);
+        if (window_ == nullptr || renderer_ == nullptr) {
+            failed_ = true;
+            Close();
+            return false;
+        }
+#ifdef _WIN32
+        win::RoundWindowCorners(SDL_GetPointerProperty(SDL_GetWindowProperties(window_), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr));
+#endif
+        icons_ = std::make_unique<IconCache>(renderer_);
+        auto* previous = ImGui::GetCurrentContext();
+        context_ = ImGui::CreateContext();
+        ImGui::SetCurrentContext(context_);
+        auto& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+        io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+        auto& style = ImGui::GetStyle();
+        style.WindowPadding = ImVec2(0, 0);
+        style.WindowBorderSize = 0;
+        style.WindowRounding = 0;
+        style.FontScaleDpi = scale_;
+        style.Colors[ImGuiCol_Text] = ImVec4(0.95f, 0.96f, 0.98f, 1.0f);
+        LoadFonts(io);
+        ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_);
+        ImGui_ImplSDLRenderer3_Init(renderer_);
+        ImGui::SetCurrentContext(previous);
+        return true;
+    }
+
+    void Close() {
+        if (context_ != nullptr) {
+            auto* previous = ImGui::GetCurrentContext();
+            ImGui::SetCurrentContext(context_);
+            ImGui_ImplSDLRenderer3_Shutdown();
+            ImGui_ImplSDL3_Shutdown();
+            ImGui::DestroyContext(context_);
+            ImGui::SetCurrentContext(previous == context_ ? nullptr : previous);
+            context_ = nullptr;
+        }
+        icons_.reset();
+        if (renderer_ != nullptr) SDL_DestroyRenderer(renderer_);
+        if (window_ != nullptr) SDL_DestroyWindow(window_);
+        renderer_ = nullptr;
+        window_ = nullptr;
+        visible_ = false;
+        if (audio_ != nullptr) SDL_DestroyAudioStream(audio_);
+        audio_ = nullptr;
+    }
+
+    void Draw(const ToastItem& item, float elapsed) {
+        auto* previous = ImGui::GetCurrentContext();
+        ImGui::SetCurrentContext(context_);
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::Begin("toast", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings);
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 at = viewport->Pos;
+        const ImVec2 size = viewport->Size;
+        const float pad = 14.0f * scale_;
+        const ImU32 grade = ImGui::GetColorU32(GradeColor(item.grade));
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), IM_COL32(24, 26, 32, 255));
+        draw->AddRectFilled(at, ImVec2(at.x + 5.0f * scale_, at.y + size.y), grade);
+        // Time left, as a thin line along the bottom.
+        const float left = std::clamp(1.0f - elapsed / Duration, 0.0f, 1.0f);
+        draw->AddRectFilled(ImVec2(at.x, at.y + size.y - 3.0f * scale_), ImVec2(at.x + size.x * left, at.y + size.y), ImGui::GetColorU32(Fade(GradeColor(item.grade), 0.6f)));
+
+        const float icon = size.y - pad * 2;
+        const ImVec2 iconAt(at.x + pad + 5.0f * scale_, at.y + pad);
+        if (auto* texture = icons_->Get(std::filesystem::path("toast"), item.icon)) {
+            draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), iconAt, ImVec2(iconAt.x + icon, iconAt.y + icon), ImVec2(0, 0),
+                                  ImVec2(1, 1), IM_COL32_WHITE, 8.0f * scale_);
+        } else {
+            draw->AddRectFilled(iconAt, ImVec2(iconAt.x + icon, iconAt.y + icon), IM_COL32(48, 52, 62, 255), 8.0f * scale_);
+            ImGui::SetCursorScreenPos(ImVec2(iconAt.x + icon * 0.2f, iconAt.y + icon * 0.2f));
+            TrophyIcon(item.grade, icon * 0.6f);
+        }
+        const float textX = iconAt.x + icon + pad;
+        const float textWidth = at.x + size.x - pad - textX;
+        ImGui::SetCursorScreenPos(ImVec2(textX, at.y + pad - 1.0f * scale_));
+        TrophyIcon(item.grade, ImGui::GetFontSize());
+        ImGui::SameLine(0, 6.0f * scale_);
+        ImGui::TextColored(GradeColor(item.grade), "Trophy earned");
+        ImGui::SetCursorScreenPos(ImVec2(textX, ImGui::GetCursorScreenPos().y));
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.15f);
+        ImGui::TextUnformatted(Elide(item.name.empty() ? std::string("A trophy") : item.name, textWidth).c_str());
+        ImGui::PopFont();
+        ImGui::SetCursorScreenPos(ImVec2(textX, ImGui::GetCursorScreenPos().y));
+        ImGui::TextColored(ImVec4(0.62f, 0.65f, 0.72f, 1.0f), "%s", Elide(item.detail.empty() ? item.game : item.detail, textWidth).c_str());
+        ImGui::End();
+        ImGui::Render();
+        SDL_SetRenderScale(renderer_, ImGui::GetIO().DisplayFramebufferScale.x, ImGui::GetIO().DisplayFramebufferScale.y);
+        SDL_SetRenderDrawColor(renderer_, 24, 26, 32, 255);
+        SDL_RenderClear(renderer_);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer_);
+        SDL_RenderPresent(renderer_);
+        ImGui::SetCurrentContext(previous);
+    }
+
+    // Two short bell-like notes.
+    void Chime() {
+        if (audio_ == nullptr) {
+            if (!SDL_WasInit(SDL_INIT_AUDIO) && !SDL_InitSubSystem(SDL_INIT_AUDIO)) return;
+            const SDL_AudioSpec spec{SDL_AUDIO_F32, 1, 48000};
+            audio_ = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
+            if (audio_ == nullptr) return;
+            SDL_ResumeAudioStreamDevice(audio_);
+        }
+        constexpr int Rate = 48000;
+        std::vector<float> samples(static_cast<std::size_t>(Rate * 0.75));
+        const auto note = [&](float start, float frequency, float level) {
+            const auto first = static_cast<std::size_t>(start * Rate);
+            for (std::size_t i = first; i < samples.size(); ++i) {
+                const float t = static_cast<float>(i - first) / Rate;
+                const float envelope = std::min(1.0f, t * 200.0f) * std::exp(-t * 6.0f);
+                samples[i] += level * envelope * (std::sin(6.2831853f * frequency * t) + 0.3f * std::sin(6.2831853f * frequency * 2.0f * t));
+            }
+        };
+        note(0.0f, 987.77f, 0.10f);   // B5
+        note(0.12f, 1318.5f, 0.10f);  // E6
+        SDL_PutAudioStreamData(audio_, samples.data(), static_cast<int>(samples.size() * sizeof(float)));
+    }
+
+    float scale_;
+    SDL_Window* window_ = nullptr;
+    SDL_Renderer* renderer_ = nullptr;
+    ImGuiContext* context_ = nullptr;
+    std::unique_ptr<IconCache> icons_;
+    SDL_AudioStream* audio_ = nullptr;
+    std::deque<ToastItem> queue_;
+    std::optional<SDL_Rect> area_;
+    Uint64 shownAt_ = 0;
+    bool visible_ = false;
+    bool failed_ = false;
+};
 
 bool PathExists(const std::filesystem::path& path) {
     std::error_code error;
@@ -439,6 +738,7 @@ class LauncherApp {
 public:
     LauncherApp(SDL_Window* window, SDL_Renderer* renderer, float scale)
         : window_(window), icons_(std::make_unique<IconCache>(renderer)), scale_(scale) {
+        toast_ = std::make_unique<TrophyToast>(scale);
         const char* base = SDL_GetBasePath();
         launcherFolder_ = FromUtf8(base != nullptr ? base : "");
         settingsFile_ = launcherFolder_ / SettingsFileName;
@@ -467,6 +767,8 @@ public:
         Picker().Poll();
         if (auto finished = scan_.Take()) {
             icons_->Clear();
+            trophyAsked_.clear();
+            artAsked_.clear();
             result_ = std::move(*finished);
             scanned_ = true;
             RecoverSessions();
@@ -508,6 +810,15 @@ public:
                 message_ = Message{Red, "Can't add that AnyPS5", failure.what()};
             }
         }
+        if (auto load = trophyLoader_.Take()) trophies_[load->key] = std::move(load->set);
+        if (auto load = artLoader_.Take()) art_[load->key] = std::move(load->png);
+        StartGameLoads();
+        if (auto lookup = onlineLoader_.Take()) {
+            if (lookup->info) online_[lookup->titleId] = std::move(*lookup->info);
+            if (lookup->error.empty()) onlineErrors_.erase(lookup->titleId);
+            else onlineErrors_[lookup->titleId] = lookup->error;
+        }
+        StartOnlineLookup();
         if (anyps5Pending_ && !anyps5Loader_.Running()) {
             anyps5Pending_ = false;
             const auto folder = settings_.anyps5Folder;
@@ -548,7 +859,17 @@ public:
         DrawMissingRelinker();
         DrawVersions();
         DrawSettings();
+        DrawTrophies();
+        if (controlsScope_ == 0) DrawControls();  // the profile's controls are drawn over Settings
         ImGui::End();
+    }
+
+    bool TakeEvent(const SDL_Event& event) { return CaptureEvent(event); }
+
+    // Runs every loop, even while the launcher is minimized: trophy cards over the game.
+    void Tick() {
+        WatchTrophies(false);
+        toast_->Frame();
     }
 
 private:
@@ -724,6 +1045,8 @@ private:
     }
 
     void FinishSession() {
+        WatchTrophies(true);  // an unlock in the last moments
+        watchPrimed_ = false;
         std::optional<RunReport> report;
         try {
             report = FinishRun(session_->Plan());
@@ -744,6 +1067,7 @@ private:
                                "ended" + (code ? " with exit code " + std::to_string(*code) : std::string()) + " without a run report; see " + ToUtf8(session_->Plan().logFile)};
         }
         session_.reset();
+        trophyAsked_.clear();  // the run may have earned some
     }
 
     void StartConvertSelf(const GameEntry& game) {
@@ -1033,6 +1357,895 @@ private:
         }
     }
 
+    std::filesystem::path OnlineCacheFolder() const {
+        return layout_.library / "cache" / "prosperopatches";
+    }
+
+    // Looks up the selected game on PROSPEROPatches, one title at a time.
+    void StartOnlineLookup() {
+        if (!settings_.onlineInfo || selected_.empty() || onlineLoader_.Running()) return;
+        const auto* game = SelectedGame();
+        if (game == nullptr) return;
+        const auto titleId = game->metadata.titleId;
+        const bool refresh = onlineRefresh_ == titleId;
+        if (!refresh && onlineAsked_.count(titleId) != 0) return;
+        onlineAsked_.insert(titleId);
+        onlineRefresh_.clear();
+        const auto folder = OnlineCacheFolder();
+        onlineLoader_.Start([titleId, folder, refresh] {
+            OnlineLookup lookup{titleId, std::nullopt, {}};
+            const auto now = UnixNow();
+            if (!refresh) {
+                if (auto cached = LoadCachedTitle(folder, titleId, now, OnlineCacheAge)) {
+                    lookup.info = std::move(cached);
+                    return lookup;
+                }
+            }
+            try {
+                auto info = FetchTitleOnline(titleId, HttpGetText, HttpPostText, now);
+                try {
+                    SaveCachedTitle(folder, info);
+                } catch (const std::exception&) {
+                    // Not being able to cache only means asking again next time.
+                }
+                lookup.info = std::move(info);
+            } catch (const std::exception& failure) {
+                lookup.error = ReadableText(failure.what());
+            }
+            return lookup;
+        });
+    }
+
+    void DrawStore(const GameEntry& game) {
+        const auto& titleId = game.metadata.titleId;
+        const auto found = online_.find(titleId);
+        const TitleOnlineInfo* info = found == online_.end() ? nullptr : &found->second;
+        const auto& contentId = !game.metadata.contentId.empty() ? game.metadata.contentId : (info != nullptr ? info->contentId : std::string());
+        auto region = RegionOf(contentId);
+        if (region.empty() && info != nullptr) region = info->region;
+        const auto row = [](const char* label, const std::string& value) {
+            if (value.empty()) return;
+            ImGui::TextColored(Dim, "%s", label);
+            ImGui::SameLine(ImGui::GetFontSize() * 6.0f);
+            ImGui::TextUnformatted(value.c_str());
+        };
+        row("Region", region);
+        if (info != nullptr) row("Publisher", info->publisher);
+
+        if (!settings_.onlineInfo) {
+            ImGui::TextColored(Dim, "Online lookups are off (Settings).");
+        } else if (info == nullptr) {
+            if (const auto error = onlineErrors_.find(titleId); error != onlineErrors_.end()) {
+                ImGui::TextColored(Dim, "Can't look up updates: %s", error->second.c_str());
+            } else {
+                ImGui::TextColored(Dim, "Looking up updates...");
+            }
+        } else if (!info->found) {
+            ImGui::TextColored(Dim, "PROSPEROPatches doesn't list this title.");
+        } else if (const auto* newest = NewestPatch(*info)) {
+            const int order = CompareVersions(game.metadata.contentVersion, newest->contentVersion);
+            if (order < 0) {
+                ImGui::TextColored(Amber, "Update available: %s", newest->contentVersion.c_str());
+            } else if (order == 0) {
+                ImGui::TextColored(Green, "Up to date (newest is %s)", newest->contentVersion.c_str());
+            } else {
+                ImGui::TextColored(Dim, "Newer than the newest listed update (%s)", newest->contentVersion.c_str());
+            }
+            const std::string header = "All updates (" + std::to_string(info->patches.size()) + ")###updates";
+            if (ImGui::CollapsingHeader(header.c_str())) {
+                ImGui::PushTextWrapPos(-1.0f);  // one line per update, even in a narrow panel
+                if (ImGui::BeginTable("updates", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+                    ImGui::TableSetupColumn("Version");
+                    ImGui::TableSetupColumn("Size");
+                    ImGui::TableSetupColumn("Firmware");
+                    ImGui::TableSetupColumn("Added");
+                    ImGui::TableHeadersRow();
+                    for (const auto& patch : info->patches) {
+                        ImGui::TableNextRow();
+                        // The game's own version: the whole row in the accent colour.
+                        const bool current = CompareVersions(patch.contentVersion, game.metadata.contentVersion) == 0;
+                        if (current) {
+                            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(Fade(Accent, 0.22f)));
+                            ImGui::PushStyleColor(ImGuiCol_Text, Accent);
+                        }
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(patch.contentVersion.c_str());
+                        if (current && ImGui::IsItemHovered()) ImGui::SetTooltip("Your version");
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(patch.size.c_str());
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(patch.requiredFirmware.c_str());
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(patch.importDate.substr(0, 10).c_str());
+                        if (current) ImGui::PopStyleColor();
+                    }
+                    ImGui::EndTable();
+                }
+                ImGui::PopTextWrapPos();
+            }
+        } else {
+            ImGui::TextColored(Dim, "No updates are listed for this title.");
+        }
+        if (ImGui::Button("View on PROSPEROPatches")) SDL_OpenURL(PatchPageUrl(titleId).c_str());
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Changelogs, update downloads and add-ons, in your browser");
+        if (settings_.onlineInfo) {
+            ImGui::SameLine();
+            ImGui::BeginDisabled(onlineLoader_.Running());
+            if (ImGui::Button("Refresh")) {
+                onlineErrors_.erase(titleId);
+                online_.erase(titleId);
+                onlineRefresh_ = titleId;
+            }
+            ImGui::EndDisabled();
+        }
+    }
+
+    static void DrawChanges(const GameEntry& game) {
+        if (game.changes.empty()) return;
+        const auto* current = ChangeNoteFor(game.changes, game.metadata.contentVersion);
+        const auto& shown = current != nullptr ? *current : game.changes.front();
+        ImGui::TextColored(Dim, "%s %s", current != nullptr ? "This version," : "Newest notes,", shown.version.c_str());
+        ImGui::TextUnformatted(shown.text.c_str());
+        if (game.changes.size() > 1 && ImGui::CollapsingHeader("Earlier notes")) {
+            for (const auto& note : game.changes) {
+                if (&note == &shown) continue;
+                ImGui::TextColored(Dim, "%s", note.version.c_str());
+                ImGui::TextUnformatted(note.text.c_str());
+                ImGui::Spacing();
+            }
+        }
+    }
+
+    // ---- trophies while playing ---------------------------------------------------
+
+    // Polls the running game's _trophy folder (AnyPS5 writes each unlock there at
+    // once) and shows a card for every unlock that wasn't there at the start.
+    void WatchTrophies(bool now) {
+        if (!session_) {
+            watchPrimed_ = false;
+            return;
+        }
+        const Uint64 ticks = SDL_GetTicks();
+        if (!now && ticks < nextWatch_) return;
+        nextWatch_ = ticks + 500;
+        const auto& home = session_->Plan().workingDirectory;
+        const auto records = ReadTrophyRecords(home / "_trophy");
+        if (!watchPrimed_) {
+            seenUnlocks_ = records.unlocks;
+            watchPrimed_ = true;
+            runTrophies_.reset();
+            for (const auto& game : result_.games) {
+                if (game.home.empty() || game.home != home) continue;
+                try {
+                    auto package = OpenGamePackage(game);
+                    runTrophies_ = LoadTrophies(*package, TrophyLanguages(profileSettings_.language));
+                } catch (const std::exception&) {
+                }
+                break;
+            }
+            return;
+        }
+        for (const auto& [key, tick] : records.unlocks) {
+            if (!seenUnlocks_.emplace(key, tick).second || !settings_.trophyPopups) continue;
+            ToastItem item;
+            item.game = session_->Name();
+            item.name = "Trophy " + std::to_string(key.second);
+            if (runTrophies_) {
+                for (const auto& trophy : runTrophies_->trophies) {
+                    if (trophy.label != key.first || trophy.id != key.second) continue;
+                    item.grade = trophy.grade;
+                    item.name = trophy.name.empty() ? item.name : trophy.name;
+                    item.detail = trophy.detail;
+                    item.icon = trophy.icon;
+                    break;
+                }
+            }
+            std::optional<SDL_Rect> area;
+            SDL_Rect rect{};
+            if (session_->WindowRect(rect.x, rect.y, rect.w, rect.h) && rect.w > 0 && rect.h > 0) area = rect;
+            toast_->Push(std::move(item), area, settings_.trophySound);
+        }
+    }
+
+    // ---- artwork and trophies -----------------------------------------------------
+
+    static std::string GameKey(const GameEntry& game) { return ToUtf8(game.location); }
+
+    std::filesystem::path TrophyRecordsFor(const GameEntry& game) const {
+        if (!game.home.empty() && HasSession(game.home)) return game.home / "_trophy";
+        return layout_.Trophies(game.metadata.titleId);
+    }
+
+    // Reads the selected game's artwork and trophies, one game at a time.
+    void StartGameLoads() {
+        const auto* game = SelectedGame();
+        if (game == nullptr) return;
+        const auto key = GameKey(*game);
+        if (!artLoader_.Running() && artAsked_.insert(key).second) {
+            auto copy = *game;
+            artLoader_.Start([copy, key] {
+                ArtLoad load{key, {}};
+                try {
+                    auto package = OpenGamePackage(copy);
+                    if (auto png = package->ReadAll("sce_sys/pic0.png", 32u << 20)) load.png = std::move(*png);
+                } catch (const std::exception&) {
+                }
+                return load;
+            });
+        }
+        if (!trophyLoader_.Running() && trophyAsked_.insert(key).second) {
+            auto copy = *game;
+            const auto records = TrophyRecordsFor(*game);
+            const auto languages = TrophyLanguages(profileSettings_.language);
+            trophyLoader_.Start([copy, key, records, languages] {
+                TrophyLoad load{key, std::nullopt};
+                try {
+                    auto package = OpenGamePackage(copy);
+                    load.set = LoadTrophies(*package, languages);
+                    if (load.set) ApplyTrophyRecords(*load.set, ReadTrophyRecords(records));
+                } catch (const std::exception&) {
+                    load.set.reset();
+                }
+                return load;
+            });
+        }
+    }
+
+    // The game's pic0.png behind the details panel, faded into the card toward the bottom.
+    void DrawArtwork(const GameEntry& game) {
+        const auto found = art_.find(GameKey(game));
+        if (found == art_.end() || found->second.empty()) return;
+        auto* texture = icons_->Get(game.location / "pic0.png", found->second);
+        if (texture == nullptr) return;
+        float width = 0;
+        float height = 0;
+        SDL_GetTextureSize(texture, &width, &height);
+        if (width <= 0 || height <= 0) return;
+        const ImVec2 at = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        const float shown = std::min(size.y, size.x * 0.75f);  // the top of the panel only
+        // Cover: crop the picture to the shown area's shape.
+        ImVec2 uv0(0, 0);
+        ImVec2 uv1(1, 1);
+        const float aspect = size.x / shown;
+        if (width / height > aspect) {
+            const float cut = (1.0f - aspect * height / width) * 0.5f;
+            uv0.x = cut;
+            uv1.x = 1.0f - cut;
+        } else {
+            const float cut = (1.0f - width / (aspect * height)) * 0.5f;
+            uv0.y = cut;
+            uv1.y = 1.0f - cut;
+        }
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->PushClipRect(at, ImVec2(at.x + size.x, at.y + size.y), false);
+        const float rounding = ImGui::GetStyle().ChildRounding * scale_;
+        const bool dark = WantDark(settings_.theme);
+        draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + size.x, at.y + shown), uv0, uv1,
+                              ImGui::GetColorU32(ImVec4(1, 1, 1, dark ? 0.55f : 0.40f)), rounding, ImDrawFlags_RoundCornersTop);
+        const ImU32 clear = ImGui::GetColorU32(Fade(Card, 0.25f));
+        const ImU32 solid = ImGui::GetColorU32(Card);
+        draw->AddRectFilledMultiColor(ImVec2(at.x, at.y + shown * 0.35f), ImVec2(at.x + size.x, at.y + shown), clear, clear, solid, solid);
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + shown * 0.35f), clear, rounding, ImDrawFlags_RoundCornersTop);
+        draw->PopClipRect();
+    }
+
+    const TrophySet* TrophiesOf(const GameEntry& game, bool& loading) const {
+        const auto found = trophies_.find(GameKey(game));
+        loading = found == trophies_.end();
+        return found == trophies_.end() || !found->second ? nullptr : &*found->second;
+    }
+
+    static void ProgressBar(float fraction, float width, ImVec4 color) {
+        const float height = ImGui::GetFontSize() * 0.4f;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(Fade(Dim, 0.25f)), height * 0.5f);
+        if (fraction > 0) draw->AddRectFilled(at, ImVec2(at.x + width * std::min(fraction, 1.0f), at.y + height), ImGui::GetColorU32(color), height * 0.5f);
+        ImGui::Dummy(ImVec2(width, height));
+    }
+
+    void DrawGradeCounts(const TrophySet& set) {
+        bool first = true;
+        for (const auto grade : {TrophyGrade::Platinum, TrophyGrade::Gold, TrophyGrade::Silver, TrophyGrade::Bronze}) {
+            const auto count = set.Count(grade);
+            if (count.total == 0) continue;
+            const auto text = std::to_string(count.earned) + "/" + std::to_string(count.total);
+            const float icon = ImGui::GetFontSize() * 1.15f;
+            if (!first) {
+                ImGui::SameLine(0, ImGui::GetFontSize() * 1.2f);
+                if (ImGui::GetContentRegionAvail().x < icon + ImGui::CalcTextSize(text.c_str()).x + ImGui::GetFontSize() * 0.3f) ImGui::NewLine();
+            }
+            first = false;
+            ImGui::BeginGroup();
+            TrophyIcon(grade, icon);
+            ImGui::SameLine(0, ImGui::GetFontSize() * 0.3f);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (icon - ImGui::GetFontSize()) * 0.5f);
+            ImGui::TextColored(GradeColor(grade), "%s", text.c_str());
+            ImGui::EndGroup();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s: %s earned", TrophyGradeName(grade), text.c_str());
+        }
+    }
+
+    void DrawTrophySummary(const GameEntry& game) {
+        bool loading = false;
+        const auto* set = TrophiesOf(game, loading);
+        if (loading) {
+            ImGui::TextColored(Dim, "Reading the trophy list...");
+            return;
+        }
+        if (set == nullptr) {
+            ImGui::TextColored(Dim, "No trophy list in the game files (sce_sys/trophy2).");
+            return;
+        }
+        const auto count = set->Count();
+        ImGui::Text("%d of %d earned  \xC2\xB7  %d%%", count.earned, count.total, set->Percent());
+        ProgressBar(static_cast<float>(set->Percent()) / 100.0f, ImGui::GetContentRegionAvail().x, Accent);
+        DrawGradeCounts(*set);
+    }
+
+    void OpenTrophies() {
+        trophyFilter_ = 0;
+        openTrophies_ = true;
+        // Read the records again: a run may have changed them.
+        if (const auto* game = SelectedGame()) trophyAsked_.erase(GameKey(*game));
+    }
+
+    void DrawTrophies() {
+        if (openTrophies_) {
+            ImGui::OpenPopup("Trophies");
+            openTrophies_ = false;
+        }
+        FollowWindow(0.70f, 0.86f);
+        if (!BeginDialog("Trophies")) return;
+        const auto* game = SelectedGame();
+        bool loading = false;
+        const auto* set = game != nullptr ? TrophiesOf(*game, loading) : nullptr;
+        const std::string title = game == nullptr ? std::string("Trophies") : "Trophies: " + game->metadata.name;
+        const std::string note = set == nullptr ? std::string() : std::to_string(set->Count().earned) + " of " + std::to_string(set->Count().total) +
+                                                                  " earned, " + std::to_string(set->Percent()) + "%. Kept per profile (" + layout_.profile +
+                                                                  "); the list updates when the game closes.";
+        if (DialogHeader(title.c_str(), note.c_str())) ImGui::CloseCurrentPopup();
+        if (set == nullptr) {
+            ImGui::TextColored(Dim, "%s", loading ? "Reading the trophy list..." : "This game has no trophy list in its files (sce_sys/trophy2).");
+            ImGui::EndPopup();
+            return;
+        }
+        ProgressBar(static_cast<float>(set->Percent()) / 100.0f, ImGui::GetContentRegionAvail().x, Accent);
+        ImGui::Spacing();
+        DrawGradeCounts(*set);
+        ImGui::Spacing();
+        const char* filters[] = {"All", "Earned", "Not earned"};
+        Segmented("trophy-filter", filters, 3, trophyFilter_);
+        ImGui::SameLine(0, ImGui::GetFontSize());
+        ImGui::Checkbox("Show hidden trophies", &showHidden_);
+        ImGui::Spacing();
+
+        ImGui::BeginChild("trophy-list", ImVec2(0, 0), ImGuiChildFlags_None);
+        const float icon = ImGui::GetFontSize() * 3.2f;
+        if (ImGui::BeginTable("trophies", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_SizingFixedFit)) {
+            ImGui::TableSetupColumn("icon", ImGuiTableColumnFlags_WidthFixed, icon);
+            ImGui::TableSetupColumn("text", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("state", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 9.5f);
+            for (const auto& trophy : set->trophies) {
+                const bool earned = trophy.earnedAt.has_value();
+                if ((trophyFilter_ == 1 && !earned) || (trophyFilter_ == 2 && earned)) continue;
+                const bool secret = trophy.hidden && !earned && !showHidden_;
+                ImGui::PushID(static_cast<int>(trophy.label * 100000 + static_cast<std::uint32_t>(trophy.id)));
+                ImGui::TableNextRow(ImGuiTableRowFlags_None, icon + ImGui::GetStyle().CellPadding.y * 2);
+                ImGui::TableNextColumn();
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                auto* draw = ImGui::GetWindowDrawList();
+                const auto key = game->location / ("trophy-" + std::to_string(trophy.label) + "-" + std::to_string(trophy.id));
+                auto* texture = secret ? nullptr : icons_->Get(key, trophy.icon);
+                if (texture != nullptr) {
+                    draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + icon, at.y + icon), ImVec2(0, 0), ImVec2(1, 1),
+                                          ImGui::GetColorU32(ImVec4(1, 1, 1, earned ? 1.0f : 0.35f)), 8.0f * scale_);
+                } else {
+                    draw->AddRectFilled(at, ImVec2(at.x + icon, at.y + icon), ImGui::GetColorU32(Placeholder), 8.0f * scale_);
+                    if (secret) {
+                        const ImVec2 size = ImGui::CalcTextSize("?");
+                        draw->AddText(ImVec2(at.x + (icon - size.x) * 0.5f, at.y + (icon - size.y) * 0.5f), ImGui::GetColorU32(Dim), "?");
+                    }
+                }
+                ImGui::Dummy(ImVec2(icon, icon));
+                ImGui::TableNextColumn();
+                ImGui::PushTextWrapPos(0.0f);
+                const ImVec4 text = earned ? ImGui::GetStyle().Colors[ImGuiCol_Text] : Fade(ImGui::GetStyle().Colors[ImGuiCol_Text], 0.6f);
+                ImGui::TextColored(text, "%s", secret ? "Hidden trophy" : (trophy.name.empty() ? ("Trophy " + std::to_string(trophy.id)).c_str() : trophy.name.c_str()));
+                ImGui::TextColored(Dim, "%s", secret ? "Keep playing to find out what it is." : trophy.detail.c_str());
+                if (trophy.statId && !earned) {
+                    ProgressBar(static_cast<float>(trophy.progress) / static_cast<float>(trophy.target), ImGui::GetContentRegionAvail().x * 0.6f, GradeColor(trophy.grade));
+                    ImGui::SameLine();
+                    ImGui::TextColored(Dim, "%llu/%llu", static_cast<unsigned long long>(trophy.progress), static_cast<unsigned long long>(trophy.target));
+                }
+                ImGui::PopTextWrapPos();
+                ImGui::TableNextColumn();
+                TrophyIcon(trophy.grade, ImGui::GetFontSize() * 1.6f);
+                if (earned) ImGui::TextColored(Green, "%s", LocalDate(*trophy.earnedAt).c_str());
+                else ImGui::TextColored(Dim, "Not earned");
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndChild();
+        ImGui::EndPopup();
+    }
+
+    // ---- controls -------------------------------------------------------------------
+
+    std::string ProfileInputHeader() const {
+        return "# AnyPS5 input mapping for the profile \"" + layout_.profile + "\", written by AnyPS5 Launcher.\n"
+               "# Lists only what differs from AnyPS5's built-in keys; see docs/user/INPUT_MAPPING.md in AnyPS5.\n"
+               "# Bindings for one game go into anyps5-input.<serial>.ini beside this file.\n";
+    }
+
+    std::string GameInputHeader() const {
+        return "# AnyPS5 input mapping for " + controlsName_ + " (" + controlsSerial_ + ") in the profile \"" + layout_.profile + "\", written by AnyPS5 Launcher.\n"
+               "# AnyPS5 reads it after anyps5-input.ini; it lists only what differs for this game.\n";
+    }
+
+    // One game's own controls; the keys of every game are edited from Settings.
+    void OpenControls(const GameEntry& game) {
+        controlsSerial_ = game.metadata.titleId;
+        controlsName_ = game.metadata.name;
+        controlsProfile_ = ReadInputFile(layout_.InputConfig());
+        controlsGame_ = ReadInputFile(layout_.GameInputConfig(controlsSerial_));
+        controlsScope_ = 0;
+        capture_.clear();
+        controlsError_.clear();
+        openControls_ = true;
+    }
+
+    // The keys of every game of the profile, opened from Settings (and drawn over it).
+    void OpenProfileControls() {
+        controlsSerial_.clear();
+        controlsName_.clear();
+        controlsProfile_ = ReadInputFile(layout_.InputConfig());
+        controlsGame_ = {};
+        controlsScope_ = 1;
+        capture_.clear();
+        controlsError_.clear();
+        openControls_ = true;
+    }
+
+    InputFile& ControlsTarget() { return controlsScope_ == 0 ? controlsGame_ : controlsProfile_; }
+
+    // What an action does in the scope being edited, and where that comes from.
+    std::vector<std::string> ControlsEffective(const InputActionInfo& action, const char** origin) {
+        static const InputFile none;
+        const auto& game = controlsScope_ == 0 ? controlsGame_ : none;
+        if (origin != nullptr) {
+            *origin = game.bindings.count(action.name) ? "this game" : controlsProfile_.bindings.count(action.name) ? (controlsScope_ == 0 ? "all games" : "changed") : "built-in";
+        }
+        return EffectiveBindings(action, controlsProfile_, game);
+    }
+
+    // Called with each SDL event while the controls window waits for a key. True when it took the event.
+    bool CaptureEvent(const SDL_Event& event) {
+        if (capture_.empty()) return false;
+        std::string source;
+        if (event.type == SDL_EVENT_KEY_DOWN) {
+            if (event.key.repeat) return true;
+            if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+                capture_.clear();
+                return true;
+            }
+            const char* name = SDL_GetScancodeName(event.key.scancode);
+            if (name == nullptr || name[0] == 0) return true;
+            source = std::string("KEY:") + name;
+        } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+            switch (event.button.button) {
+            case SDL_BUTTON_LEFT: source = "MOUSE:Left"; break;
+            case SDL_BUTTON_MIDDLE: source = "MOUSE:Middle"; break;
+            case SDL_BUTTON_RIGHT: source = "MOUSE:Right"; break;
+            case SDL_BUTTON_X1: source = "MOUSE:X1"; break;
+            case SDL_BUTTON_X2: source = "MOUSE:X2"; break;
+            default: return true;
+            }
+        } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+            if (event.wheel.y > 0) source = "WHEEL:Up";
+            else if (event.wheel.y < 0) source = "WHEEL:Down";
+            else if (event.wheel.x > 0) source = "WHEEL:Right";
+            else if (event.wheel.x < 0) source = "WHEEL:Left";
+            else return true;
+        } else if (event.type == SDL_EVENT_KEY_UP || event.type == SDL_EVENT_MOUSE_BUTTON_UP || event.type == SDL_EVENT_TEXT_INPUT) {
+            return true;
+        } else {
+            return false;
+        }
+        const auto* action = FindInputAction(capture_);
+        if (action == nullptr) {
+            capture_.clear();
+            return true;
+        }
+        if (action->keysOnly && source.rfind("KEY:", 0) != 0) {
+            captureNote_ = std::string(action->label) + " takes a keyboard key only.";
+            return true;
+        }
+        if (source.rfind("WHEEL:", 0) == 0 && std::string(action->group) == "AnyPS5") {
+            captureNote_ = "The mouse wheel can only press pad buttons.";
+            return true;
+        }
+        AssignSource(*action, source);
+        capture_.clear();
+        return true;
+    }
+
+    void AssignSource(const InputActionInfo& action, const std::string& source) {
+        auto& target = ControlsTarget();
+        const auto lower = [](std::string text) {
+            std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return text;
+        };
+        // The key leaves the actions that had it, unless that would leave one with nothing.
+        for (const auto& other : InputActions()) {
+            if (std::string(other.name) == action.name) continue;
+            auto sources = ControlsEffective(other, nullptr);
+            const auto before = sources.size();
+            sources.erase(std::remove_if(sources.begin(), sources.end(), [&](const std::string& kept) { return lower(kept) == lower(source); }), sources.end());
+            if (sources.size() != before && !sources.empty()) target.bindings[other.name] = sources;
+        }
+        std::vector<std::string> sources = captureReplace_ ? std::vector<std::string>() : ControlsEffective(action, nullptr);
+        if (std::none_of(sources.begin(), sources.end(), [&](const std::string& kept) { return lower(kept) == lower(source); })) sources.push_back(source);
+        target.bindings[action.name] = sources;
+    }
+
+    // A pad button, stick or touchpad as a drawn symbol, size by size, at the cursor.
+    // False for actions that have no symbol (shake, AnyPS5's own keys).
+    static bool PadGlyph(std::string_view name, float size) {
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 c(at.x + size * 0.5f, at.y + size * 0.5f);
+        const float line = std::max(1.5f, size * 0.09f);
+        const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
+        const ImU32 faint = ImGui::GetColorU32(Fade(ImGui::GetStyle().Colors[ImGuiCol_Text], 0.35f));
+        const auto label = [&](const char* text, float scale) {
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * scale);
+            const ImVec2 size2 = ImGui::CalcTextSize(text);
+            draw->AddText(ImVec2(c.x - size2.x * 0.5f, c.y - size2.y * 0.5f), ink, text);
+            ImGui::PopFont();
+        };
+        // The direction arm of a d-pad or the arrow beside a stick: 0 up, 1 right, 2 down, 3 left.
+        const auto direction = [](std::string_view text) {
+            if (text.ends_with("Up")) return 0;
+            if (text.ends_with("Right")) return 1;
+            if (text.ends_with("Down")) return 2;
+            return 3;
+        };
+        const float r = size * 0.36f;
+        if (name == "Cross") {
+            const ImU32 color = IM_COL32(124, 167, 230, 255);
+            draw->AddLine(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), color, line * 1.2f);
+            draw->AddLine(ImVec2(c.x + r, c.y - r), ImVec2(c.x - r, c.y + r), color, line * 1.2f);
+        } else if (name == "Circle") {
+            draw->AddCircle(c, r, IM_COL32(232, 104, 104, 255), 0, line * 1.2f);
+        } else if (name == "Square") {
+            draw->AddRect(ImVec2(c.x - r * 0.9f, c.y - r * 0.9f), ImVec2(c.x + r * 0.9f, c.y + r * 0.9f), IM_COL32(214, 140, 210, 255), size * 0.04f, 0, line * 1.2f);
+        } else if (name == "Triangle") {
+            draw->AddTriangle(ImVec2(c.x, c.y - r), ImVec2(c.x + r * 1.05f, c.y + r * 0.8f), ImVec2(c.x - r * 1.05f, c.y + r * 0.8f), IM_COL32(73, 200, 165, 255), line * 1.2f);
+        } else if (name == "L1" || name == "R1" || name == "L2" || name == "R2") {
+            // A shoulder button: a rounded tab, taller for the triggers.
+            const bool trigger = name[1] == '2';
+            const float top = trigger ? c.y - size * 0.40f : c.y - size * 0.30f;
+            draw->AddRect(ImVec2(at.x + size * 0.04f, top), ImVec2(at.x + size * 0.96f, c.y + size * 0.30f), ink, size * (trigger ? 0.28f : 0.16f), 0, line);
+            label(std::string(name).c_str(), 0.82f);
+        } else if (name == "L3" || name == "R3") {
+            draw->AddCircle(c, r * 1.1f, ink, 0, line);
+            draw->AddCircle(c, r * 0.65f, faint, 0, line);
+            label(std::string(name).c_str(), 0.72f);
+        } else if (name == "Options") {
+            // Three short lines, as printed on the button.
+            for (int i = -1; i <= 1; ++i) draw->AddLine(ImVec2(c.x - r * 0.75f, c.y + i * r * 0.55f), ImVec2(c.x + r * 0.75f, c.y + i * r * 0.55f), ink, line);
+        } else if (name == "Up" || name == "Down" || name == "Left" || name == "Right") {
+            // The d-pad cross with the pressed arm filled.
+            const float arm = size * 0.15f;
+            const float reach = size * 0.46f;
+            const int pressed = direction(name);
+            const ImVec2 arms[4][2] = {{ImVec2(c.x - arm, c.y - reach), ImVec2(c.x + arm, c.y - arm)},
+                                       {ImVec2(c.x + arm, c.y - arm), ImVec2(c.x + reach, c.y + arm)},
+                                       {ImVec2(c.x - arm, c.y + arm), ImVec2(c.x + arm, c.y + reach)},
+                                       {ImVec2(c.x - reach, c.y - arm), ImVec2(c.x - arm, c.y + arm)}};
+            draw->AddRectFilled(ImVec2(c.x - arm, c.y - arm), ImVec2(c.x + arm, c.y + arm), faint);
+            for (int i = 0; i < 4; ++i) draw->AddRectFilled(arms[i][0], arms[i][1], i == pressed ? ImGui::GetColorU32(Accent) : faint, size * 0.03f);
+        } else if (name.starts_with("LeftStick") || name.starts_with("RightStick")) {
+            // A stick seen from above, pushed toward the direction.
+            const int pushed = direction(name);
+            const float dx = pushed == 1 ? 1.0f : pushed == 3 ? -1.0f : 0.0f;
+            const float dy = pushed == 0 ? -1.0f : pushed == 2 ? 1.0f : 0.0f;
+            draw->AddCircle(c, r * 1.15f, faint, 0, line);
+            const ImVec2 cap(c.x + dx * r * 0.42f, c.y + dy * r * 0.42f);
+            draw->AddCircleFilled(cap, r * 0.78f, ImGui::GetColorU32(Accent));
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.75f);
+            const char* letter = name.starts_with("Left") ? "L" : "R";
+            const ImVec2 size2 = ImGui::CalcTextSize(letter);
+            draw->AddText(ImVec2(cap.x - size2.x * 0.5f, cap.y - size2.y * 0.5f), IM_COL32_WHITE, letter);
+            ImGui::PopFont();
+        } else if (name == "TouchLeft" || name == "TouchRight") {
+            const ImVec2 min(at.x + size * 0.04f, c.y - size * 0.28f);
+            const ImVec2 max(at.x + size * 0.96f, c.y + size * 0.28f);
+            const bool left = name == "TouchLeft";
+            draw->AddRectFilled(left ? min : ImVec2(c.x, min.y), left ? ImVec2(c.x, max.y) : max, ImGui::GetColorU32(Fade(Accent, 0.55f)), size * 0.08f,
+                                left ? ImDrawFlags_RoundCornersLeft : ImDrawFlags_RoundCornersRight);
+            draw->AddRect(min, max, ink, size * 0.08f, 0, line);
+        } else {
+            return false;
+        }
+        ImGui::Dummy(ImVec2(size, size));
+        return true;
+    }
+
+    // A key as a keycap. Returns true when clicked.
+    static bool Keycap(const char* id, const std::string& text, bool clash, bool removable) {
+        const float scale = ImGui::GetStyle().FontScaleDpi;
+        const ImVec2 pad(9.0f * scale, 4.0f * scale);
+        const std::string shown = text;
+        const ImVec2 textSize = ImGui::CalcTextSize(shown.c_str());
+        const float cross = removable ? ImGui::GetFontSize() * 0.9f : 0.0f;
+        const ImVec2 size(textSize.x + pad.x * 2 + cross, textSize.y + pad.y * 2);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(id, size);
+        const bool hovered = ImGui::IsItemHovered();
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 end(at.x + size.x, at.y + size.y);
+        const ImVec4 text4 = clash ? Amber : ImGui::GetStyle().Colors[ImGuiCol_Text];
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(hovered ? CardHover : WindowColor), 6.0f * scale);
+        draw->AddRect(at, end, ImGui::GetColorU32(clash ? Amber : ImGui::GetStyle().Colors[ImGuiCol_Border]), 6.0f * scale, 0, 1.0f);
+        // A darker bottom edge, like a key.
+        draw->AddLine(ImVec2(at.x + 4.0f * scale, end.y - 1.0f), ImVec2(end.x - 4.0f * scale, end.y - 1.0f), ImGui::GetColorU32(Fade(ImGui::GetStyle().Colors[ImGuiCol_Border], 1.0f)), 2.0f * scale);
+        draw->AddText(ImVec2(at.x + pad.x, at.y + pad.y), ImGui::GetColorU32(text4), shown.c_str());
+        if (removable && hovered) {
+            const ImVec2 mid(end.x - pad.x - cross * 0.35f, at.y + size.y * 0.5f);
+            const float arm = cross * 0.22f;
+            const ImU32 color = ImGui::GetColorU32(Dim);
+            draw->AddLine(ImVec2(mid.x - arm, mid.y - arm), ImVec2(mid.x + arm, mid.y + arm), color, 1.4f * scale);
+            draw->AddLine(ImVec2(mid.x + arm, mid.y - arm), ImVec2(mid.x - arm, mid.y + arm), color, 1.4f * scale);
+        }
+        return pressed;
+    }
+
+    static std::string LowerText(std::string text) {
+        std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return text;
+    }
+
+    // One action as a card: its symbol (or name), then its keys as keycaps. Clicking the
+    // card waits for a new key; + adds one; a keycap removes itself.
+    void DrawControlRow(const InputActionInfo& action, const std::map<std::string, std::vector<std::string>>& conflicts, InputFile& target) {
+        const auto& style = ImGui::GetStyle();
+        const float scale = style.FontScaleDpi;
+        ImGui::PushID(action.name);
+        const char* origin = "";
+        const auto sources = ControlsEffective(action, &origin);
+        const float height = ImGui::GetFontSize() * 2.3f;
+        const float width = ImGui::GetContentRegionAvail().x;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const ImVec2 end(at.x + width, at.y + height);
+        auto* draw = ImGui::GetWindowDrawList();
+        const bool waiting = capture_ == action.name;
+
+        // Keycaps are laid out right to left first, so the card's own button stops where they start.
+        float keys = 0;
+        const float gap = 6.0f * scale;
+        const auto keycapWidth = [&](const std::string& text, bool removable) {
+            return ImGui::CalcTextSize(text.c_str()).x + 18.0f * scale + (removable ? ImGui::GetFontSize() * 0.9f : 0.0f);
+        };
+        const bool removable = sources.size() > 1;
+        for (const auto& source : sources) keys += keycapWidth(DescribeInputSource(source), removable) + gap;
+        keys += keycapWidth("+", false) + gap;
+        const bool changed = target.bindings.count(action.name) != 0;
+        const float reset = changed ? ImGui::CalcTextSize("Reset").x + style.FramePadding.x * 2 : 0.0f;
+        const float right = keys + reset + 12.0f * scale;
+
+        const bool hoveredRow = ImGui::IsMouseHoveringRect(at, end) && ImGui::IsWindowHovered();
+        const ImVec4 text = style.Colors[ImGuiCol_Text];
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(waiting ? Fade(Accent, 0.22f) : Fade(text, hoveredRow ? 0.10f : 0.05f)), 10.0f * scale);
+        if (waiting) draw->AddRect(at, end, ImGui::GetColorU32(Accent), 10.0f * scale, 0, 1.5f * scale);
+
+        ImGui::SetCursorScreenPos(at);
+        if (ImGui::InvisibleButton("row", ImVec2(std::max(1.0f, width - right), height))) {
+            capture_ = action.name;
+            captureReplace_ = true;
+            captureNote_.clear();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s: click, then press the key you want", action.label);
+
+        // Symbol, then the name for actions without one.
+        const float glyph = ImGui::GetFontSize() * 1.9f;
+        ImGui::SetCursorScreenPos(ImVec2(at.x + 14.0f * scale, at.y + (height - glyph) * 0.5f));
+        const bool symbol = PadGlyph(action.name, glyph);
+        const float textY = at.y + (height - ImGui::GetFontSize()) * 0.5f;
+        if (!symbol) {
+            draw->AddText(ImVec2(at.x + 14.0f * scale, textY), ImGui::GetColorU32(ImGuiCol_Text), action.label);
+        } else if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", action.label);
+        }
+        if (std::string_view(origin) != "built-in") {
+            const float originX = at.x + 14.0f * scale + (symbol ? glyph + 12.0f * scale : ImGui::CalcTextSize(action.label).x + 12.0f * scale);
+            draw->AddText(ImVec2(originX, textY), ImGui::GetColorU32(Accent), origin);
+        }
+        if (waiting) {
+            const char* prompt = action.keysOnly ? "Press a key...  Esc cancels" : "Press a key, click or turn the wheel...  Esc cancels";
+            const float x = at.x + width * 0.30f;
+            draw->AddText(ImVec2(x, textY), ImGui::GetColorU32(Accent), prompt);
+            if (!captureNote_.empty()) draw->AddText(ImVec2(x, textY + ImGui::GetFontSize() * 0.95f), ImGui::GetColorU32(Amber), captureNote_.c_str());
+        }
+
+        // Keycaps.
+        const float capHeight = ImGui::GetFontSize() + 8.0f * scale;
+        float x = end.x - right + 4.0f * scale;
+        for (std::size_t index = 0; index < sources.size(); ++index) {
+            const auto text = DescribeInputSource(sources[index]);
+            const auto conflict = conflicts.find(LowerText(sources[index]));
+            const bool clash = conflict != conflicts.end();
+            ImGui::SetCursorScreenPos(ImVec2(x, at.y + (height - capHeight) * 0.5f));
+            if (Keycap(("key" + std::to_string(index)).c_str(), text, clash, removable) && removable) {
+                auto kept = sources;
+                kept.erase(kept.begin() + static_cast<std::ptrdiff_t>(index));
+                target.bindings[action.name] = kept;
+            }
+            if (ImGui::IsItemHovered()) {
+                std::string tip = removable ? "Click to remove" : "An action keeps at least one key; click the row to change it";
+                if (clash) {
+                    tip += "\nAlso used by:";
+                    for (const auto& user : conflict->second) {
+                        if (user != action.name) tip += " " + std::string(FindInputAction(user)->label) + " (" + FindInputAction(user)->group + ")";
+                    }
+                }
+                ImGui::SetTooltip("%s", tip.c_str());
+            }
+            x += keycapWidth(text, removable) + gap;
+        }
+        ImGui::SetCursorScreenPos(ImVec2(x, at.y + (height - capHeight) * 0.5f));
+        if (Keycap("add", "+", false, false)) {
+            capture_ = action.name;
+            captureReplace_ = false;
+            captureNote_.clear();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Add another key or mouse button");
+        x += keycapWidth("+", false) + gap;
+        if (changed) {
+            ImGui::SetCursorScreenPos(ImVec2(x, at.y + (height - ImGui::GetFontSize()) * 0.5f));
+            if (ImGui::SmallButton("Reset")) target.bindings.erase(action.name);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", controlsScope_ == 0 ? "Back to the keys of all games" : "Back to AnyPS5's built-in keys");
+        }
+        ImGui::SetCursorScreenPos(ImVec2(at.x, end.y + 6.0f * scale));
+        ImGui::Dummy(ImVec2(width, 0));
+        ImGui::PopID();
+    }
+
+    void DrawControls() {
+        if (openControls_) {
+            ImGui::OpenPopup("Controls");
+            openControls_ = false;
+        }
+        FollowWindow(0.80f, 0.90f);
+        if (!BeginDialog("Controls")) return;
+        const auto& style = ImGui::GetStyle();
+        const bool forGame = controlsScope_ == 0;
+        const std::string title = forGame ? "Controls: " + controlsName_ : "Controls for all games";
+        const std::string note = forGame ? "Click a row, then press the key you want for it; Esc cancels. Changes here are for " + controlsSerial_ +
+                                               " only; the keys of every game are in Settings. A connected controller keeps its own buttons. AnyPS5 reads these at the game's next start, or at once with F1."
+                                         : "Click a row, then press the key you want for it; Esc cancels. These keys are for every game of profile " + layout_.profile +
+                                               "; a game can still change some in its own Controls. A connected controller keeps its own buttons.";
+        bool close = DialogHeader(title.c_str(), note.c_str());
+
+        const float footer = ImGui::GetFrameHeight() * 1.3f + style.ItemSpacing.y * 3 + ImGui::GetTextLineHeightWithSpacing();
+        ImGui::BeginChild("controls-body", ImVec2(0, -footer));
+        const InputFile none;
+        const auto conflicts = InputConflicts(controlsProfile_, controlsScope_ == 0 ? controlsGame_ : none);
+        auto& target = ControlsTarget();
+        std::string group;
+        for (const auto& action : InputActions()) {
+            if (group != action.group) {
+                group = action.group;
+                ImGui::Spacing();
+                ImGui::TextColored(Dim, "%s", action.group);
+            }
+            DrawControlRow(action, conflicts, target);
+        }
+        ImGui::Spacing();
+
+        ImGui::SeparatorText("Sticks and mouse");
+        if (ImGui::BeginTable("input-settings", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_PadOuterX | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("setting", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 13.0f);
+            ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("edit", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 5.0f);
+            for (const auto& setting : InputSettings()) {
+                ImGui::PushID(setting.name);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(setting.label);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", setting.note);
+                ImGui::TableNextColumn();
+                const auto own = target.settings.find(setting.name);
+                std::string inherited = setting.choices.empty() ? FormatSettingValue(setting, setting.fallback) : setting.choices.front();
+                const char* from = "built-in";
+                if (controlsScope_ == 0) {
+                    if (const auto profile = controlsProfile_.settings.find(setting.name); profile != controlsProfile_.settings.end()) {
+                        inherited = profile->second;
+                        from = "all games";
+                    }
+                }
+                if (own == target.settings.end()) {
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextColored(Dim, "%s (%s)", inherited.c_str(), from);
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button("Change")) target.settings[setting.name] = inherited;
+                } else {
+                    ImGui::SetNextItemWidth(-FLT_MIN);
+                    if (!setting.choices.empty()) {
+                        int current = 0;
+                        for (std::size_t i = 0; i < setting.choices.size(); ++i) {
+                            if (setting.choices[i] == own->second) current = static_cast<int>(i);
+                        }
+                        std::vector<const char*> items;
+                        for (const auto& choice : setting.choices) items.push_back(choice.c_str());
+                        if (ImGui::Combo("##value", &current, items.data(), static_cast<int>(items.size()))) own->second = setting.choices[static_cast<std::size_t>(current)];
+                    } else {
+                        float value = static_cast<float>(std::atof(own->second.c_str()));
+                        const bool changed = setting.integer ? ImGui::SliderFloat("##value", &value, static_cast<float>(setting.minimum), static_cast<float>(setting.maximum), "%.0f")
+                                                             : ImGui::SliderFloat("##value", &value, static_cast<float>(setting.minimum), static_cast<float>(setting.maximum), "%.2f");
+                        if (changed) own->second = FormatSettingValue(setting, value);
+                    }
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", setting.note);
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button("Reset")) target.settings.erase(setting.name);
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+        }
+        if (!target.other.empty()) {
+            ImGui::Spacing();
+            ImGui::TextColored(Dim, "Other lines in the file are kept as they are (%d), such as controller button swaps.", static_cast<int>(target.other.size()));
+        }
+        ImGui::EndChild();
+
+        // Footer.
+        if (!conflicts.empty()) {
+            ImGui::TextColored(Amber, "%d key(s) do two things at once (shown in amber); hover one to see which.", static_cast<int>(conflicts.size()));
+        } else if (!controlsError_.empty()) {
+            ImGui::TextColored(Red, "%s", controlsError_.c_str());
+        } else {
+            ImGui::TextColored(Dim, "%s", ToUtf8(controlsScope_ == 0 ? layout_.GameInputConfig(controlsSerial_) : layout_.InputConfig()).c_str());
+        }
+        ImGui::Spacing();
+        if (ImGui::Button("Reset all")) {
+            target.bindings.clear();
+            target.settings.clear();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", controlsScope_ == 0 ? "This game uses the keys of all games again" : "Every game uses AnyPS5's built-in keys again (games with their own controls keep them)");
+        const float buttons = ImGui::CalcTextSize("Cancel").x + ImGui::CalcTextSize("Save").x + style.FramePadding.x * 8 + style.ItemSpacing.x + ImGui::GetFontSize() * 2;
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttons);
+        if (ImGui::Button("Cancel", ImVec2(0, ImGui::GetFrameHeight() * 1.3f))) close = true;
+        ImGui::SameLine();
+        if (PrimaryButton("Save", ImVec2(ImGui::GetFontSize() * 5, ImGui::GetFrameHeight() * 1.3f))) {
+            try {
+                if (forGame) {
+                    const auto gameFile = layout_.GameInputConfig(controlsSerial_);
+                    std::error_code error;
+                    if (controlsGame_.Empty()) std::filesystem::remove(gameFile, error);
+                    else WriteInputFile(gameFile, controlsGame_, GameInputHeader());
+                    message_ = Message{Green, "Controls saved", controlsName_ + " uses them from its next start (or press F1 in the game)."};
+                } else {
+                    WriteInputFile(layout_.InputConfig(), controlsProfile_, ProfileInputHeader());
+                    message_ = Message{Green, "Controls saved", "Every game of profile " + layout_.profile + " uses them from its next start."};
+                }
+                close = true;
+            } catch (const std::exception& failure) {
+                controlsError_ = failure.what();
+            }
+        }
+
+        if (close) {
+            capture_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     void DrawDetails(const GameEntry& game) {
         ImGui::PushTextWrapPos(0.0f);  // everything in the panel wraps to its width
         DrawDetailsBody(game);
@@ -1041,6 +2254,7 @@ private:
 
     void DrawDetailsBody(const GameEntry& game) {
         const auto& style = ImGui::GetStyle();
+        DrawArtwork(game);
         const float width = ImGui::GetContentRegionAvail().x;
         const float art = std::min(width, 280.0f * scale_);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (width - art) * 0.5f);
@@ -1098,6 +2312,10 @@ private:
                 }
             }
         }
+        const float half = (full - style.ItemSpacing.x) * 0.5f;
+        if (ImGui::Button("Trophies", ImVec2(half, 0))) OpenTrophies();
+        ImGui::SameLine();
+        if (ImGui::Button("Controls", ImVec2(half, 0))) OpenControls(game);
         if (ImGui::Button("All actions...", ImVec2(full, 0))) ImGui::OpenPopup("details-actions");
         if (ImGui::BeginPopup("details-actions")) {
             DrawActionItems(game);
@@ -1107,6 +2325,14 @@ private:
         ImGui::Spacing();
         ImGui::SeparatorText("Status");
         DrawStatus(game);
+        ImGui::SeparatorText("Trophies");
+        DrawTrophySummary(game);
+        ImGui::SeparatorText("Store");
+        DrawStore(game);
+        if (!game.changes.empty()) {
+            ImGui::SeparatorText("What's new");
+            DrawChanges(game);
+        }
         ImGui::SeparatorText("Executable");
         DrawExecutable(game);
         ImGui::SeparatorText("Location");
@@ -1166,6 +2392,8 @@ private:
         } else if (MenuAction("Play", PlayBlocker(game), "Runs the converted game with profile " + layout_.profile)) {
             Play(game);
         }
+        if (ImGui::MenuItem("Trophies...")) OpenTrophies();
+        if (ImGui::MenuItem("Controls...")) OpenControls(game);
         {
             const auto home = HomeFor(game);
             std::string how;
@@ -1268,8 +2496,6 @@ private:
             ImGui::TextColored(Green, "Playing %s", session_->Name().c_str());
             ImGui::SameLine();
             ImGui::TextColored(Dim, "profile %s", layout_.profile.c_str());
-            ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Stop").x - style.FramePadding.x * 2);
-            if (PrimaryButton("Stop")) session_->Stop();
         }
         if (!drew && message_) {
             ImGui::AlignTextToFramePadding();
@@ -1686,6 +2912,23 @@ private:
             }
         });
 
+        Section("controls", "Controls", "Keyboard and mouse keys for every game of this profile. Each game can change some of them for itself under Controls in its details.", [&] {
+            if (ImGui::Button("Controls for all games...")) OpenProfileControls();
+            ImGui::SameLine();
+            ImGui::TextColored(Dim, "%s", ToUtf8(layout_.InputConfig()).c_str());
+        });
+
+        Section("trophy-cards", "Trophies while playing", "A card at the top of the game's window for each trophy it earns. It never takes the keyboard or the mouse from the game.", [&] {
+            ImGui::Checkbox("Show a card when a trophy is earned", &draft_.trophyPopups);
+            ImGui::BeginDisabled(!draft_.trophyPopups);
+            ImGui::Checkbox("Play a sound with it", &draft_.trophySound);
+            ImGui::EndDisabled();
+        });
+
+        Section("online", "Online", "Looks up the selected game on PROSPEROPatches.com for its update list and publisher. Only the title ID is sent; answers are kept for a day.", [&] {
+            ImGui::Checkbox("Look up game updates online", &draft_.onlineInfo);
+        });
+
         const std::string profileTitle = "Profile: " + layout_.profile;
         Section("profile", profileTitle.c_str(), "Settings of the current profile. Switch profiles from the library's top bar.", [&] {
             ImGui::TextUnformatted("Console language");
@@ -1754,6 +2997,7 @@ private:
             ApplyCurrentTheme();  // undo a previewed appearance
             ImGui::CloseCurrentPopup();
         }
+        if (controlsScope_ == 1) DrawControls();
         ImGui::EndPopup();
     }
 
@@ -1797,6 +3041,35 @@ private:
     bool openNewProfile_ = false;
     std::string newProfileName_;
     std::string newProfileError_;
+    std::unique_ptr<TrophyToast> toast_;
+    std::map<std::pair<std::uint32_t, std::int32_t>, std::uint64_t> seenUnlocks_;
+    std::optional<TrophySet> runTrophies_;  // the running game's list, for the cards
+    bool watchPrimed_ = false;
+    Uint64 nextWatch_ = 0;
+    Background<TrophyLoad> trophyLoader_;
+    std::map<std::string, std::optional<TrophySet>> trophies_;  // by game location
+    std::set<std::string> trophyAsked_;
+    Background<ArtLoad> artLoader_;
+    std::map<std::string, std::vector<std::uint8_t>> art_;
+    std::set<std::string> artAsked_;
+    bool openTrophies_ = false;
+    int trophyFilter_ = 0;
+    bool showHidden_ = false;
+    bool openControls_ = false;
+    std::string controlsSerial_;
+    std::string controlsName_;
+    int controlsScope_ = 0;  // 0: this game, 1: every game of the profile
+    InputFile controlsProfile_;
+    InputFile controlsGame_;
+    std::string capture_;  // the action waiting for a key
+    bool captureReplace_ = false;
+    std::string captureNote_;
+    std::string controlsError_;
+    Background<OnlineLookup> onlineLoader_;
+    std::map<std::string, TitleOnlineInfo> online_;
+    std::map<std::string, std::string> onlineErrors_;
+    std::set<std::string> onlineAsked_;  // titles looked up (or being looked up) this session
+    std::string onlineRefresh_;          // a title whose cached answer should be ignored
     Background<ScanResult> scan_;
     BackgroundJob job_;
     std::string jobSerial_;
@@ -1849,11 +3122,13 @@ int main(int, char**) {
         while (!done) {
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
+                if (app.TakeEvent(event)) continue;  // a key for the controls window
                 ImGui_ImplSDL3_ProcessEvent(&event);
                 if (event.type == SDL_EVENT_QUIT) done = true;
                 if (event.type == SDL_EVENT_SYSTEM_THEME_CHANGED) app.ThemeChanged();
                 if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)) done = true;
             }
+            app.Tick();
             if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
                 SDL_Delay(10);
                 continue;

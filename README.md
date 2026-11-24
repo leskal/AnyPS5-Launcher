@@ -13,12 +13,15 @@ A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game li
 - **Profiles:** each has its own saves, trophies, input mapping, screenshots and console language.
 - **Conversions** (right-click): SELF to ELF, `.zar` to folder, folder to `.zar`.
   SELF to ELF first stores the originals in `<serial>-<version>.originals.zip` beside the game folder (for example `PPSA21567-01.018.000.originals.zip`, named from the game's `param.json`), with an `MD5SUMS` list, and checks the zip; then it replaces `eboot.bin`, each SELF `.prx`/`.sprx` in `sce_module`, `sce_modules`, `prx` and the title's module folders, and extra executables with their ELF. Files that can't be unwrapped (encrypted) are left as they are and listed. **Restore original SELF files** puts them back, each checked against its MD5.
+- **Store info** in the details panel: region (from the game's content ID), the game's own change notes under "What's new" (`sce_sys/changeinfo/changeinfo.xml`; shown only when the dump has it), and from [PROSPEROPatches](https://prosperopatches.com) the publisher and the update list, so you see "Update available: 01.015.000" or "Up to date", with every update listed and yours highlighted. Only the title ID is sent; answers are cached for a day in `library\cache\prosperopatches\`; it can be switched off in Settings. The site's changelogs sit behind a CAPTCHA, so **View on PROSPEROPatches** opens the page in your browser for those.
 - The list shows each game's modules by kind, for example `modules: 12 ELF, 3 SELF`.
 - **Settings** in `anyps5-launcher.json` next to the `.exe`.
 
 - **AnyPS5 versions** (top bar): download any release of `boykopovar/AnyPS5` or of a fork that publishes releases, or add a local relinker or AnyPS5 build; pick which one relinks games. If none is set up, the launcher offers to download the latest release at start.
 
-The trophy viewer is designed in [docs/DESIGN.md](docs/DESIGN.md) but not built yet.
+- **Trophies**: the list, texts and icons from the game's own `sce_sys/trophy2`, with what the profile earned (dates, progress, grade counts and the console's percentage). Hidden trophies stay hidden until earned, unless you choose to see them. While you play, each trophy the game earns slides in as a card at the top of the game's window, with a short chime (both can be turned off in Settings).
+- **Controls**: keyboard and mouse for the pad: every game of the profile in Settings, and one game's own changes under Controls in its details, written as AnyPS5's `anyps5-input.ini` / `anyps5-input.<serial>.ini`. Click Set and press a key; keys used twice are flagged. Also stick dead zones and mouse-as-stick tuning.
+- **Artwork**: the game's `pic0.png` behind the details panel.
 
 This is a separate project. It needs no changes to AnyPS5 and talks to it only through its documented command line, runtime layout, environment variables and run report.
 

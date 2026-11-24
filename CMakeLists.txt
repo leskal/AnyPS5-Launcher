@@ -30,6 +30,9 @@ add_library(launcher_core STATIC
     src/core/Metadata.cpp
     src/core/Modules.cpp
     src/core/Package.cpp
+    src/core/InputMapping.cpp
+    src/core/Trophies.cpp
+    src/core/PatchInfo.cpp
     src/core/Profiles.cpp
     src/core/Scanner.cpp
     src/core/Session.cpp
@@ -72,6 +75,8 @@ if(LAUNCHER_BUILD_TESTS)
         tests/ArchiveTests.cpp
         tests/ExecutableTests.cpp
         tests/MetadataTests.cpp
+        tests/PatchInfoTests.cpp
+        tests/TrophyInputTests.cpp
         tests/ScannerTests.cpp
         tests/SettingsTests.cpp
         tests/UnwrapTests.cpp

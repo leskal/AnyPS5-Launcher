@@ -35,6 +35,8 @@ struct Layout {
     std::filesystem::path Saves(std::string_view serial) const { return Profile() / "saves" / std::string(serial); }
     std::filesystem::path Trophies(std::string_view serial) const { return Profile() / "_trophy" / std::string(serial); }
     std::filesystem::path InputConfig() const { return Profile() / "input" / "anyps5-input.ini"; }
+    // AnyPS5 reads it after InputConfig() for that title only.
+    std::filesystem::path GameInputConfig(std::string_view serial) const { return Profile() / "input" / ("anyps5-input." + std::string(serial) + ".ini"); }
     std::filesystem::path Screenshots(std::string_view serial) const { return Profile() / "screenshots" / std::string(serial); }
     std::filesystem::path GameData(std::string_view serial) const { return userdata / "games" / std::string(serial); }
     std::filesystem::path Logs(std::string_view serial) const { return library / "logs" / std::string(serial); }

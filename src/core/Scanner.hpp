@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <map>
 #include <optional>
 #include <string>
@@ -9,6 +10,7 @@
 
 #include "core/Executable.hpp"
 #include "core/Metadata.hpp"
+#include "core/Package.hpp"
 
 namespace launcher {
 
@@ -52,7 +54,11 @@ struct GameEntry {
     std::optional<ExecutableInfo> unwrapped;
     ModuleSummary modules;
     std::vector<std::uint8_t> icon;
+    std::vector<ChangeNote> changes;  // from sce_sys/changeinfo/changeinfo.xml, newest first
 };
+
+// Opens the game's files for reading: its folder, or its .zar (with innerPrefix).
+std::unique_ptr<PackageReader> OpenGamePackage(const GameEntry& game);
 
 struct ScanProblem {
     std::filesystem::path location;

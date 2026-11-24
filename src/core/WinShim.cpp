@@ -151,6 +151,60 @@ void CloseJob(void* job) {
     if (job != nullptr) CloseHandle(static_cast<HANDLE>(job));
 }
 
+namespace {
+
+struct WindowSearch {
+    HANDLE job;
+    RECT best;
+    LONGLONG area;
+};
+
+BOOL CALLBACK VisitWindow(HWND window, LPARAM parameter) {
+    auto* search = reinterpret_cast<WindowSearch*>(parameter);
+    if (!IsWindowVisible(window) || IsIconic(window) || GetWindow(window, GW_OWNER) != nullptr) return TRUE;
+    DWORD processId = 0;
+    GetWindowThreadProcessId(window, &processId);
+    if (processId == 0) return TRUE;
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (process == nullptr) return TRUE;
+    BOOL inJob = FALSE;
+    const BOOL checked = IsProcessInJob(process, search->job, &inJob);
+    CloseHandle(process);
+    if (!checked || !inJob) return TRUE;
+    RECT rect{};
+    if (!GetWindowRect(window, &rect)) return TRUE;
+    const LONGLONG area = static_cast<LONGLONG>(rect.right - rect.left) * static_cast<LONGLONG>(rect.bottom - rect.top);
+    if (area > search->area) {
+        search->area = area;
+        search->best = rect;
+    }
+    return TRUE;
+}
+
+}
+
+unsigned long JobWindowRect(void* job, long* x, long* y, long* width, long* height) {
+    if (job == nullptr) return ERROR_INVALID_HANDLE;
+    WindowSearch search{static_cast<HANDLE>(job), RECT{}, 0};
+    EnumWindows(VisitWindow, reinterpret_cast<LPARAM>(&search));
+    if (search.area <= 0) return ERROR_NOT_FOUND;
+    *x = search.best.left;
+    *y = search.best.top;
+    *width = search.best.right - search.best.left;
+    *height = search.best.bottom - search.best.top;
+    return ERROR_SUCCESS;
+}
+
+void RoundWindowCorners(void* window) {
+    using SetAttribute = HRESULT(WINAPI*)(HWND, DWORD, LPCVOID, DWORD);
+    static HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
+    if (dwm == nullptr || window == nullptr) return;
+    const auto set = reinterpret_cast<SetAttribute>(reinterpret_cast<void*>(GetProcAddress(dwm, "DwmSetWindowAttribute")));
+    if (set == nullptr) return;
+    const DWORD preference = 2;  // DWMWCP_ROUND
+    set(static_cast<HWND>(window), 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &preference, sizeof(preference));
+}
+
 unsigned long OpenFolder(const wchar_t* path) {
     const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", path, nullptr, nullptr, SW_SHOWNORMAL));
     return result > 32 ? ERROR_SUCCESS : static_cast<unsigned long>(result);

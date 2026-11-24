@@ -123,4 +123,25 @@ void GameSession::Stop() {
     if (process_ != nullptr && !mainExited_) SDL_KillProcess(process_, true);
 }
 
+bool GameSession::WindowRect(int& x, int& y, int& width, int& height) const {
+#ifdef _WIN32
+    long left = 0;
+    long top = 0;
+    long w = 0;
+    long h = 0;
+    if (job_ == nullptr || win::JobWindowRect(job_, &left, &top, &w, &h) != 0) return false;
+    x = static_cast<int>(left);
+    y = static_cast<int>(top);
+    width = static_cast<int>(w);
+    height = static_cast<int>(h);
+    return true;
+#else
+    (void)x;
+    (void)y;
+    (void)width;
+    (void)height;
+    return false;
+#endif
+}
+
 }

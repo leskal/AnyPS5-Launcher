@@ -18,6 +18,7 @@ namespace {
 constexpr std::string_view ParamJson = "sce_sys/param.json";
 constexpr std::string_view ParamSfo = "sce_sys/param.sfo";
 constexpr std::string_view Icon = "sce_sys/icon0.png";
+constexpr std::string_view ChangeInfo = "sce_sys/changeinfo/changeinfo.xml";
 constexpr std::string_view Eboot = "eboot.bin";
 constexpr std::string_view UnwrappedEboot = "eboot.elf";
 
@@ -69,6 +70,12 @@ GameEntry ReadEntry(PackageReader& package, const ScanOptions& options) {
     }
     if (const auto size = package.FileSize(Icon); size && *size <= options.maxIconSize) {
         entry.icon = package.ReadRange(Icon, 0, *size);
+    }
+    try {  // only informative: a broken changeinfo never hides the game
+        if (auto xml = package.ReadAll(ChangeInfo, options.maxMetadataSize)) {
+            entry.changes = ParseChangeInfo(std::string_view(reinterpret_cast<const char*>(xml->data()), xml->size()));
+        }
+    } catch (const std::exception&) {
     }
     return entry;
 }
@@ -238,6 +245,11 @@ std::string_view ToString(ZarLayout layout) {
     case ZarLayout::Nested: return "nested folder";
     }
     return "";
+}
+
+std::unique_ptr<PackageReader> OpenGamePackage(const GameEntry& game) {
+    if (game.format == PackageFormat::Zar) return std::make_unique<ZarPackage>(ZarArchive::Open(game.location), game.innerPrefix);
+    return std::make_unique<FolderPackage>(game.location);
 }
 
 }

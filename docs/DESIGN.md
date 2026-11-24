@@ -253,9 +253,11 @@ Both:
 
 ZArchive's `LookUp` ignores its "files only / folders only" flags; `src/core/Package.cpp` checks the node type itself.
 
-## Trophies *(planned)*
+## Trophies (implemented)
 
-The viewer reads `profiles\<profile>\_trophy\<serial>\<user id>_<label>.txt` (unlocks, `<id> <tick>` per line) and `.stats.txt` (progress), plus the game's `trophyNN.ucp` copied into `games\<serial>\meta\`.
+`src/core/Trophies.cpp`; "Trophies" in the details panel and its window.
+
+The list comes straight from the game files, folder or `.zar`: every `sce_sys/trophy2/trophyNN.ucp` (NN is the service label; `00` may be missing). What was earned comes from the profile: `profiles\<profile>\_trophy\<serial>\<user id>_<label>.txt` (`<id> <tick>` per line) and `.stats.txt` (`<stat id> <value>`, progress of progressive trophies). While the game runs those files sit beside its exe (Play moves `_trophy` in), and the launcher reads them there. They are re-read when a run ends and whenever the window opens. The format is AnyPS5's own (`core/libs/prx/libSceNpTrophy2/src/TrophyStore.cpp`), the same one the AnyPS5-ARM launcher reads.
 
 `.ucp` container: everything big-endian.
 
@@ -271,16 +273,37 @@ Each file entry is `0x40` bytes from `table + 0x20`: a 32-byte name, then an 8-b
 
 Files inside:
 
-- **`tropconf.json`**: `defaultLanguage` and `trophies[]`, each with `id`, `grade` (`P`, `G`, `S` or `B`), `groupId`, `platinumTrophyId`, `hidden`, `hasReward` and `unlockCondition`.
-- **`tropmeta_<locale>.json`**: `metadata.titleMetadata.name`, `groupMetadata[]` and `trophyMetadata[]`, each trophy with `name`, `detail` and `reward`.
-- **`tropNNNN.png`**: one icon per trophy.
+- **`tropconf.json`**: `defaultLanguage` and `trophies[]`, each with `id` (number or `"0007"`), `grade` (`P`, `G`, `S` or `B`), `hidden` and `unlockCondition` (`progressive`, `udsStatId`, `targetValue`).
+- **`tropmeta_<locale>.json`**: `metadata.titleMetadata.name` and `trophyMetadata[]` with `name` and `detail`.
+- **`tropNNNN.png`**: one icon per trophy; `icon0*.png` for the set.
 
-Pick the language the way AnyPS5 does: console language, then `en-US`, then `defaultLanguage`. KytyPS5 skips `en-US`.
+Text language: the profile's console language mapped as AnyPS5 maps it (0 `ja-JP`, 1 `en-US`, 2 `fr-FR`, ... 30 `uk-UA`), then `en-US`, `en-GB`, `defaultLanguage`.
 
-- Unlock ticks are microseconds since 0001-01-01 UTC; subtract `62135596800000000` to get Unix microseconds.
-- Locked hidden trophies show a placeholder; other locked ones show their icon in greyscale.
-- Never edit the unlock files: a blank line, a `\r` or a duplicate stops the game. "Reset" deletes both files while the game isn't running.
-- Pop-ups while playing: match `[trophy] … unlocked trophy N` in the game's output and show a Windows toast. That line isn't a documented contract, so also re-read the files after the game exits.
+- Unlock ticks are microseconds since 0001-01-01 UTC; subtract `62135596800000000` to get Unix microseconds. The earliest unlock of a trophy among all user files counts.
+- The percentage is weighted as on the console and in AnyPS5: gold 90, silver 30, bronze 15; the platinum doesn't count.
+- Locked hidden trophies show "Hidden trophy" unless "Show hidden trophies" is ticked.
+- The launcher never writes the unlock files: AnyPS5 stops a game on a damaged line.
+
+**While playing** (Settings → "Trophies while playing", on by default): the launcher polls the running game's `_trophy` folder twice a second. That file is AnyPS5's documented record (`docs/user/USAGE.md`, "unlock is stored in `_trophy/<user id>_<service label>.txt`"), written at the moment of the unlock. Each unlock that wasn't there when the game started gets a card: a small borderless, always-on-top window that can't take focus (`SDL_WINDOW_NOT_FOCUSABLE`, shown without activation), slid in at the top centre of the game's largest window (found through the job object on Windows; the primary display otherwise) for six seconds, with the trophy's icon, grade cup, name and description, and an optional two-note chime made in code. Several unlocks queue. The card has its own SDL renderer and ImGui context. It shows over windowed and borderless full-screen games (AnyPS5's full screen is `SDL_WINDOW_FULLSCREEN_DESKTOP`).
+
+Not done: PS4-style (`libSceNpTrophy`) trophy data.
+
+## Artwork
+
+The selected game's `sce_sys/pic0.png` is read in the background and drawn faded behind the top of the details panel.
+
+## Controls (implemented)
+
+`src/core/InputMapping.cpp`; "Controls" in the details panel and in Settings.
+
+AnyPS5 reads `anyps5-input.ini` (`ANYPS5_INPUT_CONFIG`, the profile's `input\anyps5-input.ini`) and then `anyps5-input.<serial>.ini` beside it for that title only (upstream `docs/user/INPUT_MAPPING.md`, "Per-game profiles"). "Controls" in a game's details edits only that game's file; the profile's file (keys for every game) is edited from Settings → Controls → "Controls for all games", drawn over Settings.
+
+- Each action lists its keys as they apply (built-in, from the profile, or from the game file). **Set** waits for one key, mouse button or wheel turn and replaces the action's keys; **Add** adds another; a key chip removes that key; **Reset** drops the file's line so the level below applies. A key given to one action leaves any other action that has more keys than that one. Emulator hotkeys (full screen, screenshot, ...) take keyboard keys only, as AnyPS5 requires.
+- Keys are written as SDL scancode names (`KEY:Left Shift`), which AnyPS5 reads with `SDL_GetScancodeFromName`; mouse as `MOUSE:Left|Middle|Right|X1|X2`, wheel as `WHEEL:Up|Down|Left|Right`.
+- A key that two actions share is shown in amber with the other action named.
+- **Sticks and mouse**: dead zones, mouse-as-stick tuning, slow-stick tilt and key ramps (AnyPS5's `Setting = value` lines), each inherited until changed.
+- Lines the window doesn't edit (`SDLButton:` swaps, `ToggleActions`, comments) are kept as written. A game file left with nothing in it is deleted.
+- AnyPS5 has no way to leave an action without a key, so the last key of an action can't be removed; Reset brings back the one below.
 
 ## AnyPS5 versions (implemented)
 
@@ -305,6 +328,19 @@ Download:
 At start, when no usable version is chosen, the launcher asks whether to download the latest official release, or to open the versions window. Selecting another version re-reads it (`relinker --version`, `titles.json`); games relinked with a different revision show "Reinstall" with the reason.
 
 Not done: per-game pinning, checking for updates in the background, release lists beyond the first 30, and the launcher updating itself. Anonymous GitHub API use is limited to 60 requests an hour per IP; the error says so when it's hit.
+
+## Store info (implemented)
+
+`src/core/PatchInfo.cpp`, `src/core/Metadata.cpp`; the "Store" and "What's new" parts of the details panel.
+
+From the game itself: the content ID (`param.json` `contentId`, `param.sfo` `CONTENT_ID`), whose prefix gives the region (EP Europe, UP USA, JP Japan, HP Asia, KP Korea), and `sce_sys/changeinfo/changeinfo.xml` (`<changes app_ver="...">`), read by the scanner from folders and `.zar` alike. The note matching the game's version is shown, the rest folded.
+
+From PROSPEROPatches.com, for the selected game only and only when "Look up game updates online" is on (default):
+
+1. `GET https://prosperopatches.com/<titleId>`: the page gives publisher, region, content ID and a per-title key (`#dynpatch data-key`). A 404 means the site doesn't list the title.
+2. `POST https://prosperopatches.com/api/internal/loadpatches` with `{"titleid":..,"key":..}`: the update list (`content_ver`, `filesize`, `required_firmware`, `import_date`, `is_latest`).
+
+This is the site's own internal endpoint, not a published API, so it may change; parsing failures only show "Can't look up updates". Answers (found or not) are cached per title for 24 hours in `<library>/cache/prosperopatches/<titleId>.json`; **Refresh** asks again. Changelogs on the site need a Cloudflare Turnstile check, so the launcher does not fetch them and links to the page instead.
 
 ## Upstream wishlist (none required)
 

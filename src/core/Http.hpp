@@ -22,4 +22,9 @@ using TextFetcher = std::function<std::string(const std::string& url)>;
 
 std::string HttpGetText(const std::string& url);
 
+// POSTs body with the given Content-Type and returns the (small) answer.
+using TextPoster = std::function<std::string(const std::string& url, const std::string& body, const std::string& contentType)>;
+
+std::string HttpPostText(const std::string& url, const std::string& body, const std::string& contentType);
+
 }

@@ -34,6 +34,8 @@ public:
     const RunPlan& Plan() const { return plan_; }
     std::optional<int> ExitCode() const { return exitCode_; }
     bool StopRequested() const { return stopRequested_; }
+    // The game's main window in screen pixels (Windows); false when it can't be found.
+    bool WindowRect(int& x, int& y, int& width, int& height) const;
 
 private:
     std::string titleId_;

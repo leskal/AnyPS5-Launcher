@@ -1,5 +1,7 @@
 #include "core/Settings.hpp"
 
+#include <utility>
+
 #include <fstream>
 #include <iterator>
 #include <system_error>
@@ -66,6 +68,14 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     ReadString(*document, "profile", result.settings.profile, result.error);
     ReadString(*document, "theme", result.settings.theme, result.error);
     if (result.settings.theme != "dark" && result.settings.theme != "light") result.settings.theme = "system";
+    for (const auto& [key, target] : {std::pair<const char*, bool*>{"onlineInfo", &result.settings.onlineInfo},
+                                      std::pair<const char*, bool*>{"trophyPopups", &result.settings.trophyPopups},
+                                      std::pair<const char*, bool*>{"trophySound", &result.settings.trophySound}}) {
+        const auto found = document->find(key);
+        if (found == document->end()) continue;
+        if (found->is_boolean()) *target = found->get<bool>();
+        else if (result.error.empty()) result.error = std::string("setting \"") + key + "\" is not true or false and was ignored";
+    }
     return result;
 }
 
@@ -84,6 +94,9 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["userdataFolder"] = settings.userdataFolder;
     document["profile"] = settings.profile;
     document["theme"] = settings.theme;
+    document["onlineInfo"] = settings.onlineInfo;
+    document["trophyPopups"] = settings.trophyPopups;
+    document["trophySound"] = settings.trophySound;
     document.erase("python");
     WriteFileAtomically(file, document.dump(4) + "\n");
 }

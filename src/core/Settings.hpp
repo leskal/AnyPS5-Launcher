@@ -17,6 +17,9 @@ struct Settings {
     std::string userdataFolder;
     std::string profile;
     std::string theme = "system";  // "system" follows Windows, or "dark" / "light"
+    bool onlineInfo = true;        // look up each game's update list on PROSPEROPatches
+    bool trophyPopups = true;      // a card over the game when it earns a trophy
+    bool trophySound = true;       // and a short chime with it
 };
 
 std::filesystem::path EffectiveLibrary(const Settings& settings, const std::filesystem::path& launcherFolder);
