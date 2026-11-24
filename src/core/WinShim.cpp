@@ -285,11 +285,15 @@ void ExePath(wchar_t* path, unsigned long capacity) {
     if (length == 0 || length >= capacity) path[0] = 0;
 }
 
-bool FirstInstance(const wchar_t* name) {
+bool FirstInstance(const wchar_t* name, unsigned long waitMilliseconds) {
     // Kept open until the process ends; Windows closes it then.
     HANDLE mutex = CreateMutexW(nullptr, TRUE, name);
     if (mutex == nullptr) return true;
-    return GetLastError() != ERROR_ALREADY_EXISTS;
+    if (GetLastError() != ERROR_ALREADY_EXISTS) return true;
+    if (waitMilliseconds == 0) return false;
+    // Owned once the other process releases it or ends (abandoned counts as ours).
+    const DWORD waited = WaitForSingleObject(mutex, waitMilliseconds);
+    return waited == WAIT_OBJECT_0 || waited == WAIT_ABANDONED;
 }
 
 void ShowWindowTitled(const wchar_t* title) {

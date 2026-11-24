@@ -467,6 +467,15 @@ private:
     std::optional<Result> finished_;
 };
 
+// What the game settings window shows from disk, read in the background: a shader
+// cache can hold thousands of files, and walking it held up the window opening.
+struct GameFacts {
+    std::string serial;
+    std::string cacheSize;  // empty when there's no cache
+    bool hasSaves = false;
+    std::vector<SaveBackup> backups;
+};
+
 // A game's trophies as read in the background; set is empty when it has none.
 struct TrophyLoad {
     std::string key;
@@ -984,6 +993,13 @@ public:
             importPick_.clear();
         }
         if (auto load = trophyLoader_.Take()) trophies_[load->key] = std::move(load->set);
+        if (auto facts = factsLoader_.Take(); facts && facts->serial == settingsSerial_) {
+            cacheSize_ = std::move(facts->cacheSize);
+            hasSaves_ = facts->hasSaves;
+            backups_ = std::move(facts->backups);
+            factsReady_ = true;
+        }
+        StartGameFacts();
         if (auto load = artLoader_.Take()) art_[load->key] = std::move(load->png);
         StartGameLoads();
         if (auto lookup = onlineLoader_.Take()) {
@@ -2620,13 +2636,28 @@ private:
         }
     }
 
-    // What the game settings show from disk: walking a shader cache of thousands of
-    // files every frame made the window lag, so it's read here.
+    // Asks for the game settings' disk facts again; StartGameFacts reads them off the UI thread.
     void RefreshGameFacts() {
-        const auto cache = layout_.ShaderCache(settingsSerial_);
-        cacheSize_ = PathExists(cache) ? FolderSize(cache) : std::string();
-        hasSaves_ = HasSaves(layout_, settingsSerial_);
-        backups_ = ListSaveBackups(layout_, settingsSerial_);
+        factsWanted_ = true;
+        factsReady_ = false;
+        StartGameFacts();
+    }
+
+    void StartGameFacts() {
+        if (!factsWanted_ || settingsSerial_.empty() || factsLoader_.Running()) return;
+        factsWanted_ = false;
+        factsLoader_.Start([layout = layout_, serial = settingsSerial_] {
+            GameFacts facts;
+            facts.serial = serial;
+            try {
+                const auto cache = layout.ShaderCache(serial);
+                if (PathExists(cache)) facts.cacheSize = FolderSize(cache);
+                facts.hasSaves = HasSaves(layout, serial);
+                facts.backups = ListSaveBackups(layout, serial);
+            } catch (const std::exception&) {
+            }
+            return facts;
+        });
     }
 
     void OpenGameSettings(const GameEntry& game) {
@@ -2634,8 +2665,11 @@ private:
         settingsName_ = game.metadata.name;
         gameSettings_ = LoadGameSettings(layout_.GameSettingsFile(settingsSerial_));
         gamePin_ = versions_.pins.count(settingsSerial_) ? versions_.pins.at(settingsSerial_) : std::string();
+        cacheSize_.clear();
+        hasSaves_ = false;
+        backups_.clear();
+        factsReady_ = false;
         RefreshGameFacts();
-        backups_ = ListSaveBackups(layout_, settingsSerial_);
         gameSettingsError_.clear();
         openGameSettings_ = true;
     }
@@ -2802,7 +2836,7 @@ private:
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
-            ImGui::TextColored(Dim, "%s", exists ? cacheSize_.c_str() : "empty");
+            ImGui::TextColored(Dim, "%s", !factsReady_ ? "measuring..." : exists ? cacheSize_.c_str() : "empty");
         });
 
         Section("saves", "Saves and trophies", nullptr, [&] {
@@ -2814,7 +2848,8 @@ private:
             if (ImGui::Button("Open backups folder")) OpenFolder(SaveBackupFolder(layout_, settingsSerial_));
             ImGui::SameLine();
             if (ImGui::Button("Refresh")) RefreshGameFacts();
-            if (backups_.empty()) ImGui::TextColored(Dim, "No backups yet.");
+            if (!factsReady_) ImGui::TextColored(Dim, "Looking for backups...");
+            else if (backups_.empty()) ImGui::TextColored(Dim, "No backups yet.");
             for (const auto& backup : backups_) {
                 ImGui::PushID(ToUtf8(backup.file).c_str());
                 ImGui::AlignTextToFramePadding();
@@ -4958,8 +4993,11 @@ private:
     std::vector<SaveBackup> backups_;
     std::string gameSettingsError_;
     std::string gamePin_;
-    std::string cacheSize_;  // read when the window opens, not every frame
+    std::string cacheSize_;  // read in the background when the window opens
     bool hasSaves_ = false;
+    bool factsReady_ = false;
+    bool factsWanted_ = false;
+    Background<GameFacts> factsLoader_;
     std::string exportPick_;
     std::string importPick_;
     // Screenshots window.
@@ -5000,7 +5038,10 @@ int main(int argc, char** argv) {
         const char* base = SDL_GetBasePath();
         const std::string folder = base != nullptr ? base : "";
         const auto name = L"AnyPS5Launcher-" + std::to_wstring(std::hash<std::string>{}(folder));
-        if (!launcher::win::FirstInstance(name.c_str())) {
+        // Started by a self-update: the old launcher is still closing, so wait for it
+        // rather than handing over to it and leaving with nothing running.
+        const bool updated = std::find(arguments.begin(), arguments.end(), "--updated") != arguments.end();
+        if (!launcher::win::FirstInstance(name.c_str(), updated ? 20000 : 0)) {
             if (request) {
                 std::ofstream(launcher::FromUtf8(folder) / "anyps5-launcher.request", std::ios::binary | std::ios::trunc) << launcher::FormatRequest(*request);
             }

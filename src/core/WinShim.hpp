@@ -41,8 +41,9 @@ void WindowsVersion(wchar_t* text, unsigned long capacity);
 // unless they already open it. No administrator rights needed.
 unsigned long RegisterUrlScheme(const wchar_t* scheme, const wchar_t* description, const wchar_t* exePath);
 
-// Holds a named mutex for the life of the process; false when another process already does.
-bool FirstInstance(const wchar_t* name);
+// Holds a named mutex for the life of the process; false when another process already
+// does. With waitMilliseconds, waits up to that long for that process to end first.
+bool FirstInstance(const wchar_t* name, unsigned long waitMilliseconds = 0);
 
 // Brings the top-level window with this exact title to the front, restoring it if minimized.
 void ShowWindowTitled(const wchar_t* title);
