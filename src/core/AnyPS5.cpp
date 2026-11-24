@@ -259,4 +259,35 @@ bool HostIsIntel() {
 #endif
 }
 
+std::string HostCpuName() {
+#if defined(__x86_64__) || defined(__i386__)
+    unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
+    if (__get_cpuid(0x80000000u, &eax, &ebx, &ecx, &edx) == 0 || eax < 0x80000004u) return {};
+    char brand[49] = {};
+    for (unsigned int leaf = 0; leaf < 3; ++leaf) {
+        __get_cpuid(0x80000002u + leaf, &eax, &ebx, &ecx, &edx);
+        std::memcpy(brand + leaf * 16, &eax, 4);
+        std::memcpy(brand + leaf * 16 + 4, &ebx, 4);
+        std::memcpy(brand + leaf * 16 + 8, &ecx, 4);
+        std::memcpy(brand + leaf * 16 + 12, &edx, 4);
+    }
+    std::string name(brand);
+    // Padded with spaces on some CPUs; a clock speed at the end says nothing useful here.
+    if (const auto at = name.find(" @ "); at != std::string::npos) name.erase(at);
+    if (const auto at = name.find(" CPU"); at != std::string::npos && at + 4 == name.size()) name.erase(at);
+    const auto first = name.find_first_not_of(' ');
+    if (first == std::string::npos) return {};
+    name.erase(0, first);
+    name.erase(name.find_last_not_of(' ') + 1);
+    std::string squeezed;
+    for (const char c : name) {
+        if (c == ' ' && !squeezed.empty() && squeezed.back() == ' ') continue;
+        squeezed += c;
+    }
+    return squeezed;
+#else
+    return {};
+#endif
+}
+
 }

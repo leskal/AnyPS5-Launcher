@@ -43,6 +43,9 @@ std::vector<std::string> RelinkArguments(const TitleEntry& entry, bool windows, 
 
 bool HostIsIntel();
 
+// The CPU's model name as it reports it, e.g. "Intel(R) Core(TM) i7-12700K"; empty if unknown.
+std::string HostCpuName();
+
 inline constexpr bool TargetIsWindows =
 #ifdef _WIN32
     true;

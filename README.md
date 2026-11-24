@@ -22,6 +22,7 @@ A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game li
   - Folder game `Games\Foo\`: its files are moved (renamed) into `Games\Foo\app0\`, and the exe goes into `Games\Foo\`. Run Convert SELF to ELF first if it still has SELF files.
   - `.zar` game `Games\Foo.zar`: the archive is moved unchanged to `Games\Foo\app0.zar`, and only eboot, `sce_sys` and the modules are extracted into `Games\Foo\app0\` (SELF files unwrapped on the way). The game reads the rest from the archive.
   - The exe loads AnyPS5's libraries from AnyPS5's own folder (`--rpath`), so nothing is copied per game. **Remove install** puts everything back.
+  - On an Intel CPU the relinker gets AnyPS5's Intel flag (`--to-intel`); the first-start setup says so. **Settings > Converting games** turns it on or off for later installs.
 - **Play** (double-click): moves the profile's saves, trophies, `data` and `download0` beside the exe, starts the game, and moves them back when it exits (or at the next start if the launcher was closed). Input mapping and screenshots go to the profile. **Stop** ends it.
 - **Profiles:** each has its own saves, trophies, input mapping, screenshots and console language. Pick one from the profile button in the top bar; **Edit** there renames it, sets its console language or deletes it (to the Recycle Bin, and not while a game still has its saves).
 - **Conversions** (right-click): SELF to ELF, `.zar` to folder, folder to `.zar`.

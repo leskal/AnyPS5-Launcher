@@ -1272,8 +1272,8 @@ private:
         if (title != nullptr) titleCopy = *title;
         jobSerial_ = game.metadata.titleId;
         job_.Start("Install " + game.metadata.name, true,
-                   [game, runtime, layout = layout_, titleCopy, version = state.version](JobControl& control) {
-                       const auto manifest = InstallGame({game, runtime, layout, titleCopy ? &*titleCopy : nullptr, version, TargetIsWindows, HostIsIntel()}, RunToFile, control);
+                   [game, runtime, layout = layout_, titleCopy, version = state.version, intel = UseIntelFlag(settings_, hostIntel_)](JobControl& control) {
+                       const auto manifest = InstallGame({game, runtime, layout, titleCopy ? &*titleCopy : nullptr, version, TargetIsWindows, intel}, RunToFile, control);
                        std::string text = "Converted with AnyPS5";
                        if (!manifest.relinkerVersion.empty()) text += " " + manifest.relinkerVersion;
                        const auto count = [](int n, const char* word) { return std::to_string(n) + " " + word + (n == 1 ? "" : "s"); };
@@ -2155,6 +2155,15 @@ private:
                 ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0));
             }
             ImGui::TextColored(Dim, "%s", "You can skip this and do it later.");
+            if (hostIntel_) {
+                // Only for Intel: an AMD PC needs nothing here.
+                ImGui::Spacing();
+                ImGui::Spacing();
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextColored(Accent, "Intel CPU%s%s", cpuName_.empty() ? "" : ": ", cpuName_.c_str());
+                ImGui::TextUnformatted("The relinker will convert your games with the Intel flag (--to-intel), which this kind of CPU needs. You can turn it off in Settings under Converting games.");
+                ImGui::PopTextWrapPos();
+            }
         } else {
             title("Your profile", "A profile keeps its own saves, trophies, controls, screenshots and console language. Add more later from the profile button.");
             const float avatar = ImGui::GetFontSize() * 3.6f;
@@ -4780,6 +4789,19 @@ private:
                         "##userdata", ToUtf8(launcherFolder_ / "userdata"), draft_.userdataFolder);
         });
 
+        Section("converting", "Converting games", "How the relinker converts games at Install. A change applies to games you install from now on; reinstall an installed game to change it.", [&] {
+            bool intel = UseIntelFlag(draft_, hostIntel_);
+            if (ImGui::Checkbox("Use the Intel flag (--to-intel)", &intel)) {
+                draft_.intelFlag = intel == hostIntel_ ? std::nullopt : std::optional<bool>(intel);
+            }
+            const std::string cpu = cpuName_.empty() ? std::string(hostIntel_ ? "an Intel CPU" : "a CPU that isn't Intel") : cpuName_;
+            const std::string note = "This PC: " + cpu + ". " + (hostIntel_ ? "On by default for Intel CPUs." : "Off by default; Intel CPUs need it.") +
+                                     (draft_.intelFlag ? " Changed from the default." : "");
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(Dim, "%s", note.c_str());
+            ImGui::PopTextWrapPos();
+        });
+
         Section("appearance", "Appearance", "Follow Windows switches with Windows' light or dark mode.", [&] {
             const char* labels[] = {"Follow Windows", "Dark", "Light"};
             const char* values[] = {"system", "dark", "light"};
@@ -4907,6 +4929,8 @@ private:
     std::filesystem::path launcherFolder_;
     std::filesystem::path settingsFile_;
     Settings settings_;
+    const bool hostIntel_ = HostIsIntel();
+    const std::string cpuName_ = HostCpuName();
     std::string settingsError_;
     Layout layout_;
     std::vector<std::string> profiles_;

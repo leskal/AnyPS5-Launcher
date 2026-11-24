@@ -76,3 +76,32 @@ TEST(FindsAnyPS5Tools) {
     CHECK(tools.relinker.has_value());
     CHECK(!launcher::FindAnyPS5Tools("").relinker);
 }
+
+TEST(IntelFlagFollowsTheCpuUnlessSet) {
+    fixture::TempDir temp;
+    const auto file = temp.Path() / "anyps5-launcher.json";
+    launcher::Settings settings;
+    CHECK(launcher::UseIntelFlag(settings, true));
+    CHECK(!launcher::UseIntelFlag(settings, false));
+    SaveSettings(file, settings);
+    CHECK(ReadText(file).find("intelFlag") == std::string::npos);
+    CHECK(!LoadSettings(file).settings.intelFlag.has_value());
+
+    settings.intelFlag = false;
+    SaveSettings(file, settings);
+    auto loaded = LoadSettings(file);
+    CHECK(loaded.settings.intelFlag.has_value());
+    CHECK(!launcher::UseIntelFlag(loaded.settings, true));
+    settings.intelFlag = true;
+    SaveSettings(file, settings);
+    CHECK(launcher::UseIntelFlag(LoadSettings(file).settings, false));
+
+    settings.intelFlag.reset();  // back to the default: the key goes
+    SaveSettings(file, settings);
+    CHECK(ReadText(file).find("intelFlag") == std::string::npos);
+
+    WriteText(file, R"({"intelFlag": "yes"})");
+    loaded = LoadSettings(file);
+    CHECK(!loaded.settings.intelFlag.has_value());
+    CHECK(!loaded.error.empty());
+}

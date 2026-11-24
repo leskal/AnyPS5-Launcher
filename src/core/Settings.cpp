@@ -81,7 +81,15 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
         if (found->is_boolean()) *target = found->get<bool>();
         else if (result.error.empty()) result.error = std::string("setting \"") + key + "\" is not true or false and was ignored";
     }
+    if (const auto found = document->find("intelFlag"); found != document->end() && !found->is_null()) {
+        if (found->is_boolean()) result.settings.intelFlag = found->get<bool>();
+        else if (result.error.empty()) result.error = "setting \"intelFlag\" is not true or false and was ignored";
+    }
     return result;
+}
+
+bool UseIntelFlag(const Settings& settings, bool hostIsIntel) {
+    return settings.intelFlag.value_or(hostIsIntel);
 }
 
 void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
@@ -106,6 +114,8 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["checkUpdates"] = settings.checkUpdates;
     document["syncFolder"] = settings.syncFolder;
     document["view"] = settings.view;
+    if (settings.intelFlag) document["intelFlag"] = *settings.intelFlag;
+    else document.erase("intelFlag");
     document.erase("python");
     WriteFileAtomically(file, document.dump(4) + "\n");
 }

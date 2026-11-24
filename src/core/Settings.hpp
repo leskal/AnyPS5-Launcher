@@ -24,7 +24,12 @@ struct Settings {
     std::string syncFolder;        // saves shared with other PCs; empty: off
     std::string view = "grid";     // "grid" or "home" (a row of tiles)
     bool checkUpdates = true;      // look for a newer launcher at start
+    // Relink games with AnyPS5's --to-intel. Unset: on for an Intel CPU, off otherwise.
+    std::optional<bool> intelFlag;
 };
+
+// Whether installs pass --to-intel: the setting, or else whether the CPU is Intel.
+bool UseIntelFlag(const Settings& settings, bool hostIsIntel);
 
 std::filesystem::path EffectiveLibrary(const Settings& settings, const std::filesystem::path& launcherFolder);
 std::filesystem::path EffectiveUserdata(const Settings& settings, const std::filesystem::path& launcherFolder);
