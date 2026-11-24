@@ -2,6 +2,19 @@
 
 A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game list that finds your PS5 games, converts them with the AnyPS5 relinker and launches them, with saves, trophies and settings kept per profile.
 
+![The Home view: a row of games over the selected game's artwork](docs/screenshots/home.png)
+
+| | |
+|:---:|:---:|
+| ![Grid view with the details panel](docs/screenshots/grid.png) | ![Trophies with grade counts and dates](docs/screenshots/trophies.png) |
+| Grid view and details | Trophies |
+| ![Controls editor with PlayStation button symbols](docs/screenshots/controls.png) | ![Per-game settings](docs/screenshots/game-settings.png) |
+| Controls | Game settings |
+| ![AnyPS5 versions: download a release or add your own build](docs/screenshots/versions.png) | |
+| AnyPS5 versions | |
+
+<sub>The games in the screenshots are made-up placeholders with generated artwork.</sub>
+
 **Status:** early, but the main loop works:
 
 - **Library:** game folders and `.zar` archives as a cover grid, with search, status badges and a details panel for the selected game. Covers resize with the window (Ctrl + mouse wheel for bigger or smaller); the look follows Windows' light or dark setting, or a choice in Settings.
