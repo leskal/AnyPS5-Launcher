@@ -288,12 +288,22 @@ std::vector<std::string> ModuleDirArguments(const std::vector<std::string>& argu
     return folders;
 }
 
+// Deletes the run files left in a folder.
+void DropRunFiles(const std::filesystem::path& folder) {
+    std::error_code error;
+    for (const char* name : {RunReportName, RunRecipeName}) std::filesystem::remove(folder / name, error);
+}
+
 void RemoveFile(const std::filesystem::path& file) {
     std::error_code error;
     std::filesystem::remove(file, error);
     if (error) throw std::system_error(error, "cannot delete " + ToUtf8(file));
 }
 
+}
+
+bool IsRunFile(const std::string& name) {
+    return name == RunReportName || name == RunRecipeName;
 }
 
 std::filesystem::path ExecutableIn(const std::filesystem::path& home, std::string_view titleId) {
@@ -418,6 +428,7 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
             manifest.originalName = ToUtf8(home.filename());
             WriteManifest(home / InstallManifestName, manifest);
         } else if (game.home.empty()) {
+            DropRunFiles(home);  // from a run before an earlier removal; not the game's
             const auto names = TopLevelNames(home);
             if (std::find(names.begin(), names.end(), App0) != names.end()) throw std::runtime_error("the game folder already has an app0 entry of its own");
             std::filesystem::create_directory(app0, error);
@@ -523,7 +534,7 @@ RemovedInstall RemoveInstall(const GameEntry& game) {
     const auto manifest = ReadHomeManifest(home);
     if (!manifest) throw std::runtime_error(ToUtf8(home / InstallManifestName) + " can't be read");
 
-    std::set<std::string> ours{InstallManifestName, App0, App0Zar};
+    std::set<std::string> ours{InstallManifestName, App0, App0Zar, RunReportName, RunRecipeName};
     for (const auto& output : manifest->outputs) ours.insert(output);
     if (!manifest->titleId.empty()) ours.insert(ToUtf8(ExecutableIn(home, manifest->titleId).filename()));
     RemovedInstall result;
@@ -551,6 +562,8 @@ RemovedInstall RemoveInstall(const GameEntry& game) {
             // It was already <folder>\app0: the files stay where they were.
             result.restored = app0;
         } else {
+            DropRunFiles(app0);  // left there by an older set-up that moved them in with the game
+            DropRunFiles(home);
             const auto names = TopLevelNames(app0);
             for (const auto& name : names) {
                 if (Exists(home / FromUtf8(name)) && name != App0) throw std::runtime_error(ToUtf8(home / FromUtf8(name)) + " is in the way of the game's own " + name);

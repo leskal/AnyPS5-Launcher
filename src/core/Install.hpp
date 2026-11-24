@@ -16,6 +16,13 @@ namespace launcher {
 
 inline constexpr const char* InstallManifestName = GameHomeMarker;
 
+// Files AnyPS5 writes next to the game's exe at each run. They are never part of
+// the game: the launcher moves them to the run's logs, and set-up and removal
+// drop any that were left behind instead of treating them as the game's files.
+inline constexpr const char* RunReportName = "anyps5-report.json";
+inline constexpr const char* RunRecipeName = "anyps5-recipe.json";
+bool IsRunFile(const std::string& name);
+
 struct InstallManifest {
     std::string titleId;
     std::string name;

@@ -523,6 +523,28 @@ TEST(FailedRelinkLeavesTheGameSetUpButNotInstalled) {
     CHECK(fixture.Install(game, relinker).complete);
 }
 
+TEST(RunFilesDoNotBlockRemovingAnInstall) {
+    // A run's anyps5-recipe.json beside the exe, and one an older set-up moved into app0.
+    InstallFixture fixture;
+    const auto home = fixture.WriteConvertedGame("PPSA00107");
+    FakeRelinker relinker;
+    fixture.Install(fixture.Scan(), relinker);
+    fixture::WriteFolder(home, {{"anyps5-recipe.json", fixture::Bytes("{}")}, {"anyps5-report.json", fixture::Bytes("{}")}});
+    fixture::WriteFolder(home / "app0", {{"anyps5-recipe.json", fixture::Bytes("{}")}});
+    const auto removed = RemoveInstall(fixture.Scan());
+    CHECK(removed.restored == home);
+    CHECK(removed.leftovers.empty());
+    CHECK(!std::filesystem::exists(home / "anyps5-recipe.json"));
+    CHECK(!std::filesystem::exists(home / "anyps5-report.json"));
+    CHECK(!std::filesystem::exists(home / "app0"));
+
+    // Set up again with a run file still beside the game: it isn't moved into app0.
+    fixture::WriteFolder(home, {{"anyps5-recipe.json", fixture::Bytes("{}")}});
+    fixture.Install(fixture.Scan(), relinker);
+    CHECK(!std::filesystem::exists(home / "app0" / "anyps5-recipe.json"));
+    CHECK(!std::filesystem::exists(home / "anyps5-recipe.json"));
+}
+
 TEST(RemoveInstallPutsEverythingBack) {
     InstallFixture fixture;
     const auto home = fixture.WriteConvertedGame("PPSA00107");
@@ -673,7 +695,10 @@ TEST(RunReportsAreMovedBesideTheLogAndSummarised) {
     std::filesystem::create_directories(temp.Path() / "logs");
     fixture::WriteFolder(temp.Path() / "install", {{"anyps5-report.json", fixture::Bytes(R"({"run": {"exit": "crash", "stage": "first-draw", "seconds": 12.4},
         "stop": {"kind": "missing-function", "message": "sceFooBar is not implemented"}})")}});
+    fixture::WriteFolder(temp.Path() / "install", {{"anyps5-recipe.json", fixture::Bytes("{}")}});
     const auto report = CollectRunReport(plan);
+    CHECK(!std::filesystem::exists(temp.Path() / "install" / "anyps5-recipe.json"));
+    CHECK(std::filesystem::exists(temp.Path() / "logs" / "2026-11-23_20-00-00.recipe.json"));
     CHECK(report.has_value());
     CHECK_EQ(report->summary, std::string("crash after 12 s, reached first-draw (missing-function: sceFooBar is not implemented)"));
     CHECK(!std::filesystem::exists(plan.reportSource));

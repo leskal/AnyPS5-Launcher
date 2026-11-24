@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "core/FileOps.hpp"
+#include "core/Install.hpp"
 #include "core/Session.hpp"
 #include "core/Utf8.hpp"
 
@@ -78,9 +79,10 @@ RunPlan PrepareRun(const GameEntry& game, const Layout& layout, const ProfileSet
     plan.workingDirectory = install;
     const auto stamp = Timestamp();
     plan.logFile = layout.Logs(serial) / (stamp + ".log");
-    plan.reportSource = install / "anyps5-report.json";
+    plan.reportSource = install / RunReportName;
     plan.reportTarget = layout.Logs(serial) / (stamp + ".report.json");
     std::filesystem::remove(plan.reportSource, error);
+    std::filesystem::remove(install / RunRecipeName, error);
 
     auto& env = plan.environment;
     env.emplace_back("ANYPS5_INPUT_CONFIG", ToUtf8(layout.InputConfig()));
@@ -142,8 +144,29 @@ std::optional<RunReport> FinishRun(const RunPlan& plan) {
     return CollectRunReport(plan);
 }
 
+// Moves a file into the logs, copying when a rename can't (another drive).
+static void MoveToLogs(const std::filesystem::path& source, const std::filesystem::path& target) {
+    std::error_code error;
+    std::filesystem::rename(source, target, error);
+    if (!error) return;
+    error.clear();
+    std::filesystem::copy_file(source, target, std::filesystem::copy_options::overwrite_existing, error);
+    if (!error) std::filesystem::remove(source, error);
+}
+
 std::optional<RunReport> CollectRunReport(const RunPlan& plan) {
     std::error_code error;
+    // The recipe sits beside the report; left in the game's folder it would later be
+    // taken for one of the game's own files.
+    const auto recipe = plan.reportSource.parent_path() / RunRecipeName;
+    if (std::filesystem::is_regular_file(recipe, error)) {
+        auto target = plan.reportTarget;
+        auto name = ToUtf8(target.filename());
+        if (name.ends_with(".report.json")) name.replace(name.size() - 12, 12, ".recipe.json");
+        else name += ".recipe.json";
+        MoveToLogs(recipe, target.replace_filename(FromUtf8(name)));
+    }
+    error.clear();
     if (!std::filesystem::is_regular_file(plan.reportSource, error)) return std::nullopt;
     std::filesystem::rename(plan.reportSource, plan.reportTarget, error);
     if (error) {
