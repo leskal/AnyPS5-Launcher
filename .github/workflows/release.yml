@@ -1,0 +1,97 @@
+# Builds the Windows launcher for a version tag (v0.2.0) and publishes it as a
+# GitHub release: anyps5-launcher-<tag>-windows-x64.zip with anyps5-launcher.exe,
+# README.md and LICENSE. The launcher's self-update downloads that zip.
+#
+# Make a release: set project(... VERSION x.y.z) in CMakeLists.txt, commit, then
+#   git tag vX.Y.Z && git push origin vX.Y.Z
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+  # The toolchain AnyPS5 uses (as in its own release workflow).
+  WINLIBS_RELEASE: 15.2.0posix-14.0.0-ucrt-r7
+  WINLIBS_ZIP: winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-14.0.0-r7.zip
+  WINLIBS_SHA256: cb2fbad6162540cdf5e1facdce08d4dac359e8cf64f7f696a99274291763b815
+
+jobs:
+  windows:
+    name: Build, test and publish (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Check that the tag matches the project version
+        run: |
+          version=$(sed -n 's/^project(AnyPS5Launcher VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [ "v$version" != "$RELEASE_TAG" ]; then
+            echo "::error::Tag $RELEASE_TAG but CMakeLists.txt says $version; set project(... VERSION ${RELEASE_TAG#v}) first"
+            exit 1
+          fi
+
+      - name: Point the WinLibs CMake at the CA bundle of Git for Windows
+        run: |
+          for prefix in ucrt64 mingw64; do
+            bundle="C:/Program Files/Git/$prefix/etc/ssl/certs/ca-bundle.crt"
+            if [ -f "$bundle" ]; then echo "SSL_CERT_FILE=$bundle" >> "$GITHUB_ENV"; exit 0; fi
+          done
+          echo "::error::No CA bundle found in Git for Windows"; exit 1
+
+      - id: toolchain
+        uses: actions/cache@v4
+        with:
+          path: C:\winlibs
+          key: ${{ env.WINLIBS_ZIP }}
+
+      - name: Download WinLibs GCC 15
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/winlibs.zip" "https://github.com/brechtsanders/winlibs_mingw/releases/download/$WINLIBS_RELEASE/$WINLIBS_ZIP"
+          echo "$WINLIBS_SHA256  $RUNNER_TEMP/winlibs.zip" | sha256sum -c -
+          7z x "$RUNNER_TEMP/winlibs.zip" -oC:/winlibs > /dev/null
+
+      - run: echo 'C:\winlibs\mingw64\bin' >> "$GITHUB_PATH"
+
+      - name: Configure
+        shell: cmd
+        run: cmake --preset release
+
+      - name: Build
+        shell: cmd
+        run: cmake --build --preset release
+
+      - name: Test
+        shell: cmd
+        run: ctest --preset release --timeout 300
+
+      - name: Package
+        run: |
+          mkdir -p dist/anyps5-launcher
+          cp build/release/anyps5-launcher.exe README.md LICENSE dist/anyps5-launcher/
+          cd dist
+          7z a -tzip "anyps5-launcher-$RELEASE_TAG-windows-x64.zip" anyps5-launcher > /dev/null
+          sha256sum "anyps5-launcher-$RELEASE_TAG-windows-x64.zip" > SHA256SUMS
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "dist/anyps5-launcher-$RELEASE_TAG-windows-x64.zip" dist/SHA256SUMS \
+            --title "AnyPS5 Launcher $RELEASE_TAG" --generate-notes
