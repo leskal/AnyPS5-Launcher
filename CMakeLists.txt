@@ -28,6 +28,7 @@ add_library(launcher_core STATIC
     src/core/Http.cpp
     src/core/Install.cpp
     src/core/Launch.cpp
+    src/core/LaunchLinks.cpp
     src/core/Links.cpp
     src/core/Metadata.cpp
     src/core/Modules.cpp
@@ -37,6 +38,8 @@ add_library(launcher_core STATIC
     src/core/PatchInfo.cpp
     src/core/Profiles.cpp
     src/core/SaveBackup.cpp
+    src/core/SaveSync.cpp
+    src/core/SelfUpdate.cpp
     src/core/Scanner.cpp
     src/core/Session.cpp
     src/core/SelfUnwrap.cpp

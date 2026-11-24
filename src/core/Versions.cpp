@@ -128,6 +128,14 @@ void Fetch(const Downloader& download, const ReleaseAsset& asset, const std::fil
 
 }
 
+void FetchAsset(const Downloader& download, const ReleaseAsset& asset, const std::filesystem::path& file, JobControl& control) {
+    Fetch(download, asset, file, control);
+}
+
+std::filesystem::path SystemTar() {
+    return TarProgram();
+}
+
 bool IsValidRepository(std::string_view repository) {
     const auto slash = repository.find('/');
     if (slash == std::string_view::npos || slash == 0 || slash + 1 == repository.size() || repository.find('/', slash + 1) != std::string_view::npos) return false;
@@ -224,6 +232,11 @@ VersionStore LoadVersions(const std::filesystem::path& root) {
             if (item.is_string() && IsValidRepository(item.get<std::string>())) store.repositories.push_back(item.get<std::string>());
         }
     }
+    if (const auto pins = document.find("pins"); pins != document.end() && pins->is_object()) {
+        for (const auto& [serial, id] : pins->items()) {
+            if (id.is_string() && !serial.empty()) store.pins[serial] = id.get<std::string>();
+        }
+    }
     return store;
 }
 
@@ -240,7 +253,9 @@ void SaveVersions(const std::filesystem::path& root, const VersionStore& store) 
     }
     std::error_code error;
     std::filesystem::create_directories(root, error);
-    WriteFileAtomically(root / VersionsFileName, nlohmann::json{{"version", 1}, {"versions", versions}, {"repositories", store.repositories}}.dump(4) + "\n");
+    nlohmann::json pins = nlohmann::json::object();
+    for (const auto& [serial, id] : store.pins) pins[serial] = id;
+    WriteFileAtomically(root / VersionsFileName, nlohmann::json{{"version", 1}, {"versions", versions}, {"repositories", store.repositories}, {"pins", pins}}.dump(4) + "\n");
 }
 
 const VersionEntry* FindVersion(const VersionStore& store, std::string_view id) {
@@ -354,6 +369,11 @@ void RemoveVersion(const std::filesystem::path& root, VersionStore& store, std::
         if (!relative.empty() && *relative.begin() != ".." && !relative.is_absolute()) RemoveOwnTree(found->folder);
     }
     store.versions.erase(found);
+    // Games pinned to it go back to the selected version.
+    for (auto it = store.pins.begin(); it != store.pins.end();) {
+        if (it->second == id) it = store.pins.erase(it);
+        else ++it;
+    }
 }
 
 std::optional<Release> NewestRelease(const std::vector<Release>& releases, bool includePrereleases) {

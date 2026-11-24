@@ -67,11 +67,15 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     ReadString(*document, "userdataFolder", result.settings.userdataFolder, result.error);
     ReadString(*document, "profile", result.settings.profile, result.error);
     ReadString(*document, "theme", result.settings.theme, result.error);
+    ReadString(*document, "syncFolder", result.settings.syncFolder, result.error);
+    ReadString(*document, "view", result.settings.view, result.error);
+    if (result.settings.view != "home") result.settings.view = "grid";
     if (result.settings.theme != "dark" && result.settings.theme != "light") result.settings.theme = "system";
     for (const auto& [key, target] : {std::pair<const char*, bool*>{"onlineInfo", &result.settings.onlineInfo},
                                       std::pair<const char*, bool*>{"trophyPopups", &result.settings.trophyPopups},
                                       std::pair<const char*, bool*>{"trophySound", &result.settings.trophySound},
-                                      std::pair<const char*, bool*>{"hideWhilePlaying", &result.settings.hideWhilePlaying}}) {
+                                      std::pair<const char*, bool*>{"hideWhilePlaying", &result.settings.hideWhilePlaying},
+                                      std::pair<const char*, bool*>{"checkUpdates", &result.settings.checkUpdates}}) {
         const auto found = document->find(key);
         if (found == document->end()) continue;
         if (found->is_boolean()) *target = found->get<bool>();
@@ -99,6 +103,9 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["trophyPopups"] = settings.trophyPopups;
     document["trophySound"] = settings.trophySound;
     document["hideWhilePlaying"] = settings.hideWhilePlaying;
+    document["checkUpdates"] = settings.checkUpdates;
+    document["syncFolder"] = settings.syncFolder;
+    document["view"] = settings.view;
     document.erase("python");
     WriteFileAtomically(file, document.dump(4) + "\n");
 }

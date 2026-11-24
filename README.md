@@ -28,6 +28,13 @@ A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game li
 - **Screenshots**: the game's F12 shots in a grid and one at a time; open or delete them.
 - **Controllers** (Settings): connected pads with type, USB or Bluetooth and battery, a live button and stick test, vibration, and warnings about Steam Input, DS4Windows, DualSenseX and HidHide. The launcher can be used with a pad: the d-pad moves, ✕ plays, △ opens a game's actions, Options opens Settings.
 - **Starting a game** shows a start screen until its window appears; Settings can minimize the launcher while you play.
+- **First start**: a short setup (appearance and view, games folder, AnyPS5, profile name).
+- **Home view**: a row of game tiles with the selected one large over its artwork, beside the grid (the first icon in the top bar switches).
+- **AnyPS5 version per game**: Game settings can pin a game to another installed AnyPS5 version. **Reinstall all** (AnyPS5 versions, or the "games to reinstall" pill) converts every outdated game again, one after another.
+- **Save sync** (Settings): a folder your PCs share (OneDrive, Dropbox, USB, network); newer saves come in before a game starts and go out after it ends, and whatever is replaced is backed up first.
+- **Links**: `anyps5://play/<title ID>` starts a game and `anyps5://game/<title ID>` shows it, from a shortcut, a browser or Steam (**Copy link** in a game's actions). A launcher that is already open takes the request.
+- **Updates**: the launcher checks its GitHub releases at start (Settings → Launcher) and updates itself; releases are built by `.github/workflows/release.yml` for each `v*` tag.
+- **Open an issue**: after a run that went wrong, opens a new issue on AnyPS5's GitHub with the facts filled in, for you to check and submit.
 
 This is a separate project. It needs no changes to AnyPS5 and talks to it only through its documented command line, runtime layout, environment variables and run report.
 
@@ -52,7 +59,7 @@ ctest --preset release
 build\release\anyps5-launcher.exe
 ```
 
-On first start the Settings window opens: set your games folder, then Save. If no AnyPS5 version is set up, the launcher offers to download the latest release; you can also add your own build (for example `C:\dev\AnyPS5`) under "AnyPS5 versions". Downloaded versions go to `anyps5\` beside the launcher. Logs and shader caches go to `library\` and profiles to `userdata\` beside the launcher unless you choose other folders; converted games stay in their own folders in your games folder; keep userdata on the same drive as your games so saves are renamed, not copied, for each run. The AnyPS5 version's folder path must be plain ASCII (the relinker's `--rpath` needs it). Settings are stored next to the `.exe`, so keep the launcher in a folder you can write to. The `tests` preset builds only the core library and its tests, without SDL or ImGui.
+On first start a short setup asks for the appearance, your games folder, AnyPS5 and a profile name. If no AnyPS5 version is set up, the launcher offers to download the latest release; you can also add your own build (for example `C:\dev\AnyPS5`) under "AnyPS5 versions". Downloaded versions go to `anyps5\` beside the launcher. Logs and shader caches go to `library\` and profiles to `userdata\` beside the launcher unless you choose other folders; converted games stay in their own folders in your games folder; keep userdata on the same drive as your games so saves are renamed, not copied, for each run. The AnyPS5 version's folder path must be plain ASCII (the relinker's `--rpath` needs it). Settings are stored next to the `.exe`, so keep the launcher in a folder you can write to. The `tests` preset builds only the core library and its tests, without SDL or ImGui.
 
 After cloning an existing copy, use `git submodule update --init` instead of the bootstrap script.
 

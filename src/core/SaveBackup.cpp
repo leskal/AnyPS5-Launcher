@@ -15,14 +15,9 @@ namespace launcher {
 
 namespace {
 
-// The three folders a backup holds, by their name in the zip.
-std::vector<std::pair<std::string, std::filesystem::path>> Roots(const Layout& layout, std::string_view serial) {
-    return {{"_sd", layout.Saves(serial) / "_sd"}, {"_sd_mem", layout.Saves(serial) / "_sd_mem"}, {"_trophy", layout.Trophies(serial)}};
-}
-
-std::vector<std::pair<std::string, std::filesystem::path>> FilesIn(const Layout& layout, std::string_view serial) {
+std::vector<std::pair<std::string, std::filesystem::path>> FilesUnder(const std::vector<std::pair<std::string, std::filesystem::path>>& roots) {
     std::vector<std::pair<std::string, std::filesystem::path>> files;
-    for (const auto& [name, root] : Roots(layout, serial)) {
+    for (const auto& [name, root] : roots) {
         std::error_code error;
         if (!std::filesystem::is_directory(root, error)) continue;
         for (std::filesystem::recursive_directory_iterator it(root, error), end; !error && it != end; it.increment(error)) {
@@ -34,6 +29,10 @@ std::vector<std::pair<std::string, std::filesystem::path>> FilesIn(const Layout&
     }
     std::sort(files.begin(), files.end());
     return files;
+}
+
+std::vector<std::pair<std::string, std::filesystem::path>> FilesIn(const Layout& layout, std::string_view serial) {
+    return FilesUnder(SaveRoots(layout, serial));
 }
 
 std::string Stamp() {
@@ -65,6 +64,10 @@ bool SafeEntry(const std::string& name) {
 
 }
 
+std::vector<std::pair<std::string, std::filesystem::path>> SaveRoots(const Layout& layout, std::string_view serial) {
+    return {{"_sd", layout.Saves(serial) / "_sd"}, {"_sd_mem", layout.Saves(serial) / "_sd_mem"}, {"_trophy", layout.Trophies(serial)}};
+}
+
 std::filesystem::path SaveBackupFolder(const Layout& layout, std::string_view serial) {
     return layout.userdata / "backups" / FromUtf8(layout.profile) / std::string(serial);
 }
@@ -73,17 +76,18 @@ bool HasSaves(const Layout& layout, std::string_view serial) {
     return !FilesIn(layout, serial).empty();
 }
 
-std::filesystem::path BackUpSaves(const Layout& layout, std::string_view serial, JobControl& control) {
-    const auto files = FilesIn(layout, serial);
-    if (files.empty()) throw std::runtime_error("profile " + layout.profile + " has no saves or trophies of " + std::string(serial) + " yet");
-    const auto folder = SaveBackupFolder(layout, serial);
+std::filesystem::path ZipFolders(const std::vector<std::pair<std::string, std::filesystem::path>>& roots, const std::filesystem::path& folder,
+                                 const std::string& suffix, JobControl& control) {
+    const auto files = FilesUnder(roots);
+    if (files.empty()) throw std::runtime_error("there is nothing to back up");
     std::filesystem::create_directories(folder);
-    auto target = folder / (Stamp() + ".zip");
-    for (int n = 2; std::filesystem::exists(target); ++n) target = folder / (Stamp() + "-" + std::to_string(n) + ".zip");
+    const auto stamp = Stamp();
+    auto target = folder / (stamp + suffix + ".zip");
+    for (int n = 2; std::filesystem::exists(target); ++n) target = folder / (stamp + suffix + "-" + std::to_string(n) + ".zip");
     std::uint64_t total = 0;
     std::error_code error;
     for (const auto& [name, file] : files) total += std::filesystem::file_size(file, error);
-    control.SetTotal(total + 1);
+    control.SetTotal(control.Total() + total + 1);
     auto partial = target;
     partial += ".partial";
     try {
@@ -103,6 +107,11 @@ std::filesystem::path BackUpSaves(const Layout& layout, std::string_view serial,
     }
     control.Advance(1);
     return target;
+}
+
+std::filesystem::path BackUpSaves(const Layout& layout, std::string_view serial, JobControl& control) {
+    if (!HasSaves(layout, serial)) throw std::runtime_error("profile " + layout.profile + " has no saves or trophies of " + std::string(serial) + " yet");
+    return ZipFolders(SaveRoots(layout, serial), SaveBackupFolder(layout, serial), "", control);
 }
 
 std::vector<SaveBackup> ListSaveBackups(const Layout& layout, std::string_view serial) {
@@ -127,7 +136,7 @@ std::vector<SaveBackup> ListSaveBackups(const Layout& layout, std::string_view s
 }
 
 std::optional<std::filesystem::path> RestoreSaves(const Layout& layout, std::string_view serial, const std::filesystem::path& backup, JobControl& control) {
-    const auto roots = Roots(layout, serial);
+    const auto roots = SaveRoots(layout, serial);
     const auto staging = layout.Saves(serial).parent_path() / (std::string(serial) + ".restoring");
     std::error_code error;
     std::filesystem::remove_all(staging, error);

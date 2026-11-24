@@ -351,6 +351,15 @@ This is the site's own internal endpoint, not a published API, so it may change;
 - **Originals** zips of Convert SELF to ELF go to `<library>/originals/`; zips earlier launchers left beside game folders are not looked at (move them there by hand to restore from them).
 - **Not done: Add update.** Upstream AnyPS5 runs `/app0` only and has no way to read an update dump in place of the game's files (AnyPS5-ARM's engine does). Merging an update into the game would rewrite the dump, and a `.zar` can't be changed without unpacking it, so this waits for upstream support.
 
+## Around the launcher (implemented)
+
+- **Version pins** (`versions.json` `pins`: title ID → version id). Install, Play's per-title flags, the Reinstall check and reports use the pinned version (read once with `LoadAnyPS5`); removing a version drops its pins. **Reinstall all** queues every installed game whose `relinkerVersion` differs from its version's, and installs them one per job.
+- **Save sync** (`src/core/SaveSync.cpp`): `<sync folder>/<profile>/<serial>/_sd|_sd_mem|_trophy`. The side whose newest file is newer (by more than 2 s, for FAT and network shares) wins. Pull runs as a job before Play; push after the run. What is replaced is zipped first: the local saves as `<stamp>-before-sync.zip`, the folder's as `<stamp>-sync-folder.zip`, both in the profile's save backups. Copies keep file times and go through `<folder>.partial`.
+- **Links** (`src/core/LaunchLinks.cpp`): `anyps5://play/<ID>`, `anyps5://game/<ID>`, and `--play <ID>` / `--game <ID>`. At start the launcher registers the scheme for the current user (`HKCU\Software\Classes\anyps5`, only when it doesn't already point at this exe). A named mutex per launcher folder keeps one launcher: a second one writes `anyps5-launcher.request` beside the exe, brings the first to the front and exits; the first reads the file twice a second.
+- **Self-update** (`src/core/SelfUpdate.cpp`): releases of `leskal/AnyPS5-Launcher` with `anyps5-launcher-<tag>-windows-x64.zip`. The zip is checked against GitHub's size and SHA-256, unpacked with the system `tar` into `<launcher>/update/<tag>/`, the running exe is renamed to `.old` (Windows allows that) and the new one copied in, then the new one starts and this one quits. The next start deletes the `.old` and the update folder. `.github/workflows/release.yml` builds the zip with WinLibs GCC 15 for each `v*` tag whose number matches `project(... VERSION)`, runs the tests and publishes the release.
+- **Issues**: `https://github.com/boykopovar/AnyPS5/issues/new?title=…&body=…` with the game, version, system, changed settings and the diagnosis, redacted; the report file is for the log.
+- **First-start setup** replaces opening Settings when there was no settings file. **Home view** is `settings.view = "home"`.
+
 ## Upstream wishlist (none required)
 
 - An environment variable for the player name (`libSceUserService`); until then the setting is hidden.

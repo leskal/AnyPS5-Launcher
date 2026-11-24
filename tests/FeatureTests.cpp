@@ -152,3 +152,109 @@ TEST(SavesAreBackedUpAndRestored) {
     CHECK_EQ(ReadText(layout.Saves("PPSA00001") / "_sd" / "SAVE1" / "sdimg_SAVE1"), std::string("another"));
     CHECK_EQ(backups[1].created.size(), std::size_t{19});
 }
+
+#include <chrono>
+#include <thread>
+
+#include "core/LaunchLinks.hpp"
+#include "core/SaveSync.hpp"
+#include "core/SelfUpdate.hpp"
+#include "core/Versions.hpp"
+
+TEST(LinksAndArguments) {
+    using Kind = launcher::LaunchRequest::Kind;
+    const auto play = launcher::ParseLink("anyps5://play/ppsa01234/");
+    CHECK(play.has_value());
+    CHECK(play->kind == Kind::Play);
+    CHECK_EQ(play->titleId, std::string("PPSA01234"));
+    CHECK(launcher::ParseLink("ANYPS5://game/PPSA01234")->kind == Kind::Select);
+    CHECK(!launcher::ParseLink("anyps5://play/../etc").has_value());
+    CHECK(!launcher::ParseLink("anyps5://delete/PPSA01234").has_value());
+    CHECK(!launcher::ParseLink("https://play/PPSA01234").has_value());
+    const auto args = launcher::ParseArguments({"anyps5-launcher.exe", "--play", "PPSA00001"});
+    CHECK(args.has_value());
+    CHECK_EQ(launcher::LinkFor(*args), std::string("anyps5://play/PPSA00001"));
+    CHECK(launcher::ParseRequest(launcher::FormatRequest(*args)) == args);
+    CHECK(!launcher::ParseArguments({"anyps5-launcher.exe"}).has_value());
+}
+
+TEST(FindsLauncherUpdates) {
+    std::vector<launcher::Release> releases(3);
+    releases[0].tag = "v0.2.0";
+    releases[0].assets.push_back({launcher::LauncherAssetName("v0.2.0"), "https://example/a", 10, ""});
+    releases[1].tag = "v0.3.0";
+    releases[1].prerelease = true;
+    releases[1].assets.push_back({launcher::LauncherAssetName("v0.3.0"), "https://example/b", 10, ""});
+    releases[2].tag = "v0.2.1";  // no Windows zip
+    const auto update = launcher::FindLauncherUpdate(releases, "0.1.0");
+    CHECK(update.has_value());
+    CHECK_EQ(update->release.tag, std::string("v0.2.0"));
+    CHECK(!launcher::FindLauncherUpdate(releases, "0.2.0").has_value());
+    CHECK(!launcher::FindLauncherUpdate(releases, "v0.10.0").has_value());
+}
+
+TEST(SwapsTheLauncherExe) {
+    fixture::TempDir temp;
+    const auto current = temp.Path() / "anyps5-launcher.exe";
+    const auto fresh = temp.Path() / "update" / "v0.2.0" / "files" / "anyps5-launcher.exe";
+    WriteText(current, "old");
+    WriteText(fresh, "new");
+    launcher::SwapLauncherExe(current, fresh);
+    CHECK_EQ(ReadText(current), std::string("new"));
+    CHECK_EQ(ReadText(temp.Path() / "anyps5-launcher.exe.old"), std::string("old"));
+    launcher::CleanUpLauncherUpdate(current, temp.Path());
+    CHECK(!std::filesystem::exists(temp.Path() / "anyps5-launcher.exe.old"));
+    CHECK(!std::filesystem::exists(temp.Path() / "update"));
+}
+
+TEST(VersionPinsAreKept) {
+    fixture::TempDir temp;
+    launcher::VersionStore store;
+    launcher::VersionEntry entry;
+    entry.id = "boykopovar/AnyPS5@v0.1.5";
+    entry.folder = temp.Path() / "boykopovar" / "AnyPS5" / "v0.1.5";
+    store.versions.push_back(entry);
+    store.pins["PPSA01234"] = entry.id;
+    launcher::SaveVersions(temp.Path(), store);
+    auto loaded = launcher::LoadVersions(temp.Path());
+    CHECK_EQ(loaded.pins.at("PPSA01234"), entry.id);
+    launcher::RemoveVersion(temp.Path(), loaded, entry.id);
+    CHECK(loaded.pins.empty());
+}
+
+TEST(SavesSyncThroughAFolder) {
+    fixture::TempDir temp;
+    launcher::JobControl control;
+    const auto sync = temp.Path() / "sync";
+    launcher::Layout pc1{temp.Path() / "pc1", temp.Path() / "lib1", "Player"};
+    launcher::Layout pc2{temp.Path() / "pc2", temp.Path() / "lib2", "Player"};
+    using Action = launcher::SyncResult::Action;
+    const auto setTime = [](const std::filesystem::path& file, int secondsAgo) {
+        std::filesystem::last_write_time(file, std::filesystem::file_time_type::clock::now() - std::chrono::seconds(secondsAgo));
+    };
+
+    // PC 1 plays and pushes.
+    CHECK(launcher::PullSaves(pc1, "PPSA00001", sync, control).action == Action::Nothing);
+    WriteText(pc1.Saves("PPSA00001") / "_sd" / "SAVE0" / "data", "from pc1");
+    setTime(pc1.Saves("PPSA00001") / "_sd" / "SAVE0" / "data", 100);
+    CHECK(launcher::PushSaves(pc1, "PPSA00001", sync, control).action == Action::Pushed);
+    CHECK_EQ(ReadText(launcher::SyncFolderFor(sync, pc1, "PPSA00001") / "_sd" / "SAVE0" / "data"), std::string("from pc1"));
+    CHECK(launcher::PushSaves(pc1, "PPSA00001", sync, control).action == Action::Nothing);
+
+    // PC 2 has an older save of its own: it is backed up, then replaced.
+    WriteText(pc2.Saves("PPSA00001") / "_sd" / "SAVE0" / "data", "old on pc2");
+    setTime(pc2.Saves("PPSA00001") / "_sd" / "SAVE0" / "data", 1000);
+    const auto pulled = launcher::PullSaves(pc2, "PPSA00001", sync, control);
+    CHECK(pulled.action == Action::Pulled);
+    CHECK(pulled.backup.has_value());
+    CHECK_EQ(ReadText(pc2.Saves("PPSA00001") / "_sd" / "SAVE0" / "data"), std::string("from pc1"));
+
+    // PC 2 plays on and pushes; the folder's older copy is backed up first.
+    WriteText(pc2.Saves("PPSA00001") / "_sd" / "SAVE0" / "data", "pc2 later");
+    const auto pushed = launcher::PushSaves(pc2, "PPSA00001", sync, control);
+    CHECK(pushed.action == Action::Pushed);
+    CHECK(pushed.backup.has_value());
+    // PC 1 gets it back.
+    CHECK(launcher::PullSaves(pc1, "PPSA00001", sync, control).action == Action::Pulled);
+    CHECK_EQ(ReadText(pc1.Saves("PPSA00001") / "_sd" / "SAVE0" / "data"), std::string("pc2 later"));
+}

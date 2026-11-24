@@ -37,6 +37,19 @@ bool ProcessRunning(const wchar_t* exeName);
 // "Windows 11 Pro 24H2 (build 26100)" from the registry, into text.
 void WindowsVersion(wchar_t* text, unsigned long capacity);
 
+// Points scheme:// links at exePath for this user (HKCU\Software\Classes\<scheme>),
+// unless they already open it. No administrator rights needed.
+unsigned long RegisterUrlScheme(const wchar_t* scheme, const wchar_t* description, const wchar_t* exePath);
+
+// Holds a named mutex for the life of the process; false when another process already does.
+bool FirstInstance(const wchar_t* name);
+
+// Brings the top-level window with this exact title to the front, restoring it if minimized.
+void ShowWindowTitled(const wchar_t* title);
+
+// The running exe's full path.
+void ExePath(wchar_t* path, unsigned long capacity);
+
 // Opens a folder in Explorer.
 unsigned long OpenFolder(const wchar_t* path);
 

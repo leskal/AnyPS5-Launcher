@@ -42,7 +42,10 @@
 #include "core/Modules.hpp"
 #include "core/PatchInfo.hpp"
 #include "core/Profiles.hpp"
+#include "core/LaunchLinks.hpp"
 #include "core/SaveBackup.hpp"
+#include "core/SaveSync.hpp"
+#include "core/SelfUpdate.hpp"
 #include "core/Scanner.hpp"
 #include "core/Session.hpp"
 #include "core/Settings.hpp"
@@ -251,7 +254,7 @@ bool Segmented(const char* id, const char* const* labels, int count, int& curren
     return changed;
 }
 
-enum class TopIcon { Versions, Rescan, Settings };
+enum class TopIcon { Versions, Rescan, Settings, Grid, Home };
 
 // A round icon button for the top bar, the icon drawn in code. Returns true when pressed.
 bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled, bool spinning = false) {
@@ -303,6 +306,24 @@ bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled
         const float head = r * 0.55f;
         draw->AddTriangleFilled(ImVec2(tip.x + along.x * head * 0.8f, tip.y + along.y * head * 0.8f), ImVec2(tip.x + out.x * head * 0.6f, tip.y + out.y * head * 0.6f),
                                 ImVec2(tip.x - out.x * head * 0.6f, tip.y - out.y * head * 0.6f), ink);
+        break;
+    }
+    case TopIcon::Grid: {
+        // Four squares.
+        const float k = r * 0.9f;
+        const float g = r * 0.22f;
+        for (int i = 0; i < 4; ++i) {
+            const float x = (i % 2 == 0) ? c.x - k : c.x + g;
+            const float y = (i < 2) ? c.y - k : c.y + g;
+            draw->AddRectFilled(ImVec2(x, y), ImVec2(x + k - g, y + k - g), ink, 2.0f * scale);
+        }
+        break;
+    }
+    case TopIcon::Home: {
+        // One big tile with two small ones beside it.
+        draw->AddRectFilled(ImVec2(c.x - r * 1.1f, c.y - r * 0.75f), ImVec2(c.x + r * 0.15f, c.y + r * 0.75f), ink, 2.5f * scale);
+        draw->AddRectFilled(ImVec2(c.x + r * 0.4f, c.y - r * 0.1f), ImVec2(c.x + r * 0.8f, c.y + r * 0.3f), ink, 1.5f * scale);
+        draw->AddRectFilled(ImVec2(c.x + r * 0.95f, c.y - r * 0.1f), ImVec2(c.x + r * 1.35f, c.y + r * 0.3f), ink, 1.5f * scale);
         break;
     }
     case TopIcon::Versions: {
@@ -469,9 +490,7 @@ ImVec4 GradeColor(TrophyGrade grade) {
 }
 
 // A trophy cup in the grade's colour, size by size, at the cursor. Hovering it names the grade.
-void TrophyIcon(TrophyGrade grade, float size) {
-    const ImVec2 at = ImGui::GetCursorScreenPos();
-    auto* draw = ImGui::GetWindowDrawList();
+void DrawTrophyCup(ImDrawList* draw, ImVec2 at, TrophyGrade grade, float size) {
     const ImU32 color = ImGui::GetColorU32(GradeColor(grade));
     const auto point = [&](float x, float y) { return ImVec2(at.x + x * size, at.y + y * size); };
     // Handles, then the bowl over them, the stem and a two-step base.
@@ -483,6 +502,10 @@ void TrophyIcon(TrophyGrade grade, float size) {
     draw->AddRectFilled(point(0.24f, 0.80f), point(0.76f, 0.93f), color, size * 0.03f);
     // A soft shine on the bowl.
     draw->AddRectFilled(point(0.33f, 0.12f), point(0.40f, 0.36f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.35f)), size * 0.035f);
+}
+
+void TrophyIcon(TrophyGrade grade, float size) {
+    DrawTrophyCup(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), grade, size);
     ImGui::Dummy(ImVec2(size, size));
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TrophyGradeName(grade));
 }
@@ -652,6 +675,7 @@ private:
                                    SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_UTILITY | SDL_WINDOW_NOT_FOCUSABLE | SDL_WINDOW_HIDDEN |
                                        SDL_WINDOW_HIGH_PIXEL_DENSITY);
         if (window_ != nullptr) renderer_ = SDL_CreateRenderer(window_, nullptr);
+        if (renderer_ != nullptr) SDL_SetRenderTextureAddressMode(renderer_, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
         if (window_ == nullptr || renderer_ == nullptr) {
             failed_ = true;
             Close();
@@ -884,7 +908,14 @@ public:
         AdoptConfiguredFolder();
         ApplySettings();
         ApplyCurrentTheme();
-        if (!loaded.existed || settings_.gamesFolder.empty()) OpenSettings();
+        CleanUpLauncherUpdate(LauncherExe(), launcherFolder_);
+#ifdef _WIN32
+        // anyps5://play/<title ID> and anyps5://game/<title ID> open this launcher (this user only).
+        win::RegisterUrlScheme(L"anyps5", L"URL:AnyPS5 Launcher", LauncherExe().c_str());
+#endif
+        if (settings_.checkUpdates) CheckLauncherUpdate();
+        if (!loaded.existed) OpenSetup();
+        else if (settings_.gamesFolder.empty()) OpenSettings();
         else StartScan();
     }
 
@@ -983,6 +1014,35 @@ public:
             }
             message_ = Message{outcome->succeeded ? Green : outcome->cancelled ? Amber : Red, outcome->title, outcome->message};
             jobSerial_.clear();
+            if (!settingsSerial_.empty()) RefreshGameFacts();  // a backup or restore may have just ended
+            if (restartAfterUpdate_) {
+                restartAfterUpdate_ = false;
+                if (outcome->succeeded) RestartLauncher();
+            }
+            // A game waiting for its saves: start it now, synced or not (the message says which).
+            if (!pendingPlay_.empty()) {
+                const auto location = pendingPlay_;
+                pendingPlay_.clear();
+                for (const auto& game : result_.games) {
+                    if (ToUtf8(game.location) == location && PlayBlocker(game).empty()) StartGame(game);
+                }
+            }
+        }
+        // Reinstall all: one game after another.
+        if (!job_.Busy() && !reinstallQueue_.empty() && !session_) {
+            const auto location = reinstallQueue_.front();
+            reinstallQueue_.erase(reinstallQueue_.begin());
+            for (const auto& game : result_.games) {
+                if (ToUtf8(game.location) == location && InstallBlocker(game).empty()) StartInstall(game);
+            }
+        }
+        HandleRequests();
+        if (auto list = launcherReleases_.Take()) {
+#ifdef LAUNCHER_VERSION
+            if (list->error.empty()) launcherUpdate_ = FindLauncherUpdate(list->releases, LAUNCHER_VERSION);
+#endif
+            launcherCheckError_ = list->error;
+            launcherChecked_ = true;
         }
         if (session_ && !session_->Running()) FinishSession();
         if (rescanWanted_ && !scan_.Running()) {
@@ -995,8 +1055,10 @@ public:
         ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::Begin("Games", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
         DrawTopBar();
-        DrawLibrary();
+        if (settings_.view == "home") DrawHome();
+        else DrawLibrary();
         DrawFooter();
+        DrawSetup();
         DrawNewProfile();
         DrawEditProfile();
         // Options on a controller opens Settings when nothing else is open.
@@ -1107,9 +1169,46 @@ private:
         });
     }
 
+    // The AnyPS5 version a game uses: the one it's pinned to, else the selected one.
+    const AnyPS5State& StateFor(const std::string& serial) const {
+        const auto pin = versions_.pins.find(serial);
+        if (pin == versions_.pins.end() || pin->second == settings_.anyps5Version) return anyps5_;
+        const auto* entry = FindVersion(versions_, pin->second);
+        if (entry == nullptr) return anyps5_;
+        auto found = pinnedStates_.find(pin->second);
+        if (found == pinnedStates_.end()) {
+            // Read once (relinker --version and titles.json), then kept.
+            found = pinnedStates_.emplace(pin->second, LoadAnyPS5(ToUtf8(entry->folder), layout_.library / "logs" / "relinker-version.txt")).first;
+        }
+        return found->second;
+    }
+
     const TitleEntry* TitleFor(const std::string& serial) const {
-        const auto found = anyps5_.titles.find(serial);
-        return found == anyps5_.titles.end() ? nullptr : &found->second;
+        const auto& state = StateFor(serial);
+        const auto found = state.titles.find(serial);
+        return found == state.titles.end() ? nullptr : &found->second;
+    }
+
+    std::string VersionLabelFor(const std::string& serial) {
+        const auto pin = versions_.pins.find(serial);
+        if (pin == versions_.pins.end()) return CurrentVersionLabel();
+        const auto* entry = FindVersion(versions_, pin->second);
+        return entry != nullptr ? entry->Label() + " (pinned)" : CurrentVersionLabel();
+    }
+
+    // Installed games whose relinker isn't the one they'd use now.
+    std::vector<const GameEntry*> GamesToReinstall() {
+        std::vector<const GameEntry*> games;
+        for (const auto& game : result_.games) {
+            if (const auto* manifest = InstallFor(game); manifest != nullptr && !ReinstallReason(game, *manifest, StateFor(game.metadata.titleId).version).empty()) {
+                games.push_back(&game);
+            }
+        }
+        return games;
+    }
+
+    void ReinstallAll() {
+        for (const auto* game : GamesToReinstall()) reinstallQueue_.push_back(ToUtf8(game->location));
     }
 
     const InstallManifest* InstallFor(const GameEntry& game) const {
@@ -1127,7 +1226,8 @@ private:
         if (job_.Busy()) return "Another task is running";
         if (IsRunning(game)) return "Stop the game first";
         if (anyps5Pending_ || anyps5Loader_.Running()) return "Still checking the AnyPS5 folder";
-        if (!anyps5_.probe.runtime) return "AnyPS5: " + anyps5_.probe.problem;
+        const auto& state = StateFor(game.metadata.titleId);
+        if (!state.probe.runtime) return "AnyPS5: " + state.probe.problem;
         if (game.format == PackageFormat::Zar && game.layout == ZarLayout::Nested) return "This .zar keeps the game inside a folder: convert it to a folder first";
         if (game.executable.kind == ExecutableKind::Missing) return "eboot.bin is missing";
         const bool usableEboot = game.unwrapped && game.unwrapped->kind == ExecutableKind::Elf;
@@ -1148,13 +1248,15 @@ private:
     }
 
     void StartInstall(const GameEntry& game) {
-        const auto& runtime = *anyps5_.probe.runtime;
+        const auto& state = StateFor(game.metadata.titleId);
+        if (!state.probe.runtime) return;
+        const auto& runtime = *state.probe.runtime;
         const auto* title = TitleFor(game.metadata.titleId);
         std::optional<TitleEntry> titleCopy;
         if (title != nullptr) titleCopy = *title;
         jobSerial_ = game.metadata.titleId;
         job_.Start("Install " + game.metadata.name, true,
-                   [game, runtime, layout = layout_, titleCopy, version = anyps5_.version](JobControl& control) {
+                   [game, runtime, layout = layout_, titleCopy, version = state.version](JobControl& control) {
                        const auto manifest = InstallGame({game, runtime, layout, titleCopy ? &*titleCopy : nullptr, version, TargetIsWindows, HostIsIntel()}, RunToFile, control);
                        std::string text = "Converted with AnyPS5";
                        if (!manifest.relinkerVersion.empty()) text += " " + manifest.relinkerVersion;
@@ -1183,7 +1285,27 @@ private:
         });
     }
 
+    // Starts a game; with save sync on, newer saves from the sync folder come in first.
     void Play(const GameEntry& game) {
+        if (!settings_.syncFolder.empty() && !job_.Busy() && !session_) {
+            const auto layout = layout_;
+            const auto serial = game.metadata.titleId;
+            const auto root = FromUtf8(settings_.syncFolder);
+            pendingPlay_ = ToUtf8(game.location);
+            jobSerial_ = serial;
+            job_.Start("Sync saves: " + game.metadata.name, false, [layout, serial, root](JobControl& control) {
+                const auto result = PullSaves(layout, serial, root, control);
+                if (result.action == SyncResult::Action::Pulled) {
+                    return std::string("Newer saves came in from the sync folder") + (result.backup ? "; the ones here are kept in " + ToUtf8(result.backup->filename()) : std::string());
+                }
+                return std::string("Saves are up to date");
+            });
+            return;
+        }
+        StartGame(game);
+    }
+
+    void StartGame(const GameEntry& game) {
         try {
             auto plan = PrepareRun(game, layout_, profileSettings_, TitleFor(game.metadata.titleId), LoadGameSettings(layout_.GameSettingsFile(game.metadata.titleId)));
             session_ = std::make_unique<GameSession>(game.metadata.titleId, game.metadata.name, std::move(plan));
@@ -1206,7 +1328,7 @@ private:
             session_.reset();
             return;
         }
-        const auto& serial = session_->TitleId();
+        const std::string serial = session_->TitleId();  // a copy: session_ goes away below
         diagnoses_[serial] = DiagnoseRun(report, ReadLogTail(session_->Plan().logFile, 128 * 1024), session_->ExitCode(), session_->StopRequested());
         launching_ = false;
         if (minimizedForGame_) {
@@ -1218,6 +1340,7 @@ private:
             message_ = Message{Red, session_->Name(), diagnosis.headline + (diagnosis.detail.empty() ? std::string() : ": " + diagnosis.detail)};
             session_.reset();
             trophyAsked_.clear();
+            PushAfterRun(serial);
             return;
         }
         if (report) {
@@ -1232,6 +1355,19 @@ private:
         }
         session_.reset();
         trophyAsked_.clear();  // the run may have earned some
+        PushAfterRun(serial);
+    }
+
+    // With save sync on, this PC's newer saves go to the sync folder after a run.
+    void PushAfterRun(const std::string& serial) {
+        if (settings_.syncFolder.empty() || job_.Busy()) return;
+        const auto layout = layout_;
+        const auto root = FromUtf8(settings_.syncFolder);
+        job_.Start("Sync saves: " + serial, false, [layout, serial, root](JobControl& control) {
+            const auto result = PushSaves(layout, serial, root, control);
+            if (result.action == SyncResult::Action::Pushed) return std::string("Saves sent to the sync folder");
+            return std::string("The sync folder already has these saves");
+        });
     }
 
     void StartConvertSelf(const GameEntry& game) {
@@ -1525,7 +1661,7 @@ private:
 
         DrawProfileSelector();
         // The search box takes the room left before the buttons, and its own row when there's too little.
-        const float buttons = ImGui::GetFrameHeight() * 1.2f * 3 + style.ItemSpacing.x * 2;
+        const float buttons = ImGui::GetFrameHeight() * 1.2f * 4 + style.ItemSpacing.x * 3;
         ImGui::SameLine();
         const float room = ImGui::GetContentRegionMax().x - buttons - ImGui::GetCursorPosX() - style.ItemSpacing.x;
         const bool searchInline = room >= ImGui::GetFontSize() * 7;
@@ -1538,6 +1674,18 @@ private:
         // The icons sit a little lower so their centres line up with the search box.
         const float iconY = ImGui::GetCursorPosY() - (ImGui::GetFrameHeight() * 1.2f - ImGui::GetFrameHeight()) * 0.5f;
         ImGui::SetCursorPosY(iconY);
+        {
+            const bool home = settings_.view == "home";
+            if (IconButton("view", home ? TopIcon::Grid : TopIcon::Home, home ? "Show the games as a grid" : "Show the games as a row, the selected one large", false)) {
+                settings_.view = home ? "grid" : "home";
+                try {
+                    SaveSettings(settingsFile_, settings_);
+                } catch (const std::exception&) {
+                }
+            }
+            ImGui::SameLine();
+            ImGui::SetCursorPosY(iconY);
+        }
         if (IconButton("versions", TopIcon::Versions, session_ != nullptr ? "AnyPS5 versions (not while a game runs)" : "AnyPS5 versions", session_ != nullptr)) OpenVersions();
         ImGui::SameLine();
         ImGui::SetCursorPosY(iconY);
@@ -1587,6 +1735,24 @@ private:
                 ImGui::EndPopup();
             }
         }
+        if (const auto outdated = GamesToReinstall(); !outdated.empty()) {
+            ImGui::SameLine();
+            const std::string label = std::to_string(outdated.size()) + (outdated.size() == 1 ? " game to reinstall" : " games to reinstall");
+            Pill(label.c_str(), Amber);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Converted with another AnyPS5 than the one they use now. Click to reinstall them one after another.");
+            if (ImGui::IsItemClicked() && !job_.Busy() && !session_ && reinstallQueue_.empty()) ReinstallAll();
+        }
+        if (!reinstallQueue_.empty()) {
+            ImGui::SameLine();
+            Pill((std::to_string(reinstallQueue_.size()) + " more to reinstall").c_str(), Dim);
+        }
+        if (launcherUpdate_) {
+            ImGui::SameLine();
+            const std::string label = "Launcher " + launcherUpdate_->release.tag;
+            Pill(label.c_str(), Green);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("A newer launcher is out. Click to update; it restarts by itself.");
+            if (ImGui::IsItemClicked()) StartLauncherUpdate();
+        }
         ImGui::SameLine();
         ImGui::TextColored(Dim, "%s", settings_.gamesFolder.empty() ? "No games folder set" : settings_.gamesFolder.c_str());
         if (!settingsError_.empty()) ImGui::TextColored(Red, "Settings: %s", settingsError_.c_str());
@@ -1611,7 +1777,7 @@ private:
         if (IsRunning(game)) return {"Running", Accent};
         if (jobSerial_ == game.metadata.titleId && job_.Busy()) return {"Working...", Amber};
         if (const auto* manifest = InstallFor(game)) {
-            if (!ReinstallReason(game, *manifest, anyps5_.version).empty()) return {"Reinstall", Amber};
+            if (!ReinstallReason(game, *manifest, StateFor(game.metadata.titleId).version).empty()) return {"Reinstall", Amber};
             return {"Installed", Green};
         }
         if (game.executable.kind == ExecutableKind::ElfEncrypted) return {"Encrypted", Red};
@@ -1877,6 +2043,467 @@ private:
         }
     }
 
+
+    // ---- first start ------------------------------------------------------------------
+
+    void OpenSetup() {
+        draft_ = settings_;
+        setupStep_ = 0;
+        setupProfile_ = layout_.profile.empty() ? std::string(DefaultProfileName) : layout_.profile;
+        setupError_.clear();
+        missingAsked_ = true;  // the setup has its own AnyPS5 step
+        openSetup_ = true;
+    }
+
+    // Big step dots at the top of the setup.
+    void SetupDots(int steps) {
+        const float r = 5.0f * scale_;
+        const float gap = 14.0f * scale_;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        auto* draw = ImGui::GetWindowDrawList();
+        for (int i = 0; i < steps; ++i) {
+            const ImVec2 c(at.x + r + static_cast<float>(i) * (r * 2 + gap), at.y + r);
+            if (i == setupStep_) draw->AddRectFilled(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r * 3, c.y + r), ImGui::GetColorU32(Accent), r);
+            else draw->AddCircleFilled(c, r, ImGui::GetColorU32(i < setupStep_ ? Accent : Fade(Dim, 0.5f)));
+        }
+        ImGui::Dummy(ImVec2(static_cast<float>(steps) * (r * 2 + gap) + r * 2, r * 2));
+    }
+
+    void DrawSetup() {
+        if (openSetup_) {
+            ImGui::OpenPopup("Welcome");
+            openSetup_ = false;
+        }
+        FollowWindow(0.62f, 0.72f);
+        if (!BeginDialog("Welcome")) return;
+        const auto& style = ImGui::GetStyle();
+        constexpr int Steps = 4;
+        SetupDots(Steps);
+        ImGui::Spacing();
+        const float footer = ImGui::GetFrameHeight() * 1.3f + style.ItemSpacing.y * 3 + ImGui::GetTextLineHeightWithSpacing();
+        ImGui::BeginChild("setup-body", ImVec2(0, -footer));
+        const auto title = [&](const char* text, const char* note) {
+            ImGui::PushFont(nullptr, style.FontSizeBase * 1.7f);
+            ImGui::TextUnformatted(text);
+            ImGui::PopFont();
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(Dim, "%s", note);
+            ImGui::PopTextWrapPos();
+            ImGui::Spacing();
+            ImGui::Spacing();
+        };
+        bool canGoOn = true;
+        if (setupStep_ == 0) {
+            title("Welcome to AnyPS5 Launcher", "It finds your PS5 game dumps, converts them with AnyPS5, starts them, and keeps saves, trophies and controls per profile. Four quick steps.");
+            ImGui::TextUnformatted("Appearance");
+            int current = draft_.theme == "dark" ? 1 : draft_.theme == "light" ? 2 : 0;
+            const char* labels[] = {"Follow Windows", "Dark", "Light"};
+            if (Segmented("setup-theme", labels, 3, current)) {
+                draft_.theme = current == 1 ? "dark" : current == 2 ? "light" : "system";
+                auto& imguiStyle = ImGui::GetStyle();
+                ApplyTheme(imguiStyle, WantDark(draft_.theme));
+                imguiStyle.ScaleAllSizes(scale_);
+                imguiStyle.FontScaleDpi = scale_;
+            }
+            ImGui::Spacing();
+            ImGui::TextUnformatted("Library view");
+            int view = draft_.view == "home" ? 1 : 0;
+            const char* views[] = {"Grid", "Home row"};
+            if (Segmented("setup-view", views, 2, view)) draft_.view = view == 1 ? "home" : "grid";
+        } else if (setupStep_ == 1) {
+            title("Your games", "The folder with your game dumps: game folders and .zar archives, in it or in its subfolders. Nothing is copied; .zar files stay as they are.");
+            FolderField("Games folder", nullptr, "##setup-games", "e.g. D:\\Games\\PS5", draft_.gamesFolder);
+            canGoOn = !draft_.gamesFolder.empty();
+            if (!canGoOn) ImGui::TextColored(Dim, "Choose one to go on.");
+        } else if (setupStep_ == 2) {
+            title("AnyPS5", "The relinker that converts games and the libraries they run on. Download the official release, or use a build of your own; you can add more later under AnyPS5 versions.");
+            const bool busy = job_.Busy() || releasesLoader_.Running();
+            if (anyps5_.probe.runtime) {
+                ImGui::TextColored(Green, "Ready: AnyPS5 %s", CurrentVersionLabel().c_str());
+            } else if (busy) {
+                ImGui::TextColored(Amber, "%s", job_.Busy() ? job_.Title().c_str() : "Looking up the latest release...");
+            } else {
+                ImGui::TextColored(Dim, "No AnyPS5 yet.");
+            }
+            ImGui::Spacing();
+            ImGui::BeginDisabled(busy);
+            if (PrimaryButton("Download the latest official release")) LoadReleases(OfficialRepository, true);
+            ImGui::SameLine();
+            ImGui::BeginDisabled(Picker().IsOpen());
+            if (ImGui::Button("Use my own build...")) Picker().Open(window_, &localPick_);
+            ImGui::EndDisabled();
+            ImGui::EndDisabled();
+            if (job_.Busy()) {
+                const auto& control = job_.Control();
+                const float fraction = control.Total() == 0 ? 0.0f : static_cast<float>(control.Done()) / static_cast<float>(control.Total());
+                ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0));
+            }
+            ImGui::TextColored(Dim, "%s", "You can skip this and do it later.");
+        } else {
+            title("Your profile", "A profile keeps its own saves, trophies, controls, screenshots and console language. Add more later from the profile button.");
+            const float avatar = ImGui::GetFontSize() * 3.6f;
+            DrawProfileAvatar(setupProfile_.empty() ? std::string("?") : setupProfile_, ImGui::GetCursorScreenPos(), avatar);
+            ImGui::Dummy(ImVec2(avatar, avatar));
+            ImGui::SameLine(0, 16.0f * scale_);
+            ImGui::BeginGroup();
+            ImGui::TextUnformatted("Name");
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 18);
+            ImGui::InputText("##setup-profile", &setupProfile_);
+            ImGui::EndGroup();
+            canGoOn = IsValidProfileName(setupProfile_);
+            if (!canGoOn) ImGui::TextColored(Red, "Use a name that can be a folder name (no \\ / : * ? \" < > |)");
+        }
+        ImGui::EndChild();
+
+        if (!setupError_.empty()) ImGui::TextColored(Red, "%s", Elide(setupError_, ImGui::GetContentRegionAvail().x).c_str());
+        else ImGui::TextColored(Dim, "Step %d of %d", setupStep_ + 1, Steps);
+        ImGui::Spacing();
+        const float buttonWidth = ImGui::GetFontSize() * 6.5f;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+        if (setupStep_ > 0 && ImGui::Button("Back", ImVec2(buttonWidth, buttonHeight))) --setupStep_;
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonWidth);
+        ImGui::BeginDisabled(!canGoOn || Picker().IsOpen());
+        const bool last = setupStep_ == Steps - 1;
+        if (PrimaryButton(last ? "Start" : "Next", ImVec2(buttonWidth, buttonHeight))) {
+            if (!last) {
+                ++setupStep_;
+            } else {
+                try {
+                    draft_.anyps5Folder = settings_.anyps5Folder;  // chosen in step 3 meanwhile
+                    draft_.anyps5Version = settings_.anyps5Version;
+                    settings_ = draft_;
+                    ApplySettings();
+                    if (setupProfile_ != layout_.profile) {
+                        const bool fresh = profiles_.size() <= 1;
+                        if (fresh && std::find(profiles_.begin(), profiles_.end(), layout_.profile) != profiles_.end()) {
+                            RenameProfile(layout_, setupProfile_);
+                        }
+                        layout_.profile = setupProfile_;
+                    }
+                    CreateProfile(layout_);
+                    settings_.profile = layout_.profile;
+                    SaveSettings(settingsFile_, settings_);
+                    profiles_ = ListProfiles(layout_.userdata);
+                    LoadCurrentProfile();
+                    ApplyCurrentTheme();
+                    StartScan();
+                    ImGui::CloseCurrentPopup();
+                } catch (const std::exception& failure) {
+                    setupError_ = ReadableText(failure.what());
+                }
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::EndPopup();
+    }
+
+    // ---- home view: a row of tiles, the selected one large ---------------------------
+
+    void DrawHome() {
+        const auto& style = ImGui::GetStyle();
+        const float height = -FooterHeight();
+        ImGui::BeginChild("home", ImVec2(0, height), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+        const ImVec2 origin = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        auto* draw = ImGui::GetWindowDrawList();
+        const auto* selected = SelectedGame();
+        if (selected == nullptr && !result_.games.empty()) {
+            selected_ = ToUtf8(result_.games.front().location);
+            selected = SelectedGame();
+        }
+        // The selected game's artwork fills the view, fading into the window colour.
+        if (selected != nullptr) {
+            const auto art = art_.find(GameKey(*selected));
+            if (art != art_.end() && !art->second.empty()) {
+                if (auto* texture = icons_->Get(selected->location / "pic0.png", art->second)) {
+                    float w = 0;
+                    float h = 0;
+                    SDL_GetTextureSize(texture, &w, &h);
+                    const float aspect = size.x / size.y;
+                    ImVec2 uv0(0, 0);
+                    ImVec2 uv1(1, 1);
+                    if (w / h > aspect) {
+                        const float cut = (1.0f - aspect * h / w) * 0.5f;
+                        uv0.x = cut;
+                        uv1.x = 1.0f - cut;
+                    } else {
+                        const float cut = (1.0f - w / (aspect * h)) * 0.5f;
+                        uv0.y = cut;
+                        uv1.y = 1.0f - cut;
+                    }
+                    const bool dark = WantDark(settings_.theme);
+                    draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), origin, ImVec2(origin.x + size.x, origin.y + size.y), uv0, uv1,
+                                          ImGui::GetColorU32(ImVec4(1, 1, 1, dark ? 0.55f : 0.45f)), 12.0f * scale_);
+                    // Darker to the left and toward the bottom, where the text is; no hard edges.
+                    const ImU32 clear = ImGui::GetColorU32(Fade(WindowColor, 0.0f));
+                    const ImU32 half = ImGui::GetColorU32(Fade(WindowColor, 0.55f));
+                    const ImU32 solid = ImGui::GetColorU32(Fade(WindowColor, 0.92f));
+                    const ImVec2 end(origin.x + size.x, origin.y + size.y);
+                    draw->AddRectFilledMultiColor(origin, end, solid, clear, clear, solid);
+                    draw->AddRectFilledMultiColor(origin, end, clear, clear, half, half);
+                }
+            }
+        }
+
+        // The row: small tiles, the selected one larger with its name under it.
+        const float small = std::clamp(size.y * 0.16f, 64.0f * scale_, 120.0f * scale_);
+        const float large = small * 1.55f;
+        const float gap = 14.0f * scale_;
+        const float halo = 14.0f * scale_;  // room for the selected game's glow, so the row does not cut it off
+        ImGui::SetCursorPos(ImVec2(style.WindowPadding.x + 8.0f * scale_ - halo, 16.0f * scale_ - halo));
+        ImGui::BeginChild("home-row", ImVec2(0, large + ImGui::GetTextLineHeightWithSpacing() * 1.5f + halo), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::SetCursorPos(ImVec2(halo, halo));
+        int index = 0;
+        for (const auto& game : result_.games) {
+            if (!ContainsFolded(game.metadata.name, search_) && !ContainsFolded(game.metadata.titleId, search_)) continue;
+            const auto key = ToUtf8(game.location);
+            const bool isSelected = key == selected_;
+            const float tile = isSelected ? large : small;
+            if (index++ > 0) ImGui::SameLine(0, gap);
+            ImGui::PushID(key.c_str());
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton("tile", ImVec2(tile, large));
+            if (ImGui::IsItemClicked()) selected_ = key;
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ActivateGame(game);
+            if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible) {
+                if (selected_ != key) selected_ = key;
+                if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown, false) || ImGui::IsKeyPressed(ImGuiKey_Enter, false)) ActivateGame(game);
+                if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) ImGui::OpenPopup("actions");
+            }
+            if (isSelected && ImGui::IsWindowAppearing()) ImGui::SetScrollHereX(0.3f);
+            if (ImGui::BeginPopupContextItem("actions")) {
+                DrawActionItems(game);
+                ImGui::EndPopup();
+            }
+            auto* rowDraw = ImGui::GetWindowDrawList();
+            const ImVec2 top(at.x, at.y + (large - tile));
+            const float rounding = (isSelected ? 14.0f : 10.0f) * scale_;
+            if (isSelected) {
+                // A soft glow marks the selected game instead of a ring, which read as a stray line around the icon.
+                for (int ring = 6; ring >= 1; --ring) {
+                    const float grow = static_cast<float>(ring) * 2.0f * scale_;
+                    rowDraw->AddRectFilled(ImVec2(top.x - grow, top.y - grow), ImVec2(top.x + tile + grow, top.y + tile + grow), ImGui::GetColorU32(Fade(Accent, 0.07f)), rounding + grow);
+                }
+            }
+            if (auto* texture = icons_->Get(game.location, game.icon)) {
+                rowDraw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), top, ImVec2(top.x + tile, top.y + tile), ImVec2(0, 0), ImVec2(1, 1),
+                                         IM_COL32_WHITE, rounding);
+            } else {
+                rowDraw->AddRectFilled(top, ImVec2(top.x + tile, top.y + tile), ImGui::GetColorU32(Placeholder), rounding);
+            }
+            const auto badge = BadgeFor(game);
+            if (badge.text != nullptr && !isSelected) rowDraw->AddCircleFilled(ImVec2(top.x + tile - 9 * scale_, top.y + 9 * scale_), 5 * scale_, ImGui::GetColorU32(badge.color));
+            ImGui::PopID();
+        }
+        if (index == 0) ImGui::TextColored(Dim, "%s", scanned_ ? "No games found. Choose the games folder in Settings." : "Looking for games...");
+        ImGui::EndChild();
+
+        // The selected game: name, facts and what to do.
+        if (selected != nullptr) {
+            ImGui::SetCursorPosX(style.WindowPadding.x + 16.0f * scale_);
+            ImGui::BeginGroup();
+            ImGui::PushFont(nullptr, style.FontSizeBase * 2.4f);
+            ImGui::TextUnformatted(selected->metadata.name.c_str());
+            ImGui::PopFont();
+            bool loading = false;
+            const auto* set = TrophiesOf(*selected, loading);
+            std::string facts = selected->metadata.titleId + "  \xC2\xB7  v" + selected->metadata.contentVersion + "  \xC2\xB7  " + std::string(ToString(selected->format));
+            const auto region = RegionOf(selected->metadata.contentId);
+            if (!region.empty()) facts += "  \xC2\xB7  " + region;
+            ImGui::TextColored(Dim, "%s", facts.c_str());
+            const auto badge = BadgeFor(*selected);
+            if (badge.text != nullptr) Pill(badge.text, badge.color);
+            ImGui::Spacing();
+            ImGui::Spacing();
+            const float button = ImGui::GetFrameHeight() * 1.5f;
+            const auto* manifest = InstallFor(*selected);
+            if (IsRunning(*selected)) {
+                if (PrimaryButton("Stop", ImVec2(ImGui::GetFontSize() * 9, button))) session_->Stop();
+            } else if (manifest != nullptr) {
+                const auto reason = PlayBlocker(*selected);
+                ImGui::BeginDisabled(!reason.empty());
+                if (PrimaryButton("Play", ImVec2(ImGui::GetFontSize() * 9, button))) Play(*selected);
+                ImGui::EndDisabled();
+                if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+            } else {
+                const auto reason = InstallBlocker(*selected);
+                ImGui::BeginDisabled(!reason.empty());
+                if (PrimaryButton("Install", ImVec2(ImGui::GetFontSize() * 9, button))) StartInstall(*selected);
+                ImGui::EndDisabled();
+                if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+            }
+            ImGui::SameLine();
+            const std::string trophies = set != nullptr ? std::to_string(set->Count().earned) + "/" + std::to_string(set->Count().total) : std::string("Trophies");
+            const ImVec2 cupAt = ImGui::GetCursorScreenPos();
+            if (ImGui::Button(("     " + trophies + "##home-trophies").c_str(), ImVec2(0, button))) OpenTrophies();
+            {
+                // A cup inside the button, before the count.
+                const float cup = ImGui::GetFontSize() * 1.1f;
+                DrawTrophyCup(ImGui::GetWindowDrawList(), ImVec2(cupAt.x + style.FramePadding.x, cupAt.y + (button - cup) * 0.5f), TrophyGrade::Gold, cup);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Controls", ImVec2(0, button))) OpenControls(*selected);
+            ImGui::SameLine();
+            if (ImGui::Button("Game settings", ImVec2(0, button))) OpenGameSettings(*selected);
+            ImGui::SameLine();
+            if (ImGui::Button("Screenshots", ImVec2(0, button))) OpenScreenshots(*selected);
+            ImGui::SameLine();
+            if (ImGui::Button("...", ImVec2(button, button))) ImGui::OpenPopup("home-actions");
+            if (ImGui::BeginPopup("home-actions")) {
+                DrawActionItems(*selected);
+                ImGui::EndPopup();
+            }
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(size.x * 0.6f);
+            DrawStatus(*selected);
+            ImGui::PopTextWrapPos();
+            ImGui::EndGroup();
+        }
+        ImGui::EndChild();
+    }
+
+    // ---- links, requests from a second launcher, self-update, issues -----------------
+
+public:
+    bool QuitRequested() const { return quitRequested_; }
+
+    void SetStartRequest(std::optional<LaunchRequest> request) { pendingRequest_ = std::move(request); }
+
+private:
+    std::filesystem::path RequestFile() const { return launcherFolder_ / "anyps5-launcher.request"; }
+
+    // A link opened while the launcher runs reaches it through a small file the
+    // second launcher writes (it then exits); checked twice a second.
+    void HandleRequests() {
+        const Uint64 now = SDL_GetTicks();
+        if (now >= nextRequestCheck_) {
+            nextRequestCheck_ = now + 500;
+            std::error_code error;
+            if (std::filesystem::exists(RequestFile(), error)) {
+                std::ifstream stream(RequestFile(), std::ios::binary);
+                std::string line;
+                std::getline(stream, line);
+                stream.close();
+                std::filesystem::remove(RequestFile(), error);
+                if (auto request = ParseRequest(line)) pendingRequest_ = request;
+            }
+        }
+        if (!pendingRequest_ || !scanned_) return;
+        const auto request = *pendingRequest_;
+        pendingRequest_.reset();
+        const GameEntry* found = nullptr;
+        for (const auto& game : result_.games) {
+            if (game.metadata.titleId != request.titleId) continue;
+            if (found == nullptr || (InstallFor(*found) == nullptr && InstallFor(game) != nullptr)) found = &game;  // the installed copy first
+        }
+        if (found == nullptr) {
+            message_ = Message{Amber, "Link", request.titleId + " isn't in the games folder"};
+            return;
+        }
+        selected_ = ToUtf8(found->location);
+        if (request.kind == LaunchRequest::Kind::Play && !session_) {
+            if (const auto reason = PlayBlocker(*found); reason.empty()) Play(*found);
+            else message_ = Message{Amber, "Can't play " + found->metadata.name, reason};
+        }
+    }
+
+    void CopyLink(const GameEntry& game, LaunchRequest::Kind kind) {
+        const auto link = LinkFor({kind, game.metadata.titleId});
+        SDL_SetClipboardText(link.c_str());
+        message_ = Message{Green, "Link copied", link + " (paste it in a shortcut, Steam, a browser...)"};
+    }
+
+    void CheckLauncherUpdate() {
+        if (launcherReleases_.Running()) return;
+        launcherChecked_ = false;
+        launcherReleases_.Start([] {
+            ReleaseList list;
+            list.repository = LauncherRepository;
+            try {
+                list.releases = ParseReleases(HttpGetText(ReleasesUrl(LauncherRepository)));
+            } catch (const std::exception& failure) {
+                list.error = ReadableText(failure.what());
+            }
+            return list;
+        });
+    }
+
+    std::filesystem::path LauncherExe() const {
+#ifdef _WIN32
+        wchar_t path[1024];
+        win::ExePath(path, 1024);
+        return std::filesystem::path(path);
+#else
+        return launcherFolder_ / "anyps5-launcher";
+#endif
+    }
+
+    void StartLauncherUpdate() {
+        if (!launcherUpdate_ || job_.Busy() || session_) return;
+        const auto update = *launcherUpdate_;
+        const auto folder = launcherFolder_;
+        const auto exe = LauncherExe();
+        restartAfterUpdate_ = true;
+        job_.Start("Update the launcher to " + update.release.tag, true, [update, folder, exe](JobControl& control) {
+            const auto fresh = StageLauncherUpdate(update, folder, HttpDownload, RunToFile, control);
+            SwapLauncherExe(exe, fresh);
+            return "Updated to " + update.release.tag + "; starting it";
+        });
+    }
+
+    // Starts the (new) launcher and closes this one.
+    void RestartLauncher() {
+        const auto exe = ToUtf8(LauncherExe());
+        const char* arguments[] = {exe.c_str(), "--updated", nullptr};
+        SDL_PropertiesID properties = SDL_CreateProperties();
+        SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, const_cast<char**>(arguments));
+        SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+        SDL_Process* process = SDL_CreateProcessWithProperties(properties);
+        SDL_DestroyProperties(properties);
+        if (process == nullptr) {
+            message_ = Message{Amber, "Updated", "Start the launcher again to use the new version."};
+            return;
+        }
+        SDL_DestroyProcess(process);  // it runs on by itself
+        quitRequested_ = true;
+    }
+
+    static std::string UrlEncode(std::string_view text) {
+        std::string out;
+        for (const unsigned char c : text) {
+            if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+                out += static_cast<char>(c);
+            } else {
+                char hex[4];
+                std::snprintf(hex, sizeof(hex), "%%%02X", c);
+                out += hex;
+            }
+        }
+        return out;
+    }
+
+    // Opens a new issue on upstream AnyPS5 with the run's facts filled in; you read it and submit it.
+    void OpenIssue(const GameEntry& game) {
+        const auto& serial = game.metadata.titleId;
+        const auto found = diagnoses_.find(serial);
+        const std::string headline = found != diagnoses_.end() ? found->second.headline : "a problem";
+        const std::string title = game.metadata.name + " (" + serial + ") v" + game.metadata.contentVersion + ": " + headline;
+        std::string body = "**What happened**\n\n" + headline + "\n";
+        if (found != diagnoses_.end() && !found->second.detail.empty()) body += "\n```\n" + found->second.detail + "\n```\n";
+        body += "\n**Game**: " + game.metadata.name + " (" + serial + ") v" + game.metadata.contentVersion + ", " + std::string(ToString(game.format)) + "\n";
+        body += "**AnyPS5**: " + VersionLabelFor(serial) + (StateFor(serial).version.empty() ? std::string() : " (relinker " + StateFor(serial).version + ")") + "\n";
+        body += "**System**: " + SystemDescription() + "\n";
+        const auto env = GameSettingsEnvironment(LoadGameSettings(layout_.GameSettingsFile(serial)));
+        if (!env.empty()) {
+            body += "**Settings**:";
+            for (const auto& [name, value] : env) body += " `" + name + "=" + value + "`";
+            body += "\n";
+        }
+        body += "\n_Sent from AnyPS5 Launcher. Attach the report file from \"Make a report\" (library\\reports) for the log._\n";
+        const auto url = "https://github.com/boykopovar/AnyPS5/issues/new?title=" + UrlEncode(RedactPersonal(title)) + "&body=" + UrlEncode(RedactPersonal(body));
+        SDL_OpenURL(url.c_str());
+    }
+
     // ---- game settings, saves, screenshots, reports ---------------------------------
 
     void StartBackUpSaves(const std::string& serial) {
@@ -1993,10 +2620,21 @@ private:
         }
     }
 
+    // What the game settings show from disk: walking a shader cache of thousands of
+    // files every frame made the window lag, so it's read here.
+    void RefreshGameFacts() {
+        const auto cache = layout_.ShaderCache(settingsSerial_);
+        cacheSize_ = PathExists(cache) ? FolderSize(cache) : std::string();
+        hasSaves_ = HasSaves(layout_, settingsSerial_);
+        backups_ = ListSaveBackups(layout_, settingsSerial_);
+    }
+
     void OpenGameSettings(const GameEntry& game) {
         settingsSerial_ = game.metadata.titleId;
         settingsName_ = game.metadata.name;
         gameSettings_ = LoadGameSettings(layout_.GameSettingsFile(settingsSerial_));
+        gamePin_ = versions_.pins.count(settingsSerial_) ? versions_.pins.at(settingsSerial_) : std::string();
+        RefreshGameFacts();
         backups_ = ListSaveBackups(layout_, settingsSerial_);
         gameSettingsError_.clear();
         openGameSettings_ = true;
@@ -2103,6 +2741,21 @@ private:
             });
         });
 
+        Section("version", "AnyPS5 version", "Install and play this game with a version other than the selected one, for example one it's known to run on.", [&] {
+            const auto* pinned = FindVersion(versions_, gamePin_);
+            const std::string shown = pinned == nullptr ? "The selected one (" + CurrentVersionLabel() + ")" : pinned->Label();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            if (ImGui::BeginCombo("##pin", shown.c_str())) {
+                if (ImGui::Selectable(("The selected one (" + CurrentVersionLabel() + ")").c_str(), pinned == nullptr)) gamePin_.clear();
+                for (const auto& entry : versions_.versions) {
+                    if (ImGui::Selectable(entry.Label().c_str(), entry.id == gamePin_)) gamePin_ = entry.id;
+                }
+                ImGui::EndCombo();
+            }
+            const auto current = versions_.pins.count(settingsSerial_) ? versions_.pins.at(settingsSerial_) : std::string();
+            if (gamePin_ != current) ImGui::TextColored(Amber, "%s", "After Save the game shows Reinstall: install it again to use this version.");
+        });
+
         Section("overlay", "Performance overlay", "Frames per second, frame times, memory; F10 cycles it while playing.", [&] {
             SettingRow("At start", nullptr, [&] {
                 int page = g.overlay.empty() ? 0 : g.overlay == "1" ? 1 : 2;
@@ -2141,23 +2794,26 @@ private:
         Section("cache", "Shader cache", "Compiled shaders, so later starts don't stutter. Safe to clear; it's rebuilt.", [&] {
             SettingRow("Keep a shader cache", nullptr, [&] { ImGui::Checkbox("##cache", &g.shaderCache); });
             const auto cache = layout_.ShaderCache(settingsSerial_);
-            const bool exists = PathExists(cache);
+            const bool exists = !cacheSize_.empty();
             ImGui::BeginDisabled(!exists || session_ != nullptr);
-            if (ImGui::Button("Clear shader cache")) ClearShaderCache(settingsSerial_);
+            if (ImGui::Button("Clear shader cache")) {
+                ClearShaderCache(settingsSerial_);
+                RefreshGameFacts();
+            }
             ImGui::EndDisabled();
             ImGui::SameLine();
-            ImGui::TextColored(Dim, "%s", exists ? FolderSize(cache).c_str() : "empty");
+            ImGui::TextColored(Dim, "%s", exists ? cacheSize_.c_str() : "empty");
         });
 
         Section("saves", "Saves and trophies", nullptr, [&] {
             const bool busy = session_ != nullptr || job_.Busy();
-            ImGui::BeginDisabled(busy || !HasSaves(layout_, settingsSerial_));
+            ImGui::BeginDisabled(busy || !hasSaves_);
             if (ImGui::Button("Back up now")) StartBackUpSaves(settingsSerial_);
             ImGui::EndDisabled();
             ImGui::SameLine();
             if (ImGui::Button("Open backups folder")) OpenFolder(SaveBackupFolder(layout_, settingsSerial_));
             ImGui::SameLine();
-            if (ImGui::Button("Refresh")) backups_ = ListSaveBackups(layout_, settingsSerial_);
+            if (ImGui::Button("Refresh")) RefreshGameFacts();
             if (backups_.empty()) ImGui::TextColored(Dim, "No backups yet.");
             for (const auto& backup : backups_) {
                 ImGui::PushID(ToUtf8(backup.file).c_str());
@@ -2213,6 +2869,12 @@ private:
             try {
                 if (!ValidFpsLimit(g.fpsLimit)) throw std::runtime_error("the frame rate limit isn't a number AnyPS5 takes");
                 SaveGameSettings(layout_.GameSettingsFile(settingsSerial_), g);
+                const auto current = versions_.pins.count(settingsSerial_) ? versions_.pins.at(settingsSerial_) : std::string();
+                if (gamePin_ != current) {
+                    if (gamePin_.empty() || gamePin_ == settings_.anyps5Version) versions_.pins.erase(settingsSerial_);
+                    else versions_.pins[settingsSerial_] = gamePin_;
+                    SaveVersions(versionsRoot_, versions_);
+                }
                 message_ = Message{Green, "Game settings saved", settingsName_ + " uses them from its next start."};
                 close = true;
             } catch (const std::exception& failure) {
@@ -3324,7 +3986,7 @@ private:
         } else if (jobSerial_ == serial && job_.Busy()) {
             ImGui::TextColored(Amber, "Installing...");
         } else if (const auto* manifest = InstallFor(game)) {
-            const auto reason = ReinstallReason(game, *manifest, anyps5_.version);
+            const auto reason = ReinstallReason(game, *manifest, StateFor(serial).version);
             if (reason.empty()) ImGui::TextColored(Green, "Installed %s", manifest->installedAt.substr(0, 10).c_str());
             else ImGui::TextColored(Amber, "Reinstall: %s", reason.c_str());
         } else {
@@ -3340,6 +4002,9 @@ private:
             ImGui::PopTextWrapPos();
             if (problem) {
                 if (ImGui::SmallButton("Make a report")) MakeReport(game);
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Open an issue")) OpenIssue(game);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Opens a new issue on github.com/boykopovar/AnyPS5 with the facts filled in; you check it and submit it");
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)");
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Open log")) OpenLatestLog(serial);
@@ -3378,6 +4043,11 @@ private:
         if (ImGui::MenuItem("Trophies...")) OpenTrophies();
         if (ImGui::MenuItem("Controls...")) OpenControls(game);
         if (ImGui::MenuItem("Game settings...")) OpenGameSettings(game);
+        if (ImGui::BeginMenu("Copy link")) {
+            if (ImGui::MenuItem(("Play: " + LinkFor({LaunchRequest::Kind::Play, serial})).c_str())) CopyLink(game, LaunchRequest::Kind::Play);
+            if (ImGui::MenuItem(("Show: " + LinkFor({LaunchRequest::Kind::Select, serial})).c_str())) CopyLink(game, LaunchRequest::Kind::Select);
+            ImGui::EndMenu();
+        }
         if (ImGui::MenuItem("Screenshots...")) OpenScreenshots(game);
         {
             const bool hasSaves = HasSaves(layout_, serial);
@@ -4002,6 +4672,17 @@ private:
         if (!versionsError_.empty()) ImGui::TextColored(Red, "%s", Elide(versionsError_, ImGui::GetContentRegionAvail().x).c_str());
         ImGui::Spacing();
         const float buttonWidth = ImGui::GetFontSize() * 6.5f;
+        {
+            const auto outdated = GamesToReinstall();
+            ImGui::BeginDisabled(outdated.empty() || busy || !reinstallQueue_.empty());
+            const std::string label = outdated.empty() ? std::string("Reinstall all") : "Reinstall all (" + std::to_string(outdated.size()) + ")";
+            if (ImGui::Button(label.c_str(), ImVec2(0, ImGui::GetFrameHeight() * 1.3f))) ReinstallAll();
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", outdated.empty() ? "Every installed game uses the relinker it was converted with" : "Installs again, one after another, every game converted with another AnyPS5 than the one it uses now");
+            }
+            ImGui::SameLine();
+        }
         ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - buttonWidth);
         if (ImGui::Button("Close", ImVec2(buttonWidth, ImGui::GetFrameHeight() * 1.3f))) close = true;
         if (close) ImGui::CloseCurrentPopup();
@@ -4086,6 +4767,33 @@ private:
 
         Section("controllers", "Controllers", "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (✕ plays, △ opens a game's actions).", [&] {
             DrawControllers();
+        });
+
+        Section("sync", "Save sync", "Keep saves and trophies the same on your other PCs through a folder they all see (OneDrive, Dropbox, a USB stick, a network share). Before a game starts newer saves come in; after it ends this PC's go out. Whatever gets replaced is kept in the save backups first.", [&] {
+            FolderField("Sync folder", "Empty: off.", "##sync", "e.g. C:\\Users\\you\\OneDrive\\AnyPS5 saves", draft_.syncFolder);
+        });
+
+        Section("launcher", "Launcher", nullptr, [&] {
+#ifdef LAUNCHER_VERSION
+            ImGui::Text("AnyPS5 Launcher %s", LAUNCHER_VERSION);
+#endif
+            ImGui::Checkbox("Check for a newer launcher at start", &draft_.checkUpdates);
+            ImGui::BeginDisabled(launcherReleases_.Running());
+            if (ImGui::Button("Check now")) CheckLauncherUpdate();
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (launcherReleases_.Running()) {
+                ImGui::TextColored(Dim, "Checking...");
+            } else if (launcherUpdate_) {
+                ImGui::BeginDisabled(job_.Busy() || session_ != nullptr);
+                if (PrimaryButton(("Update to " + launcherUpdate_->release.tag).c_str())) StartLauncherUpdate();
+                ImGui::EndDisabled();
+            } else if (!launcherCheckError_.empty()) {
+                ImGui::TextColored(Amber, "%s", Elide(launcherCheckError_, ImGui::GetContentRegionAvail().x).c_str());
+            } else if (launcherChecked_) {
+                ImGui::TextColored(Green, "Up to date");
+            }
+            ImGui::TextColored(Dim, "Updates come from github.com/%s/releases. Links like anyps5://play/PPSA01234 open the launcher (Copy link in a game's actions).", LauncherRepository);
         });
 
         Section("trophy-cards", "While playing", "The trophy card shows at the top of the game's window and never takes the keyboard or the mouse from the game.", [&] {
@@ -4226,7 +4934,22 @@ private:
     bool captureReplace_ = false;
     std::string captureNote_;
     std::string controlsError_;
-    std::map<std::string, RunDiagnosis> diagnoses_;  // the last run of each game, by serial
+    std::map<std::string, RunDiagnosis> diagnoses_;
+    mutable std::map<std::string, AnyPS5State> pinnedStates_;  // versions games are pinned to, by id
+    std::vector<std::string> reinstallQueue_;                  // game locations, installed one after another
+    std::string pendingPlay_;                                  // a game waiting for its saves to sync
+    std::optional<LaunchRequest> pendingRequest_;              // from a link, handled once the games are scanned
+    Background<ReleaseList> launcherReleases_;
+    std::optional<LauncherUpdate> launcherUpdate_;
+    bool restartAfterUpdate_ = false;
+    bool quitRequested_ = false;
+    bool launcherChecked_ = false;
+    bool openSetup_ = false;
+    int setupStep_ = 0;
+    std::string setupProfile_;
+    std::string setupError_;
+    std::string launcherCheckError_;
+    Uint64 nextRequestCheck_ = 0;  // the last run of each game, by serial
     // Game settings window.
     bool openGameSettings_ = false;
     std::string settingsSerial_;
@@ -4234,6 +4957,9 @@ private:
     GameSettings gameSettings_;
     std::vector<SaveBackup> backups_;
     std::string gameSettingsError_;
+    std::string gamePin_;
+    std::string cacheSize_;  // read when the window opens, not every frame
+    bool hasSaves_ = false;
     std::string exportPick_;
     std::string importPick_;
     // Screenshots window.
@@ -4265,7 +4991,24 @@ private:
 
 }
 
-int main(int, char**) {
+int main(int argc, char** argv) {
+    const std::vector<std::string> arguments(argv, argv + argc);
+    const auto request = launcher::ParseArguments(arguments);
+#ifdef _WIN32
+    {
+        // One launcher per folder: a second one (from a link) hands its request over and leaves.
+        const char* base = SDL_GetBasePath();
+        const std::string folder = base != nullptr ? base : "";
+        const auto name = L"AnyPS5Launcher-" + std::to_wstring(std::hash<std::string>{}(folder));
+        if (!launcher::win::FirstInstance(name.c_str())) {
+            if (request) {
+                std::ofstream(launcher::FromUtf8(folder) / "anyps5-launcher.request", std::ios::binary | std::ios::trunc) << launcher::FormatRequest(*request);
+            }
+            launcher::win::ShowWindowTitled(L"AnyPS5 Launcher");
+            return 0;
+        }
+    }
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init failed: %s", SDL_GetError());
         return 1;
@@ -4283,6 +5026,9 @@ int main(int, char**) {
         return 1;
     }
     SDL_SetRenderVSync(renderer, 1);
+    // Rounded pictures are drawn with an anti-aliased edge whose texture coordinates go
+    // a hair past 0..1; the default (wrap there) would paint the opposite edge as a thin line.
+    SDL_SetRenderTextureAddressMode(renderer, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(window);
 
@@ -4301,6 +5047,7 @@ int main(int, char**) {
 
     {
         LauncherApp app(window, renderer, scale);
+        app.SetStartRequest(request);
         bool done = false;
         while (!done) {
             SDL_Event event;
@@ -4312,6 +5059,7 @@ int main(int, char**) {
                 if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)) done = true;
             }
             app.Tick();
+            if (app.QuitRequested()) done = true;
             if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
                 SDL_Delay(10);
                 continue;

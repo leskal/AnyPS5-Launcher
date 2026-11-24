@@ -21,6 +21,9 @@ struct Settings {
     bool trophyPopups = true;      // a card over the game when it earns a trophy
     bool trophySound = true;       // and a short chime with it
     bool hideWhilePlaying = false; // minimize the launcher once the game's window is up
+    std::string syncFolder;        // saves shared with other PCs; empty: off
+    std::string view = "grid";     // "grid" or "home" (a row of tiles)
+    bool checkUpdates = true;      // look for a newer launcher at start
 };
 
 std::filesystem::path EffectiveLibrary(const Settings& settings, const std::filesystem::path& launcherFolder);

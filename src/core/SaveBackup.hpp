@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "core/Job.hpp"
@@ -22,6 +23,14 @@ struct SaveBackup {
 };
 
 std::filesystem::path SaveBackupFolder(const Layout& layout, std::string_view serial);
+
+// The folders a backup holds, by their name in the zip: _sd, _sd_mem, _trophy.
+std::vector<std::pair<std::string, std::filesystem::path>> SaveRoots(const Layout& layout, std::string_view serial);
+
+// Zips the files under roots (name -> folder) into folder/<stamp><suffix>.zip,
+// read back before it's kept. Throws when there is nothing to zip.
+std::filesystem::path ZipFolders(const std::vector<std::pair<std::string, std::filesystem::path>>& roots, const std::filesystem::path& folder,
+                                 const std::string& suffix, JobControl& control);
 
 // True when the profile has anything saved for the game.
 bool HasSaves(const Layout& layout, std::string_view serial);

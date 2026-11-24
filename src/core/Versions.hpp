@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,6 +69,7 @@ struct VersionEntry {
 struct VersionStore {
     std::vector<VersionEntry> versions;
     std::vector<std::string> repositories;  // custom repositories the user added, besides the official one
+    std::map<std::string, std::string> pins;  // title ID -> version id: the game installs and plays with that version
 };
 
 std::filesystem::path VersionsRoot(const std::filesystem::path& launcherFolder);
@@ -96,6 +98,11 @@ VersionEntry LocalVersion(const std::filesystem::path& relinkerOrFolder);
 void RemoveVersion(const std::filesystem::path& root, VersionStore& store, std::string_view id);
 
 // Newest first by publish date; prereleases only when asked.
+// Downloads a release asset and checks its size and SHA-256 against GitHub's.
+void FetchAsset(const Downloader& download, const ReleaseAsset& asset, const std::filesystem::path& file, JobControl& control);
+// The system's tar (Windows 10 1803 and later ship one that reads .zip).
+std::filesystem::path SystemTar();
+
 std::optional<Release> NewestRelease(const std::vector<Release>& releases, bool includePrereleases = false);
 
 }

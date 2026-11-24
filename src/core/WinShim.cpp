@@ -229,6 +229,76 @@ void WindowsVersion(wchar_t* text, unsigned long capacity) {
     append(L")");
 }
 
+unsigned long RegisterUrlScheme(const wchar_t* scheme, const wchar_t* description, const wchar_t* exePath) {
+    // The command line: "C:\...\anyps5-launcher.exe" "%1"
+    wchar_t command[1100];
+    unsigned long used = 0;
+    const auto append = [&](const wchar_t* part) {
+        for (const wchar_t* c = part; *c != 0 && used + 1 < 1100; ++c) command[used++] = *c;
+        command[used] = 0;
+    };
+    command[0] = 0;
+    append(L"\"");
+    append(exePath);
+    append(L"\" \"%1\"");
+    wchar_t key[160];
+    used = 0;
+    {
+        unsigned long k = 0;
+        for (const wchar_t* c = L"Software\\Classes\\"; *c != 0; ++c) key[k++] = *c;
+        for (const wchar_t* c = scheme; *c != 0 && k + 40 < 160; ++c) key[k++] = *c;
+        key[k] = 0;
+    }
+    wchar_t commandKey[200];
+    {
+        unsigned long k = 0;
+        for (const wchar_t* c = key; *c != 0; ++c) commandKey[k++] = *c;
+        for (const wchar_t* c = L"\\shell\\open\\command"; *c != 0; ++c) commandKey[k++] = *c;
+        commandKey[k] = 0;
+    }
+    wchar_t existing[1100];
+    DWORD size = sizeof(existing);
+    if (RegGetValueW(HKEY_CURRENT_USER, commandKey, nullptr, RRF_RT_REG_SZ, nullptr, existing, &size) == ERROR_SUCCESS && lstrcmpiW(existing, command) == 0) {
+        return ERROR_SUCCESS;  // already ours
+    }
+    HKEY root = nullptr;
+    LSTATUS status = RegCreateKeyExW(HKEY_CURRENT_USER, key, 0, nullptr, 0, KEY_WRITE, nullptr, &root, nullptr);
+    if (status != ERROR_SUCCESS) return static_cast<unsigned long>(status);
+    const auto length = [](const wchar_t* text) {
+        DWORD n = 0;
+        while (text[n] != 0) ++n;
+        return (n + 1) * static_cast<DWORD>(sizeof(wchar_t));
+    };
+    RegSetValueExW(root, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(description), length(description));
+    RegSetValueExW(root, L"URL Protocol", 0, REG_SZ, reinterpret_cast<const BYTE*>(L""), sizeof(wchar_t));
+    RegCloseKey(root);
+    HKEY open = nullptr;
+    status = RegCreateKeyExW(HKEY_CURRENT_USER, commandKey, 0, nullptr, 0, KEY_WRITE, nullptr, &open, nullptr);
+    if (status != ERROR_SUCCESS) return static_cast<unsigned long>(status);
+    status = RegSetValueExW(open, nullptr, 0, REG_SZ, reinterpret_cast<const BYTE*>(command), length(command));
+    RegCloseKey(open);
+    return static_cast<unsigned long>(status);
+}
+
+void ExePath(wchar_t* path, unsigned long capacity) {
+    const DWORD length = GetModuleFileNameW(nullptr, path, capacity);
+    if (length == 0 || length >= capacity) path[0] = 0;
+}
+
+bool FirstInstance(const wchar_t* name) {
+    // Kept open until the process ends; Windows closes it then.
+    HANDLE mutex = CreateMutexW(nullptr, TRUE, name);
+    if (mutex == nullptr) return true;
+    return GetLastError() != ERROR_ALREADY_EXISTS;
+}
+
+void ShowWindowTitled(const wchar_t* title) {
+    HWND window = FindWindowW(nullptr, title);
+    if (window == nullptr) return;
+    if (IsIconic(window)) ShowWindow(window, SW_RESTORE);
+    SetForegroundWindow(window);
+}
+
 unsigned long RecycleItem(const wchar_t* path) {
     // SHFileOperation wants a list ending in two zeros.
     int length = 0;
