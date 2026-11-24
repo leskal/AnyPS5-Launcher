@@ -28,6 +28,9 @@ unsigned long JobWindowRect(void* job, long* x, long* y, long* width, long* heig
 // Asks Windows 11 to round the window's corners; does nothing on older Windows.
 void RoundWindowCorners(void* window);
 
+// Moves a file or folder to the Recycle Bin, without asking.
+unsigned long RecycleItem(const wchar_t* path);
+
 // Opens a folder in Explorer.
 unsigned long OpenFolder(const wchar_t* path);
 

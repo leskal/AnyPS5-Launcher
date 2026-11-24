@@ -244,6 +244,105 @@ bool Segmented(const char* id, const char* const* labels, int count, int& curren
     return changed;
 }
 
+enum class TopIcon { Versions, Rescan, Settings };
+
+// A round icon button for the top bar, the icon drawn in code. Returns true when pressed.
+bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled, bool spinning = false) {
+    const float scale = ImGui::GetStyle().FontScaleDpi;
+    const float size = ImGui::GetFrameHeight() * 1.2f;
+    ImGui::BeginDisabled(disabled);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const bool pressed = ImGui::InvisibleButton(id, ImVec2(size, size));
+    const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+    const bool held = ImGui::IsItemActive();
+    ImGui::EndDisabled();
+    if (hovered) ImGui::SetTooltip("%s", tooltip);
+    auto* draw = ImGui::GetWindowDrawList();
+    const ImVec2 c(at.x + size * 0.5f, at.y + size * 0.5f);
+    const ImVec4 base = ImGui::GetStyle().Colors[ImGuiCol_Button];
+    const ImVec4 back = held ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] : hovered && !disabled ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : base;
+    draw->AddCircleFilled(c, size * 0.5f, ImGui::GetColorU32(back));
+    const ImU32 ink = ImGui::GetColorU32(disabled ? ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] : ImGui::GetStyle().Colors[ImGuiCol_Text]);
+    const float r = size * 0.27f;
+    const float line = std::max(1.5f, 1.7f * scale);
+    switch (icon) {
+    case TopIcon::Settings: {
+        // A gear: eight teeth around a ring.
+        constexpr int Teeth = 8;
+        ImVec2 points[Teeth * 4];
+        for (int i = 0; i < Teeth; ++i) {
+            const float a = static_cast<float>(i) * 6.2831853f / Teeth;
+            const float half = 6.2831853f / Teeth * 0.22f;
+            const float outer = r * 1.18f;
+            const float inner = r * 0.86f;
+            const float spans[4] = {a - half * 1.6f, a - half, a + half, a + half * 1.6f};
+            const float radii[4] = {inner, outer, outer, inner};
+            for (int k = 0; k < 4; ++k) points[i * 4 + k] = ImVec2(c.x + std::cos(spans[k]) * radii[k], c.y + std::sin(spans[k]) * radii[k]);
+        }
+        draw->AddConcavePolyFilled(points, Teeth * 4, ink);
+        draw->AddCircleFilled(c, r * 0.42f, ImGui::GetColorU32(back));
+        break;
+    }
+    case TopIcon::Rescan: {
+        // A circular arrow; it turns while a scan runs.
+        const float turn = spinning ? static_cast<float>(ImGui::GetTime()) * 5.0f : 0.0f;
+        const float start = -1.2f + turn;
+        const float end = start + 4.9f;
+        draw->PathArcTo(c, r, start, end, 24);
+        draw->PathStroke(ink, 0, line);
+        const ImVec2 tip(c.x + std::cos(end) * r, c.y + std::sin(end) * r);
+        const ImVec2 along(-std::sin(end), std::cos(end));  // the arc's direction at its end
+        const ImVec2 out(std::cos(end), std::sin(end));
+        const float head = r * 0.55f;
+        draw->AddTriangleFilled(ImVec2(tip.x + along.x * head * 0.8f, tip.y + along.y * head * 0.8f), ImVec2(tip.x + out.x * head * 0.6f, tip.y + out.y * head * 0.6f),
+                                ImVec2(tip.x - out.x * head * 0.6f, tip.y - out.y * head * 0.6f), ink);
+        break;
+    }
+    case TopIcon::Versions: {
+        // Stacked layers: the AnyPS5 versions you can switch between.
+        const float w = r * 1.15f;
+        const float h = r * 0.58f;
+        for (int i = 2; i >= 0; --i) {
+            const float y = c.y - r * 0.55f + static_cast<float>(i) * r * 0.55f;
+            const ImVec2 diamond[4] = {ImVec2(c.x, y - h), ImVec2(c.x + w, y), ImVec2(c.x, y + h), ImVec2(c.x - w, y)};
+            draw->AddConvexPolyFilled(diamond, 4, ImGui::GetColorU32(back));
+            draw->AddPolyline(diamond, 4, ink, ImDrawFlags_Closed, line);
+        }
+        break;
+    }
+    }
+    return pressed && !disabled;
+}
+
+// A round avatar with the profile's first letter, its colour picked from the name.
+void DrawProfileAvatar(const std::string& name, ImVec2 at, float size) {
+    static const ImU32 colors[] = {IM_COL32(59, 130, 246, 255), IM_COL32(16, 185, 129, 255), IM_COL32(245, 158, 11, 255), IM_COL32(239, 68, 68, 255),
+                                   IM_COL32(139, 92, 246, 255), IM_COL32(236, 72, 153, 255), IM_COL32(20, 184, 166, 255), IM_COL32(234, 88, 12, 255)};
+    std::uint32_t hash = 2166136261u;
+    for (const unsigned char c : name) hash = (hash ^ c) * 16777619u;
+    const ImVec2 c(at.x + size * 0.5f, at.y + size * 0.5f);
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddCircleFilled(c, size * 0.5f, colors[hash % std::size(colors)]);
+    std::string letter = name.empty() ? std::string("?") : name.substr(0, 1);
+    if (!name.empty() && (static_cast<unsigned char>(name[0]) & 0x80)) {
+        std::size_t length = 1;  // a whole UTF-8 character
+        while (length < name.size() && (static_cast<unsigned char>(name[length]) & 0xC0) == 0x80) ++length;
+        letter = name.substr(0, length);
+    } else if (!letter.empty()) {
+        letter[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(letter[0])));
+    }
+    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.95f * size / ImGui::GetFrameHeight());
+    const ImVec2 text = ImGui::CalcTextSize(letter.c_str());
+    draw->AddText(ImVec2(c.x - text.x * 0.5f, c.y - text.y * 0.5f), IM_COL32_WHITE, letter.c_str());
+    ImGui::PopFont();
+}
+
+// A small chevron pointing down.
+void Chevron(ImVec2 c, float size, ImU32 color) {
+    const ImVec2 points[3] = {ImVec2(c.x - size, c.y - size * 0.45f), ImVec2(c.x, c.y + size * 0.5f), ImVec2(c.x + size, c.y - size * 0.45f)};
+    ImGui::GetWindowDrawList()->AddPolyline(points, 3, color, ImDrawFlags_None, std::max(1.5f, 1.6f * ImGui::GetStyle().FontScaleDpi));
+}
+
 // A dialog's header: big title, a note under it, and a close button at the right. Returns true when closed.
 bool DialogHeader(const char* title, const char* note) {
     const float scale = ImGui::GetStyle().FontScaleDpi;
@@ -856,6 +955,7 @@ public:
         DrawLibrary();
         DrawFooter();
         DrawNewProfile();
+        DrawEditProfile();
         DrawMissingRelinker();
         DrawVersions();
         DrawSettings();
@@ -1121,6 +1221,98 @@ private:
 
     // ---- drawing -----------------------------------------------------------------
 
+    // The profile as a pill: avatar, name and a chevron; a menu lists the others.
+    void DrawProfileSelector() {
+        const auto& style = ImGui::GetStyle();
+        const float scale = style.FontScaleDpi;
+        const float height = ImGui::GetFrameHeight() * 1.2f;
+        const float avatar = height - 8.0f * scale;
+        const float nameWidth = std::min(ImGui::CalcTextSize(layout_.profile.c_str()).x, ImGui::GetFontSize() * 9);
+        const float width = 4.0f * scale + avatar + 8.0f * scale + nameWidth + 10.0f * scale + ImGui::GetFontSize() * 0.6f + 12.0f * scale;
+        const bool locked = session_ != nullptr;
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - (height - ImGui::GetFrameHeight()) * 0.5f);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::BeginDisabled(locked);
+        const bool pressed = ImGui::InvisibleButton("profile", ImVec2(width, height));
+        const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+        ImGui::EndDisabled();
+        if (hovered) ImGui::SetTooltip("%s", locked ? "The profile can't change while a game runs" : "Profile: saves, trophies, controls and language");
+        if (pressed && !locked) ImGui::OpenPopup("profile-menu");
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 end(at.x + width, at.y + height);
+        const bool open = ImGui::IsPopupOpen("profile-menu");
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(open ? style.Colors[ImGuiCol_ButtonActive] : hovered && !locked ? style.Colors[ImGuiCol_ButtonHovered] : style.Colors[ImGuiCol_Button]),
+                           height * 0.5f);
+        DrawProfileAvatar(layout_.profile, ImVec2(at.x + 4.0f * scale, at.y + 4.0f * scale), avatar);
+        const ImU32 ink = ImGui::GetColorU32(locked ? style.Colors[ImGuiCol_TextDisabled] : style.Colors[ImGuiCol_Text]);
+        const float textX = at.x + 4.0f * scale + avatar + 8.0f * scale;
+        draw->AddText(ImVec2(textX, at.y + (height - ImGui::GetFontSize()) * 0.5f), ink, Elide(layout_.profile, nameWidth).c_str());
+        Chevron(ImVec2(end.x - 12.0f * scale - ImGui::GetFontSize() * 0.3f, at.y + height * 0.5f), ImGui::GetFontSize() * 0.28f, ImGui::GetColorU32(Dim));
+        ImGui::SetNextWindowPos(ImVec2(at.x, end.y + 4.0f * scale));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * scale, 8.0f * scale));
+        ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 12.0f * scale);
+        if (ImGui::BeginPopup("profile-menu")) {
+            ImGui::TextColored(Dim, "Profiles");
+            const float row = ImGui::GetFrameHeight() * 1.25f;
+            const float menuWidth = std::max(ImGui::GetFontSize() * 14, width);
+            auto names = profiles_;
+            if (std::find(names.begin(), names.end(), layout_.profile) == names.end()) names.insert(names.begin(), layout_.profile);
+            std::string chosen;
+            bool create = false;
+            // kind: 0 a profile, 1 "new" (plus), 2 "edit" (pencil).
+            const auto item = [&](const std::string& id, const std::string& label, bool current, int kind) {
+                const ImVec2 rowAt = ImGui::GetCursorScreenPos();
+                const bool clicked = ImGui::Selectable(("##" + id).c_str(), false, ImGuiSelectableFlags_None, ImVec2(menuWidth, row));
+                const float size = row - 8.0f * scale;
+                if (kind != 0) {
+                    auto* menuDraw = ImGui::GetWindowDrawList();
+                    const ImVec2 c(rowAt.x + 4.0f * scale + size * 0.5f, rowAt.y + row * 0.5f);
+                    const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
+                    menuDraw->AddCircle(c, size * 0.5f - 1.0f, ImGui::GetColorU32(Dim), 0, 1.2f * scale);
+                    if (kind == 1) {
+                        menuDraw->AddLine(ImVec2(c.x - size * 0.22f, c.y), ImVec2(c.x + size * 0.22f, c.y), ink, 1.6f * scale);
+                        menuDraw->AddLine(ImVec2(c.x, c.y - size * 0.22f), ImVec2(c.x, c.y + size * 0.22f), ink, 1.6f * scale);
+                    } else {
+                        // A pencil, tip at the bottom left.
+                        const float k = size * 0.2f;
+                        menuDraw->AddLine(ImVec2(c.x - k, c.y + k), ImVec2(c.x + k * 0.9f, c.y - k * 0.9f), ink, 3.2f * scale);
+                        menuDraw->AddTriangleFilled(ImVec2(c.x - k * 1.25f, c.y + k * 1.25f), ImVec2(c.x - k * 1.15f, c.y + k * 0.55f), ImVec2(c.x - k * 0.55f, c.y + k * 1.15f), ink);
+                    }
+                } else {
+                    DrawProfileAvatar(label, ImVec2(rowAt.x + 4.0f * scale, rowAt.y + 4.0f * scale), size);
+                }
+                auto* menuDraw = ImGui::GetWindowDrawList();
+                menuDraw->AddText(ImVec2(rowAt.x + 4.0f * scale + size + 10.0f * scale, rowAt.y + (row - ImGui::GetFontSize()) * 0.5f),
+                                  ImGui::GetColorU32(current ? Accent : style.Colors[ImGuiCol_Text]), label.c_str());
+                if (current) {
+                    // A check mark at the right.
+                    const float x = rowAt.x + menuWidth - 14.0f * scale;
+                    const float y = rowAt.y + row * 0.5f;
+                    const float k = ImGui::GetFontSize() * 0.3f;
+                    const ImVec2 check[3] = {ImVec2(x - k * 1.4f, y), ImVec2(x - k * 0.5f, y + k * 0.9f), ImVec2(x + k * 0.9f, y - k * 0.8f)};
+                    menuDraw->AddPolyline(check, 3, ImGui::GetColorU32(Accent), ImDrawFlags_None, 2.0f * scale);
+                }
+                return clicked;
+            };
+            bool edit = false;
+            for (const auto& name : names) {
+                if (item(name, name, name == layout_.profile, 0) && name != layout_.profile) chosen = name;
+            }
+            ImGui::Separator();
+            if (item("edit", "Edit " + layout_.profile + "...", false, 2)) edit = true;
+            if (item("new", "New profile...", false, 1)) create = true;
+            ImGui::EndPopup();
+            if (edit) OpenEditProfile();
+            if (!chosen.empty()) SwitchProfile(chosen);
+            if (create) {
+                newProfileName_.clear();
+                newProfileError_.clear();
+                openNewProfile_ = true;
+            }
+        }
+        ImGui::PopStyleVar(2);
+    }
+
     void DrawTopBar() {
         const auto& style = ImGui::GetStyle();
         ImGui::PushFont(nullptr, style.FontSizeBase * 1.45f);
@@ -1129,28 +1321,9 @@ private:
         ImGui::PopFont();
         ImGui::SameLine(0, style.ItemSpacing.x * 2);
 
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 11);
-        ImGui::BeginDisabled(session_ != nullptr);
-        const std::string profileLabel = "Profile: " + layout_.profile;
-        if (ImGui::BeginCombo("##profile", profileLabel.c_str())) {
-            for (const auto& name : profiles_) {
-                if (ImGui::Selectable(name.c_str(), name == layout_.profile)) SwitchProfile(name);
-            }
-            if (std::find(profiles_.begin(), profiles_.end(), layout_.profile) == profiles_.end()) {
-                ImGui::Selectable(layout_.profile.c_str(), true);
-            }
-            ImGui::Separator();
-            if (ImGui::Selectable("New profile...")) {
-                newProfileName_.clear();
-                newProfileError_.clear();
-                openNewProfile_ = true;
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::EndDisabled();
+        DrawProfileSelector();
         // The search box takes the room left before the buttons, and its own row when there's too little.
-        const float buttons = ImGui::CalcTextSize("AnyPS5 versions").x + ImGui::CalcTextSize("Rescan").x + ImGui::CalcTextSize("Settings").x + style.FramePadding.x * 6 +
-                              style.ItemSpacing.x * 2;
+        const float buttons = ImGui::GetFrameHeight() * 1.2f * 3 + style.ItemSpacing.x * 2;
         ImGui::SameLine();
         const float room = ImGui::GetContentRegionMax().x - buttons - ImGui::GetCursorPosX() - style.ItemSpacing.x;
         const bool searchInline = room >= ImGui::GetFontSize() * 7;
@@ -1160,17 +1333,17 @@ private:
             ImGui::SameLine();
         }
         ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - buttons));
-        ImGui::BeginDisabled(session_ != nullptr);
-        if (ImGui::Button("AnyPS5 versions")) OpenVersions();
-        ImGui::EndDisabled();
+        // The icons sit a little lower so their centres line up with the search box.
+        const float iconY = ImGui::GetCursorPosY() - (ImGui::GetFrameHeight() * 1.2f - ImGui::GetFrameHeight()) * 0.5f;
+        ImGui::SetCursorPosY(iconY);
+        if (IconButton("versions", TopIcon::Versions, session_ != nullptr ? "AnyPS5 versions (not while a game runs)" : "AnyPS5 versions", session_ != nullptr)) OpenVersions();
         ImGui::SameLine();
-        ImGui::BeginDisabled(scan_.Running() || job_.Busy() || settings_.gamesFolder.empty());
-        if (ImGui::Button("Rescan")) StartScan();
-        ImGui::EndDisabled();
+        ImGui::SetCursorPosY(iconY);
+        const char* rescanTip = scan_.Running() ? "Scanning..." : settings_.gamesFolder.empty() ? "Rescan (set a games folder in Settings first)" : "Rescan the games folder";
+        if (IconButton("rescan", TopIcon::Rescan, rescanTip, scan_.Running() || job_.Busy() || settings_.gamesFolder.empty(), scan_.Running())) StartScan();
         ImGui::SameLine();
-        ImGui::BeginDisabled(session_ != nullptr || job_.Busy());
-        if (ImGui::Button("Settings")) OpenSettings();
-        ImGui::EndDisabled();
+        ImGui::SetCursorPosY(iconY);
+        if (IconButton("settings", TopIcon::Settings, session_ != nullptr ? "Settings (not while a game runs)" : "Settings", session_ != nullptr || job_.Busy())) OpenSettings();
         if (!searchInline) {
             ImGui::SetNextItemWidth(-FLT_MIN);
             ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
@@ -2537,6 +2710,171 @@ private:
         ImGui::EndPopup();
     }
 
+    // A game whose run didn't finish still has the profile's saves beside its exe,
+    // recorded by folder path: renaming or deleting the profile now would lose them.
+    std::string ProfileBusyReason() const {
+        if (session_) return "a game is running";
+        for (const auto& game : result_.games) {
+            if (!game.home.empty() && HasSession(game.home)) return game.metadata.name + " still has the profile's saves beside its exe; restart the launcher to put them back";
+        }
+        return {};
+    }
+
+    void OpenEditProfile() {
+        editName_ = layout_.profile;
+        editProfile_ = profileSettings_;
+        editError_.clear();
+        openEditProfile_ = true;
+    }
+
+    void DrawEditProfile() {
+        if (openEditProfile_) {
+            ImGui::OpenPopup("Edit profile");
+            openEditProfile_ = false;
+        }
+        const float scale = scale_;
+        const float width = ImGui::GetFontSize() * 26;
+        ImGui::SetNextWindowSize(ImVec2(width, 0));
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f * scale, 20.0f * scale));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f * scale);
+        const bool open = ImGui::BeginPopupModal("Edit profile", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                                                              ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::PopStyleVar(2);
+        if (!open) return;
+        const auto& style = ImGui::GetStyle();
+        bool close = DialogHeader("Edit profile", "Saves, trophies, controls and screenshots stay with the profile.");
+
+        // The avatar follows the name as it's typed.
+        const float avatar = ImGui::GetFontSize() * 3.6f;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        DrawProfileAvatar(editName_.empty() ? std::string("?") : editName_, at, avatar);
+        ImGui::Dummy(ImVec2(avatar, avatar));
+        ImGui::SameLine(0, 16.0f * scale);
+        ImGui::BeginGroup();
+        ImGui::TextUnformatted("Name");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+        const bool submit = ImGui::InputText("##profile-name", &editName_, ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::TextColored(Dim, "%s", "Games still see the player as \"Player\".");
+        ImGui::EndGroup();
+        ImGui::Spacing();
+
+        ImGui::TextUnformatted("Console language");
+        ImGui::TextColored(Dim, "The language games start in.");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::BeginCombo("##profile-language", LanguageLabel(editProfile_.language).c_str())) {
+            if (ImGui::Selectable(LanguageLabel("").c_str(), editProfile_.language.empty())) editProfile_.language.clear();
+            if (ImGui::Selectable(LanguageLabel("auto").c_str(), editProfile_.language == "auto")) editProfile_.language = "auto";
+            for (const auto& item : ConsoleLanguages()) {
+                const auto value = std::to_string(item.number);
+                if (ImGui::Selectable(LanguageLabel(value).c_str(), editProfile_.language == value)) editProfile_.language = value;
+            }
+            ImGui::EndCombo();
+        }
+        if (!editError_.empty()) {
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(Red, "%s", editError_.c_str());
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+        const auto busy = ProfileBusyReason();
+        const bool only = profiles_.size() <= 1;
+        ImGui::BeginDisabled(!busy.empty() || only);
+        ImGui::PushStyleColor(ImGuiCol_Text, Red);
+        if (ImGui::Button("Delete profile...", ImVec2(0, buttonHeight))) ImGui::OpenPopup("Delete profile?");
+        ImGui::PopStyleColor();
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && (only || !busy.empty())) {
+            ImGui::SetTooltip("%s", only ? "It's the only profile" : ("Not now: " + busy).c_str());
+        }
+        const float buttonWidth = ImGui::GetFontSize() * 5.5f;
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonWidth * 2 - style.ItemSpacing.x);
+        if (ImGui::Button("Cancel", ImVec2(buttonWidth, buttonHeight))) close = true;
+        ImGui::SameLine();
+        if (PrimaryButton("Save", ImVec2(buttonWidth, buttonHeight)) || submit) {
+            try {
+                if (editName_ != layout_.profile) {
+                    if (!busy.empty()) throw std::runtime_error("the profile can't be renamed now: " + busy);
+                    RenameProfile(layout_, editName_);
+                    layout_.profile = editName_;
+                    settings_.profile = editName_;
+                    SaveSettings(settingsFile_, settings_);
+                    profiles_ = ListProfiles(layout_.userdata);
+                }
+                SaveProfile(layout_, editProfile_);
+                LoadCurrentProfile();
+                trophyAsked_.clear();  // texts may follow the new language
+                close = true;
+            } catch (const std::exception& failure) {
+                editError_ = ReadableText(failure.what());
+            }
+        }
+
+        // Asked once more before anything goes.
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        if (ImGui::BeginPopupModal("Delete profile?", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove)) {
+            ImGui::Text("Delete the profile \"%s\"?", layout_.profile.c_str());
+#ifdef _WIN32
+            ImGui::TextColored(Dim, "Its saves, trophies, controls and screenshots go to the Recycle Bin.");
+#else
+            ImGui::TextColored(Amber, "Its saves, trophies, controls and screenshots are deleted for good.");
+#endif
+            ImGui::Spacing();
+            ImGui::PushStyleColor(ImGuiCol_Button, Red);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Fade(Red, 0.85f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+            const bool confirmed = ImGui::Button("Delete", ImVec2(ImGui::GetFontSize() * 6, 0));
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine();
+            if (ImGui::Button("Keep it", ImVec2(ImGui::GetFontSize() * 6, 0))) ImGui::CloseCurrentPopup();
+            if (confirmed) {
+                ImGui::CloseCurrentPopup();
+                if (DeleteCurrentProfile()) close = true;
+            }
+            ImGui::EndPopup();
+        }
+
+        if (close) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    // Switches to another profile, then deletes (or recycles) this one.
+    bool DeleteCurrentProfile() {
+        try {
+            if (const auto busy = ProfileBusyReason(); !busy.empty()) throw std::runtime_error("not now: " + busy);
+            const auto doomed = layout_.profile;
+            std::string next;
+            for (const auto& name : profiles_) {
+                if (name != doomed) {
+                    next = name;
+                    break;
+                }
+            }
+            if (next.empty()) throw std::runtime_error("it's the only profile");
+            const auto folder = layout_.Profile();
+            SwitchProfile(next);
+            if (layout_.profile != next) throw std::runtime_error("couldn't switch to " + next);
+#ifdef _WIN32
+            if (const auto code = win::RecycleItem(folder.c_str()); code != 0) {
+                throw std::runtime_error("couldn't move " + ToUtf8(folder) + " to the Recycle Bin (error " + std::to_string(code) + ")");
+            }
+#else
+            std::filesystem::remove_all(folder);
+#endif
+            profiles_ = ListProfiles(layout_.userdata);
+            message_ = Message{Green, "Profile deleted", "\"" + doomed + "\" is gone; now using " + next + "."};
+            return true;
+        } catch (const std::exception& failure) {
+            editError_ = ReadableText(failure.what());
+            return false;
+        }
+    }
+
     void ApplyCurrentTheme() {
         auto& style = ImGui::GetStyle();
         ApplyTheme(style, WantDark(settings_.theme));
@@ -2929,20 +3267,6 @@ private:
             ImGui::Checkbox("Look up game updates online", &draft_.onlineInfo);
         });
 
-        const std::string profileTitle = "Profile: " + layout_.profile;
-        Section("profile", profileTitle.c_str(), "Settings of the current profile. Switch profiles from the library's top bar.", [&] {
-            ImGui::TextUnformatted("Console language");
-            ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * 20));
-            if (ImGui::BeginCombo("##language", LanguageLabel(draftProfile_.language).c_str())) {
-                if (ImGui::Selectable(LanguageLabel("").c_str(), draftProfile_.language.empty())) draftProfile_.language.clear();
-                if (ImGui::Selectable(LanguageLabel("auto").c_str(), draftProfile_.language == "auto")) draftProfile_.language = "auto";
-                for (const auto& item : ConsoleLanguages()) {
-                    const auto value = std::to_string(item.number);
-                    if (ImGui::Selectable(LanguageLabel(value).c_str(), draftProfile_.language == value)) draftProfile_.language = value;
-                }
-                ImGui::EndCombo();
-            }
-        });
         ImGui::EndChild();
 
         if (!saveError_.empty()) ImGui::TextColored(Red, "%s", Elide(saveError_, ImGui::GetContentRegionAvail().x).c_str());
@@ -3039,6 +3363,10 @@ private:
     bool missingAsked_ = false;
     bool latestWanted_ = false;
     bool openNewProfile_ = false;
+    bool openEditProfile_ = false;
+    std::string editName_;
+    ProfileSettings editProfile_;
+    std::string editError_;
     std::string newProfileName_;
     std::string newProfileError_;
     std::unique_ptr<TrophyToast> toast_;

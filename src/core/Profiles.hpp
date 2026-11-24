@@ -61,4 +61,8 @@ void CreateProfile(const Layout& layout);
 ProfileSettings LoadProfile(const Layout& layout);
 void SaveProfile(const Layout& layout, const ProfileSettings& settings);
 
+// Renames the profile's folder (layout.profile) to newName. Throws when the name
+// isn't valid or another profile has it; a change of letter case only is allowed.
+void RenameProfile(const Layout& layout, std::string_view newName);
+
 }

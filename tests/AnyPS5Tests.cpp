@@ -189,6 +189,29 @@ TEST(ProfilesAreCreatedListedAndKeepTheirLanguage) {
     CHECK_EQ(std::string(ConsoleLanguages()[25].name), std::string("Greek"));
 }
 
+TEST(ProfilesAreRenamedWithTheirData) {
+    fixture::TempDir temp;
+    Layout layout{temp.Path(), temp.Path() / "library", "Player"};
+    CreateProfile(layout);
+    SaveProfile(layout, {"8"});
+    std::filesystem::create_directories(layout.Saves("PPSA00001") / "_sd");
+    layout.profile = "Other";
+    CreateProfile(layout);
+    layout.profile = "Player";
+    CHECK_THROWS(RenameProfile(layout, "Other"));
+    CHECK_THROWS(RenameProfile(layout, "bad/name"));
+    RenameProfile(layout, "player");  // case only
+    layout.profile = "player";
+    CHECK(std::filesystem::is_directory(layout.Saves("PPSA00001") / "_sd"));
+    RenameProfile(layout, "Leska");
+    layout.profile = "Leska";
+    CHECK(std::filesystem::is_directory(layout.Saves("PPSA00001") / "_sd"));
+    CHECK_EQ(LoadProfile(layout).language, std::string("8"));
+    const auto names = ListProfiles(temp.Path());
+    CHECK_EQ(names.size(), std::size_t{2});
+    CHECK_EQ(names[0], std::string("Leska"));
+}
+
 TEST(FindsAnAnyPS5BuildOrRelease) {
     fixture::TempDir temp;
     CHECK(!ProbeAnyPS5("").runtime);

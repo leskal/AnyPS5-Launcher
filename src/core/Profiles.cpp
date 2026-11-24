@@ -113,4 +113,30 @@ void SaveProfile(const Layout& layout, const ProfileSettings& settings) {
     WriteFileAtomically(layout.ProfileFile(), document.dump(4) + "\n");
 }
 
+void RenameProfile(const Layout& layout, std::string_view newName) {
+    if (!IsValidProfileName(newName)) throw std::runtime_error("\"" + std::string(newName) + "\" can't be a profile name (no \\ / : * ? \" < > |)");
+    const auto from = layout.Profile();
+    Layout renamed = layout;
+    renamed.profile = std::string(newName);
+    const auto to = renamed.Profile();
+    if (from == to) return;
+    const auto lower = [](std::string text) {
+        std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return text;
+    };
+    const bool caseOnly = lower(layout.profile) == lower(std::string(newName));
+    std::error_code error;
+    if (!caseOnly && std::filesystem::exists(to, error)) throw std::runtime_error("a profile named \"" + std::string(newName) + "\" already exists");
+    if (!std::filesystem::is_directory(from, error)) throw std::runtime_error("the profile folder " + ToUtf8(from) + " is missing");
+    if (caseOnly) {
+        // Windows matches names without case: go through a temporary name.
+        auto step = from;
+        step += ".renaming";
+        std::filesystem::rename(from, step);
+        std::filesystem::rename(step, to);
+    } else {
+        std::filesystem::rename(from, to);
+    }
+}
+
 }

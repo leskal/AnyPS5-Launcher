@@ -183,6 +183,25 @@ BOOL CALLBACK VisitWindow(HWND window, LPARAM parameter) {
 
 }
 
+unsigned long RecycleItem(const wchar_t* path) {
+    // SHFileOperation wants a list ending in two zeros.
+    int length = 0;
+    while (path[length] != 0) ++length;
+    if (length == 0 || length > 32000) return ERROR_INVALID_PARAMETER;
+    HANDLE heap = GetProcessHeap();
+    auto* list = static_cast<wchar_t*>(HeapAlloc(heap, HEAP_ZERO_MEMORY, static_cast<SIZE_T>(length + 2) * sizeof(wchar_t)));
+    if (list == nullptr) return ERROR_NOT_ENOUGH_MEMORY;
+    for (int i = 0; i < length; ++i) list[i] = path[i];
+    SHFILEOPSTRUCTW operation{};
+    operation.wFunc = FO_DELETE;
+    operation.pFrom = list;
+    operation.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+    const int result = SHFileOperationW(&operation);
+    HeapFree(heap, 0, list);
+    if (result != 0) return static_cast<unsigned long>(result);
+    return operation.fAnyOperationsAborted ? ERROR_CANCELLED : ERROR_SUCCESS;
+}
+
 unsigned long JobWindowRect(void* job, long* x, long* y, long* width, long* height) {
     if (job == nullptr) return ERROR_INVALID_HANDLE;
     WindowSearch search{static_cast<HANDLE>(job), RECT{}, 0};
