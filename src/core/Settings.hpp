@@ -14,6 +14,7 @@ struct Settings {
     std::string anyps5Version;  // its id in <launcher>/anyps5/versions.json
     std::string gamesFolder;     // PS5 games
     std::string ps4GamesFolder;  // PS4 games; empty: none
+    std::string ps4TrophyKey;    // the user's own PS4 trophy key (32 hex digits) to read PS4 trophy lists
     // Empty means <launcher folder>/library and <launcher folder>/userdata.
     std::string libraryFolder;
     std::string userdataFolder;

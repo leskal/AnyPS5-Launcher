@@ -10,6 +10,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/Aes.hpp"
+#include "core/Metadata.hpp"
 #include "core/Package.hpp"
 #include "core/Utf8.hpp"
 
@@ -325,7 +327,217 @@ void ApplyTrophyRecords(TrophySet& set, const TrophyRecords& records) {
     }
 }
 
-std::optional<TrophySet> LoadTrophies(PackageReader& package, const std::vector<std::string>& languages) {
+std::optional<TrophyKey> ParseTrophyKey(std::string_view text) {
+    TrophyKey key{};
+    std::size_t nibbles = 0;
+    for (const char c : text) {
+        if (c == ' ' || c == '-' || c == ':' || c == '\t') continue;
+        int value = -1;
+        if (c >= '0' && c <= '9') value = c - '0';
+        else if (c >= 'a' && c <= 'f') value = c - 'a' + 10;
+        else if (c >= 'A' && c <= 'F') value = c - 'A' + 10;
+        if (value < 0 || nibbles >= 32) return std::nullopt;
+        key[nibbles / 2] = static_cast<std::uint8_t>(key[nibbles / 2] | (nibbles % 2 == 0 ? value << 4 : value));
+        ++nibbles;
+    }
+    if (nibbles != 32) return std::nullopt;
+    return key;
+}
+
+std::map<std::string, TrpEntry> ReadTrp(std::span<const std::uint8_t> data) {
+    constexpr std::uint64_t TrpMagic = 0xDCA24D00;
+    constexpr std::uint64_t HeaderSize = 0x60;
+    std::map<std::string, TrpEntry> files;
+    const auto magic = BigEndian(data, 0, 4);
+    const auto count = BigEndian(data, 0x10, 4);
+    const auto entrySize = BigEndian(data, 0x14, 4);
+    if (!magic || *magic != TrpMagic || !count || *count > 4096 || !entrySize || *entrySize < 0x40 || *entrySize > 0x1000) return files;
+    for (std::uint64_t index = 0; index < *count; ++index) {
+        const auto entry = HeaderSize + index * *entrySize;
+        if (entry + 0x40 > data.size()) return {};
+        const auto* field = reinterpret_cast<const char*>(data.data() + entry);
+        const std::string name(field, std::find(field, field + 32, '\0'));
+        const auto offset = BigEndian(data, entry + 32, 8);
+        const auto length = BigEndian(data, entry + 40, 8);
+        const auto flag = BigEndian(data, entry + 48, 4);
+        if (!offset || !length || !flag || *offset > data.size() || *length > data.size() - *offset) return {};
+        files[name] = {static_cast<std::uint32_t>(*flag),
+                       std::vector<std::uint8_t>(data.begin() + static_cast<std::ptrdiff_t>(*offset), data.begin() + static_cast<std::ptrdiff_t>(*offset + *length))};
+    }
+    return files;
+}
+
+std::vector<std::string> NpCommIds(std::span<const std::uint8_t> npbind) {
+    std::vector<std::string> ids;
+    const std::string_view text(reinterpret_cast<const char*>(npbind.data()), npbind.size());
+    for (auto at = text.find("NPWR"); at != std::string_view::npos; at = text.find("NPWR", at + 4)) {
+        if (at + 12 > text.size()) break;
+        const auto id = text.substr(at, 12);  // NPWR12345_00
+        bool ok = id[9] == '_';
+        for (const std::size_t i : {4u, 5u, 6u, 7u, 8u, 10u, 11u}) ok = ok && id[i] >= '0' && id[i] <= '9';
+        if (ok && std::find(ids.begin(), ids.end(), id) == ids.end()) ids.emplace_back(id);
+    }
+    return ids;
+}
+
+std::string DecryptEsfm(std::span<const std::uint8_t> esfm, const TrophyKey& key, std::string_view npCommId) {
+    if (esfm.size() <= 16) return {};
+    // The file key: the NP communication ID (16 bytes, zero padded) encrypted with the
+    // trophy key (one CBC block with a zero IV is one plain block).
+    std::array<std::uint8_t, 16> id{};
+    std::copy_n(npCommId.begin(), std::min<std::size_t>(npCommId.size(), 16), id.begin());
+    const Aes128 fileKey(Aes128(key).EncryptBlock(id));
+    const auto plain = fileKey.DecryptCbc(esfm.subspan(16), esfm.first<16>());
+    std::string xml(plain.begin(), plain.end());
+    if (const auto end = xml.rfind('>'); end != std::string::npos) xml.resize(end + 1);  // padding after the last tag
+    else xml.clear();
+    return xml;
+}
+
+namespace {
+
+// The text between <tag> and </tag> after from; empty when there's none.
+std::string Element(std::string_view xml, std::string_view tag, std::size_t from = 0, std::size_t until = std::string_view::npos) {
+    const std::string open = "<" + std::string(tag) + ">";
+    const std::string close = "</" + std::string(tag) + ">";
+    const auto start = xml.find(open, from);
+    if (start == std::string_view::npos || start >= until) return {};
+    const auto end = xml.find(close, start);
+    if (end == std::string_view::npos || end > until) return {};
+    return DecodeXmlEntities(xml.substr(start + open.size(), end - start - open.size()));
+}
+
+std::string Attribute(std::string_view tag, std::string_view name) {
+    const std::string key = std::string(name) + "=\"";
+    for (auto at = tag.find(key); at != std::string_view::npos; at = tag.find(key, at + 1)) {
+        if (at > 0 && tag[at - 1] != ' ' && tag[at - 1] != '\t' && tag[at - 1] != '\n' && tag[at - 1] != '\r') continue;
+        const auto start = at + key.size();
+        const auto end = tag.find('"', start);
+        if (end == std::string_view::npos) return {};
+        return std::string(tag.substr(start, end - start));
+    }
+    return {};
+}
+
+}
+
+std::optional<TrophySet> ParsePs4TrophyXml(std::string_view xml, std::uint32_t label) {
+    if (xml.find("<trophyconf") == std::string_view::npos) return std::nullopt;
+    TrophySet set;
+    set.title = Element(xml, "title-name");
+    for (auto at = xml.find("<trophy "); at != std::string_view::npos; at = xml.find("<trophy ", at + 1)) {
+        const auto tagEnd = xml.find('>', at);
+        const auto close = xml.find("</trophy>", at);
+        if (tagEnd == std::string_view::npos || close == std::string_view::npos) break;
+        const auto tag = xml.substr(at, tagEnd - at);
+        Trophy trophy;
+        trophy.label = label;
+        int id = -1;
+        const auto idText = Attribute(tag, "id");
+        if (!ParseNumber(idText, id) || id < 0) continue;
+        trophy.id = id;
+        const auto grade = Grade(Attribute(tag, "ttype"));
+        if (!grade) continue;
+        trophy.grade = *grade;
+        trophy.hidden = Attribute(tag, "hidden") == "yes";
+        trophy.name = Element(xml, "name", tagEnd, close);
+        trophy.detail = Element(xml, "detail", tagEnd, close);
+        set.trophies.push_back(std::move(trophy));
+    }
+    if (set.trophies.empty()) return std::nullopt;
+    return set;
+}
+
+namespace {
+
+// The file name part of TROP_NN for the first language: "TROP_01" for en-US.
+std::string Ps4TextFile(const std::vector<std::string>& languages) {
+    static constexpr std::array<std::string_view, 31> Tags{"ja-JP", "en-US", "fr-FR", "es-ES", "de-DE", "it-IT",  "nl-NL", "pt-PT",
+                                                           "ru-RU", "ko-KR", "zh-Hant", "zh-Hans", "fi-FI", "sv-SE", "da-DK", "no-NO",
+                                                           "pl-PL", "pt-BR", "en-GB", "tr-TR", "es-419", "ar-AE", "fr-CA", "cs-CZ",
+                                                           "hu-HU", "el-GR", "ro-RO", "th-TH", "vi-VN", "id-ID", "uk-UA"};
+    for (const auto& language : languages) {
+        for (std::size_t index = 0; index < Tags.size(); ++index) {
+            if (Tags[index] == language) {
+                const auto number = std::to_string(index);
+                return "TROP_" + std::string(number.size() < 2 ? "0" : "") + number;
+            }
+        }
+    }
+    return {};
+}
+
+std::optional<TrophySet> LoadPs4Trophies(PackageReader& package, const std::vector<std::string>& languages, const std::optional<TrophyKey>& key) {
+    std::vector<std::string> commIds;
+    try {
+        if (auto npbind = package.ReadAll("sce_sys/npbind.dat", 1u << 20)) commIds = NpCommIds(*npbind);
+    } catch (const std::exception&) {
+    }
+    const auto localized = Ps4TextFile(languages);
+    std::optional<TrophySet> result;
+    for (std::uint32_t label = 0; label < 100; ++label) {
+        std::array<char, 40> name{};
+        std::snprintf(name.data(), name.size(), "sce_sys/trophy/trophy%02u.trp", label);
+        std::optional<std::vector<std::uint8_t>> data;
+        try {
+            data = package.ReadAll(name.data(), UcpMaxSize);
+        } catch (const std::exception&) {
+            continue;
+        }
+        if (!data) {
+            if (label == 0) continue;
+            break;
+        }
+        const auto files = ReadTrp(*data);
+        if (files.empty()) continue;
+        const auto icon = [&](const std::string& file) {
+            const auto found = files.find(file);
+            return found == files.end() ? std::vector<std::uint8_t>{} : found->second.data;
+        };
+        // Plain XML in some packages (.SFM), encrypted in a retail one (.ESFM).
+        std::optional<TrophySet> loaded;
+        const std::string commId = label < commIds.size() ? commIds[label] : std::string();
+        for (const auto& stem : {localized, std::string("TROP"), std::string("TROPCONF")}) {
+            if (stem.empty() || loaded) continue;
+            if (const auto plain = files.find(stem + ".SFM"); plain != files.end()) {
+                loaded = ParsePs4TrophyXml(std::string_view(reinterpret_cast<const char*>(plain->second.data.data()), plain->second.data.size()), label);
+            } else if (const auto locked = files.find(stem + ".ESFM"); locked != files.end() && key && !commId.empty()) {
+                loaded = ParsePs4TrophyXml(DecryptEsfm(locked->second.data, *key, commId), label);
+            }
+        }
+        if (!loaded) {
+            // No key (or a wrong one): what the icons tell.
+            TrophySet placeholder;
+            placeholder.encrypted = true;
+            for (const auto& [file, entry] : files) {
+                if (file.size() == 11 && file.starts_with("TROP") && file.ends_with(".PNG")) ++placeholder.lockedCount;
+            }
+            loaded = std::move(placeholder);
+        } else {
+            for (auto& trophy : loaded->trophies) {
+                char file[16];
+                std::snprintf(file, sizeof(file), "TROP%03d.PNG", trophy.id);
+                trophy.icon = icon(file);
+            }
+        }
+        loaded->icon = icon("ICON0.PNG");
+        if (!result) {
+            result = std::move(loaded);
+        } else if (result->encrypted || loaded->encrypted) {
+            result->encrypted = true;
+            result->lockedCount += loaded->lockedCount + static_cast<int>(loaded->trophies.size());
+            result->trophies.clear();
+        } else {
+            for (auto& trophy : loaded->trophies) result->trophies.push_back(std::move(trophy));
+        }
+    }
+    return result;
+}
+
+}
+
+std::optional<TrophySet> LoadTrophies(PackageReader& package, const std::vector<std::string>& languages, const std::optional<TrophyKey>& ps4Key) {
+    if (!package.IsDirectory("sce_sys/trophy2") && package.IsDirectory("sce_sys/trophy")) return LoadPs4Trophies(package, languages, ps4Key);
     std::optional<TrophySet> result;
     for (std::uint32_t label = 0; label < 100; ++label) {
         std::array<char, 40> name{};

@@ -65,6 +65,7 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     ReadString(*document, "anyps5Version", result.settings.anyps5Version, result.error);
     ReadString(*document, "gamesFolder", result.settings.gamesFolder, result.error);
     ReadString(*document, "ps4GamesFolder", result.settings.ps4GamesFolder, result.error);
+    ReadString(*document, "ps4TrophyKey", result.settings.ps4TrophyKey, result.error);
     ReadString(*document, "libraryFolder", result.settings.libraryFolder, result.error);
     ReadString(*document, "userdataFolder", result.settings.userdataFolder, result.error);
     ReadString(*document, "profile", result.settings.profile, result.error);
@@ -126,6 +127,8 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["anyps5Version"] = settings.anyps5Version;
     document["gamesFolder"] = settings.gamesFolder;
     document["ps4GamesFolder"] = settings.ps4GamesFolder;
+    if (settings.ps4TrophyKey.empty()) document.erase("ps4TrophyKey");
+    else document["ps4TrophyKey"] = settings.ps4TrophyKey;
     document["libraryFolder"] = settings.libraryFolder;
     document["userdataFolder"] = settings.userdataFolder;
     document["profile"] = settings.profile;

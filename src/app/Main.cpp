@@ -2924,7 +2924,9 @@ private:
                 if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
             }
             ImGui::SameLine();
-            const std::string trophies = set != nullptr ? std::to_string(set->Count().earned) + "/" + std::to_string(set->Count().total) : std::string("Trophies");
+            const std::string trophies = set == nullptr ? std::string("Trophies")
+                                         : set->encrypted ? std::to_string(set->lockedCount)
+                                                          : std::to_string(set->Count().earned) + "/" + std::to_string(set->Count().total);
             const ImVec2 cupAt = ImGui::GetCursorScreenPos();
             if (ImGui::Button(("     " + trophies + "##home-trophies").c_str(), ImVec2(0, button))) OpenTrophies();
             {
@@ -3878,7 +3880,7 @@ private:
                 if (game.home.empty() || game.home != home) continue;
                 try {
                     auto package = OpenGamePackage(game);
-                    runTrophies_ = LoadTrophies(*package, TrophyLanguages(profileSettings_.language));
+                    runTrophies_ = LoadTrophies(*package, TrophyLanguages(profileSettings_.language), ParseTrophyKey(settings_.ps4TrophyKey));
                 } catch (const std::exception&) {
                 }
                 break;
@@ -3937,11 +3939,12 @@ private:
             auto copy = *game;
             const auto records = TrophyRecordsFor(*game);
             const auto languages = TrophyLanguages(profileSettings_.language);
-            trophyLoader_.Start([copy, key, records, languages] {
+            const auto ps4Key = ParseTrophyKey(settings_.ps4TrophyKey);
+            trophyLoader_.Start([copy, key, records, languages, ps4Key] {
                 TrophyLoad load{key, std::nullopt};
                 try {
                     auto package = OpenGamePackage(copy);
-                    load.set = LoadTrophies(*package, languages);
+                    load.set = LoadTrophies(*package, languages, ps4Key);
                     if (load.set) ApplyTrophyRecords(*load.set, ReadTrophyRecords(records));
                 } catch (const std::exception&) {
                     load.set.reset();
@@ -4035,13 +4038,33 @@ private:
             return;
         }
         if (set == nullptr) {
-            ImGui::TextColored(Dim, "No trophy list in the game files (sce_sys/trophy2).");
+            ImGui::TextColored(Dim, "No trophy list in the game files (sce_sys/trophy2 or sce_sys/trophy).");
+            return;
+        }
+        if (set->encrypted) {
+            DrawLockedTrophies(*set);
             return;
         }
         const auto count = set->Count();
         ImGui::Text("%d of %d earned  \xC2\xB7  %d%%", count.earned, count.total, set->Percent());
         ProgressBar(static_cast<float>(set->Percent()) / 100.0f, ImGui::GetContentRegionAvail().x, Accent);
         DrawGradeCounts(*set);
+    }
+
+    // A PS4 list without the key: how many there are, and where the key goes.
+    void DrawLockedTrophies(const TrophySet& set) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::Text("%d trophies", set.lockedCount);
+        const bool badKey = !settings_.ps4TrophyKey.empty();
+        ImGui::TextColored(badKey ? Amber : Dim, "%s",
+                           badKey ? "The PS4 trophy key in Settings doesn't open this list. Check that it's your console's key (32 hex digits)."
+                                  : "This PS4 game's trophy list is encrypted. Add your console's PS4 trophy key in Settings > Games to see the names and grades.");
+        ImGui::PopTextWrapPos();
+        if (ImGui::SmallButton("Open Settings")) {
+            ImGui::CloseCurrentPopup();
+            settingsPage_ = SettingsPage::Games;
+            OpenSettings();
+        }
     }
 
     void OpenTrophies() {
@@ -4062,12 +4085,17 @@ private:
         bool loading = false;
         const auto* set = game != nullptr ? TrophiesOf(*game, loading) : nullptr;
         const std::string title = game == nullptr ? std::string("Trophies") : "Trophies: " + game->metadata.name;
-        const std::string note = set == nullptr ? std::string() : std::to_string(set->Count().earned) + " of " + std::to_string(set->Count().total) +
+        const std::string note = set == nullptr || set->encrypted ? std::string() : std::to_string(set->Count().earned) + " of " + std::to_string(set->Count().total) +
                                                                   " earned, " + std::to_string(set->Percent()) + "%. Kept per profile (" + layout_.profile +
                                                                   "); the list updates when the game closes.";
         if (DialogHeader(title.c_str(), note.c_str())) ImGui::CloseCurrentPopup();
         if (set == nullptr) {
-            ImGui::TextColored(Dim, "%s", loading ? "Reading the trophy list..." : "This game has no trophy list in its files (sce_sys/trophy2).");
+            ImGui::TextColored(Dim, "%s", loading ? "Reading the trophy list..." : "This game has no trophy list in its files (sce_sys/trophy2 or sce_sys/trophy).");
+            ImGui::EndPopup();
+            return;
+        }
+        if (set->encrypted) {
+            DrawLockedTrophies(*set);
             ImGui::EndPopup();
             return;
         }
@@ -5795,6 +5823,18 @@ private:
             SettingRow("intel", "Intel flag (--to-intel)", note.c_str(), 40.0f * s, [&] {
                 if (Toggle("##intel", &intel)) draft_.intelFlag = intel == hostIntel_ ? std::nullopt : std::optional<bool>(intel);
             });
+            GroupLabel("PS4 trophies");
+            {
+                const bool valid = draft_.ps4TrophyKey.empty() || ParseTrophyKey(draft_.ps4TrophyKey).has_value();
+                const char* note = draft_.ps4TrophyKey.empty() ? "PS4 trophy lists are encrypted. Your console's trophy key (32 hex digits) opens them; the launcher doesn't include one."
+                                   : valid                    ? "Set. PS4 trophy lists show their names and grades."
+                                                              : "Not a key: it needs 32 hex digits (0-9, A-F).";
+                const float field = ImGui::GetFontSize() * 17.0f;
+                SettingRow("ps4key", "PS4 trophy key", note, field, [&] {
+                    ImGui::SetNextItemWidth(field);
+                    ImGui::InputTextWithHint("##ps4key", "32 hex digits", &draft_.ps4TrophyKey, ImGuiInputTextFlags_Password);
+                });
+            }
             GroupLabel("Online");
             ToggleRow("online", "Look up game updates", "Asks PROSPEROPatches.com for the selected game's region, publisher and newest update. Only the title ID is sent; answers are kept for a day.",
                       &draft_.onlineInfo);
@@ -5988,6 +6028,10 @@ private:
                 draft_.anyps5Version = settings_.anyps5Version;
                 SaveSettings(settingsFile_, draft_);
                 const bool gamesChanged = draft_.gamesFolder != settings_.gamesFolder || draft_.ps4GamesFolder != settings_.ps4GamesFolder;
+                if (draft_.ps4TrophyKey != settings_.ps4TrophyKey) {
+                    trophies_.clear();  // read the lists again with the new key
+                    trophyAsked_.clear();
+                }
                 settings_ = draft_;
                 settingsError_.clear();
                 ApplySettings();

@@ -7,6 +7,7 @@
 #include "Fixtures.hpp"
 #include "Framework.hpp"
 
+#include "core/Aes.hpp"
 #include "core/InputMapping.hpp"
 #include "core/Scanner.hpp"
 #include "core/Trophies.hpp"
@@ -145,6 +146,121 @@ TEST(LoadsTrophiesFromGamePackage) {
     fixture::WriteFolder(empty.Path() / "Plain", fixture::Game("PPSA00002", "Plain"));
     auto plain = launcher::OpenGamePackage(launcher::Scan({.roots = {empty.Path()}}).games.at(0));
     CHECK(!launcher::LoadTrophies(*plain, {}).has_value());
+}
+
+namespace {
+
+std::vector<std::uint8_t> Hex(std::string_view text) {
+    std::vector<std::uint8_t> out;
+    for (std::size_t i = 0; i + 1 < text.size(); i += 2) out.push_back(static_cast<std::uint8_t>(std::stoi(std::string(text.substr(i, 2)), nullptr, 16)));
+    return out;
+}
+
+// What a retail .trp holds: the XML encrypted the way the console does.
+std::vector<std::uint8_t> Esfm(const std::string& xml, const launcher::TrophyKey& key, const std::string& commId) {
+    std::array<std::uint8_t, 16> id{};
+    std::copy(commId.begin(), commId.end(), id.begin());
+    const launcher::Aes128 fileKey(launcher::Aes128(key).EncryptBlock(id));
+    std::vector<std::uint8_t> plain(xml.begin(), xml.end());
+    plain.resize((plain.size() + 15) / 16 * 16, 0);
+    std::array<std::uint8_t, 16> previous{};
+    for (int i = 0; i < 16; ++i) previous[static_cast<std::size_t>(i)] = static_cast<std::uint8_t>(0x30 + i);
+    std::vector<std::uint8_t> out(previous.begin(), previous.end());
+    for (std::size_t at = 0; at < plain.size(); at += 16) {
+        std::array<std::uint8_t, 16> block{};
+        for (int i = 0; i < 16; ++i) block[static_cast<std::size_t>(i)] = plain[at + static_cast<std::size_t>(i)] ^ previous[static_cast<std::size_t>(i)];
+        previous = fileKey.EncryptBlock(block);
+        out.insert(out.end(), previous.begin(), previous.end());
+    }
+    return out;
+}
+
+std::vector<std::uint8_t> Trp(const std::vector<std::pair<std::string, std::pair<std::uint32_t, std::vector<std::uint8_t>>>>& files) {
+    std::vector<std::uint8_t> out(0x60 + files.size() * 0x40, 0);
+    PutBig(out, 0, 0xDCA24D00, 4);
+    PutBig(out, 4, 1, 4);
+    PutBig(out, 0x10, files.size(), 4);
+    PutBig(out, 0x14, 0x40, 4);
+    for (std::size_t i = 0; i < files.size(); ++i) {
+        const auto entry = 0x60 + i * 0x40;
+        std::memcpy(out.data() + entry, files[i].first.data(), files[i].first.size());
+        PutBig(out, entry + 32, out.size(), 8);
+        PutBig(out, entry + 40, files[i].second.second.size(), 8);
+        PutBig(out, entry + 48, files[i].second.first, 4);
+        out.insert(out.end(), files[i].second.second.begin(), files[i].second.second.end());
+    }
+    PutBig(out, 8, out.size(), 8);
+    return out;
+}
+
+}
+
+TEST(Aes128MatchesTheStandard) {
+    const auto key = Hex("000102030405060708090a0b0c0d0e0f");
+    const auto plain = Hex("00112233445566778899aabbccddeeff");
+    const launcher::Aes128 aes(std::span<const std::uint8_t, 16>(key.data(), 16));
+    const auto cipher = aes.EncryptBlock(std::span<const std::uint8_t, 16>(plain.data(), 16));
+    CHECK(std::vector<std::uint8_t>(cipher.begin(), cipher.end()) == Hex("69c4e0d86a7b0430d8cdb78070b4c55a"));  // FIPS-197 C.1
+    const auto back = aes.DecryptBlock(cipher);
+    CHECK(std::vector<std::uint8_t>(back.begin(), back.end()) == plain);
+    // NIST SP 800-38A F.2.2, CBC-AES128 decryption, two blocks.
+    const auto cbcKey = Hex("2b7e151628aed2a6abf7158809cf4f3c");
+    const auto iv = Hex("000102030405060708090a0b0c0d0e0f");
+    const launcher::Aes128 cbc(std::span<const std::uint8_t, 16>(cbcKey.data(), 16));
+    const auto out = cbc.DecryptCbc(Hex("7649abac8119b246cee98e9b12e9197d5086cb9b507219ee95db113a917678b2"), std::span<const std::uint8_t, 16>(iv.data(), 16));
+    CHECK(out == Hex("6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"));
+}
+
+TEST(ReadsPs4TrophiesWithTheKey) {
+    CHECK(!launcher::ParseTrophyKey("1234").has_value());
+    CHECK(!launcher::ParseTrophyKey("zz112233445566778899aabbccddeeff").has_value());
+    const auto key = *launcher::ParseTrophyKey("00112233-44556677 8899AABB:ccddeeff");
+    CHECK_EQ(key[0], std::uint8_t{0x00});
+    CHECK_EQ(key[15], std::uint8_t{0xff});
+    const std::string commId = "NPWR01234_00";
+    const std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<trophyconf version="1.1" platform="ps4" policy="large">
+<npcommid>NPWR01234_00</npcommid>
+<title-name>Sword &amp; Shield</title-name>
+<trophy id="000" hidden="no" ttype="P" pid="000"><name>All of them</name><detail>Every trophy</detail></trophy>
+<trophy id="001" hidden="yes" ttype="B"><name>A secret</name><detail>Found it</detail></trophy>
+</trophyconf>)";
+    const auto english = std::string(xml).replace(xml.find("All of them"), 11, "Everything!");
+    const auto png = fixture::Bytes("\x89PNG fake");
+    fixture::TempDir temp;
+    auto tree = fixture::Game("CUSA01234", "PS4 game");
+    tree["sce_sys/npbind.dat"] = fixture::Bytes(std::string("\xD2\x94\xA0\x18 header ") + commId + std::string(8, '\0') + "NPWR01234_00 repeated");
+    tree["sce_sys/trophy/trophy00.trp"] = Trp({{"ICON0.PNG", {0, png}},
+                                               {"TROP000.PNG", {0, png}},
+                                               {"TROP001.PNG", {0, png}},
+                                               {"TROP.ESFM", {3, Esfm(xml, key, commId)}},
+                                               {"TROP_01.ESFM", {3, Esfm(english, key, commId)}}});
+    fixture::WriteFolder(temp.Path() / "Game", tree);
+    const auto game = launcher::Scan({.roots = {temp.Path()}}).games.at(0);
+    auto package = launcher::OpenGamePackage(game);
+    CHECK(launcher::NpCommIds(*package->ReadAll("sce_sys/npbind.dat", 4096)) == std::vector<std::string>{commId});
+
+    // With the key: names, grades, hidden, icons; the profile's language first.
+    auto set = launcher::LoadTrophies(*package, {}, key);
+    CHECK(set.has_value() && !set->encrypted);
+    CHECK_EQ(set->title, std::string("Sword & Shield"));
+    CHECK_EQ(set->trophies.size(), std::size_t{2});
+    CHECK_EQ(set->trophies[0].name, std::string("All of them"));
+    CHECK(set->trophies[0].grade == launcher::TrophyGrade::Platinum);
+    CHECK(set->trophies[1].hidden);
+    CHECK(set->trophies[1].icon == png);
+    CHECK(set->icon == png);
+    set = launcher::LoadTrophies(*package, {"en-US"}, key);
+    CHECK_EQ(set->trophies[0].name, std::string("Everything!"));
+
+    // Without it (or with a wrong one): how many there are, nothing more.
+    for (const auto& other : {std::optional<launcher::TrophyKey>{}, launcher::ParseTrophyKey("ffffffffffffffffffffffffffffffff")}) {
+        const auto locked = launcher::LoadTrophies(*package, {}, other);
+        CHECK(locked.has_value() && locked->encrypted);
+        CHECK_EQ(locked->lockedCount, 2);
+        CHECK(locked->trophies.empty());
+        CHECK(locked->icon == png);
+    }
 }
 
 TEST(ParsesAndWritesInputFile) {

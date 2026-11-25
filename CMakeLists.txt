@@ -19,6 +19,7 @@ include(cmake/Dependencies.cmake)
 
 add_library(launcher_core STATIC
     src/core/AnyPS5.cpp
+    src/core/Aes.cpp
     src/core/Archive.cpp
     src/core/Encryption.cpp
     src/core/Executable.cpp

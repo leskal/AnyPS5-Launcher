@@ -46,6 +46,10 @@ struct TrophySet {
     std::string title;
     std::vector<std::uint8_t> icon;
     std::vector<Trophy> trophies;
+    // A PS4 list that can't be read without the PS4 trophy key: trophies is empty,
+    // lockedCount says how many there are (from their icons).
+    bool encrypted = false;
+    int lockedCount = 0;
 
     TrophyCount Count() const;
     TrophyCount Count(TrophyGrade grade) const;
@@ -71,8 +75,37 @@ TrophyRecords ReadTrophyRecords(const std::filesystem::path& folder);
 // Marks earned trophies and fills in progress.
 void ApplyTrophyRecords(TrophySet& set, const TrophyRecords& records);
 
-// Reads every sce_sys/trophy2/trophyNN.ucp of the game. nullopt when it has none.
-std::optional<TrophySet> LoadTrophies(PackageReader& package, const std::vector<std::string>& languages);
+// ---- PS4: sce_sys/trophy/trophyNN.trp --------------------------------------------
+// A .trp holds PNG icons and encrypted XML (.ESFM). The XML's key comes from the
+// console's trophy key (not part of the launcher: the user supplies it) and the
+// game's NP communication ID from sce_sys/npbind.dat.
+
+using TrophyKey = std::array<std::uint8_t, 16>;
+
+// "0123...": 32 hex digits, spaces and dashes allowed. nullopt otherwise.
+std::optional<TrophyKey> ParseTrophyKey(std::string_view text);
+
+struct TrpEntry {
+    std::uint32_t flag = 0;  // 0: PNG, 3: encrypted XML
+    std::vector<std::uint8_t> data;
+};
+
+// The files of a .trp by name. Empty when the data isn't a valid .trp.
+std::map<std::string, TrpEntry> ReadTrp(std::span<const std::uint8_t> data);
+
+// The NP communication IDs (NPWR12345_00) in npbind.dat, in order.
+std::vector<std::string> NpCommIds(std::span<const std::uint8_t> npbind);
+
+// An .ESFM's XML: the first 16 bytes are the IV, the rest AES-128-CBC.
+std::string DecryptEsfm(std::span<const std::uint8_t> esfm, const TrophyKey& key, std::string_view npCommId);
+
+// The trophies of a PS4 trophy XML (TROP.SFM, TROP_NN.SFM or TROPCONF.SFM).
+std::optional<TrophySet> ParsePs4TrophyXml(std::string_view xml, std::uint32_t label);
+
+// Reads every sce_sys/trophy2/trophyNN.ucp of the game, or for a PS4 game its
+// sce_sys/trophy/trophyNN.trp (with key; without one, an encrypted placeholder).
+// nullopt when it has none.
+std::optional<TrophySet> LoadTrophies(PackageReader& package, const std::vector<std::string>& languages, const std::optional<TrophyKey>& ps4Key = std::nullopt);
 
 // The trophy text language for a profile's console language ("", "auto" or "0".."30").
 std::vector<std::string> TrophyLanguages(std::string_view consoleLanguage);
