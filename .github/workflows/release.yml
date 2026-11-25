@@ -96,15 +96,17 @@ jobs:
           previous=$(git describe --tags --abbrev=0 --match 'v*' "$RELEASE_TAG^" 2>/dev/null || true)
           range="$RELEASE_TAG"
           [ -n "$previous" ] && range="$previous..$RELEASE_TAG"
-          git log --no-merges --format='%s' "$range" > dist/titles.txt
+          # "bump: ..." commits only raise the version for a tag: they are left out,
+          # and so are the older "Version 0.1.6" ones.
+          git log --no-merges --format='%s' "$range" | grep -viE '^bump(\([^)]*\))?!?: |^version [0-9.]+$' > dist/titles.txt || true
           # "feat: ..." goes under New, "fix: ..." under Fixed, anything else under
           # Other; the prefix (and a scope like "feat(ui):") is dropped.
           section() {
-            grep -iE "^$1(\([^)]*\))?!?: " dist/titles.txt | sed -E 's/^[^:]*: *//; s/^./\u&/; s/^/- /'
+            { grep -iE "^$1(\([^)]*\))?!?: " dist/titles.txt || true; } | sed -E 's/^[^:]*: *//; s/^./\u&/; s/^/- /'
           }
           new=$(section feat)
           fixed=$(section fix)
-          other=$(grep -viE '^(feat|fix)(\([^)]*\))?!?: ' dist/titles.txt | sed -E 's/^[a-z]+(\([^)]*\))?!?: *//; s/^./\u&/; s/^/- /')
+          other=$({ grep -viE '^(feat|fix)(\([^)]*\))?!?: ' dist/titles.txt || true; } | sed -E 's/^[a-z]+(\([^)]*\))?!?: *//; s/^./\u&/; s/^/- /')
           {
             if [ -n "$new" ]; then echo "## New"; echo "$new"; echo; fi
             if [ -n "$fixed" ]; then echo "## Fixed"; echo "$fixed"; echo; fi
