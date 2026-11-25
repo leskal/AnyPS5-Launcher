@@ -117,6 +117,13 @@ TEST(CachesTitleForADay) {
     CHECK(!launcher::LoadCachedTitle(temp.Path(), "PPSA00001", 2000, 86400).has_value());
 }
 
+TEST(PlatformComesFromTheTitleId) {
+    CHECK_EQ(launcher::PlatformOf("PPSA01325"), std::string("PS5"));
+    CHECK_EQ(launcher::PlatformOf("CUSA00001"), std::string("PS4"));
+    CHECK(launcher::PlatformOf("ABCD12345").empty());
+    CHECK(launcher::PlatformOf("PPSA").empty());
+}
+
 TEST(RegionFromContentId) {
     CHECK_EQ(launcher::RegionOf("EP9000-PPSA21567_00-0000000000000000"), std::string("Europe"));
     CHECK_EQ(launcher::RegionOf("UP0001-PPSA00001_00-X"), std::string("USA"));

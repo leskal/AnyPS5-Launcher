@@ -251,6 +251,14 @@ std::string RegionOf(std::string_view contentId) {
     return {};
 }
 
+std::string PlatformOf(std::string_view titleId) {
+    if (titleId.size() < 9) return {};
+    const auto prefix = titleId.substr(0, 3);
+    if (prefix == "PPS") return "PS5";
+    if (prefix == "CUS" || prefix == "PLA" || prefix == "PCJ" || prefix == "PCA" || prefix == "PCE" || prefix == "PCK") return "PS4";
+    return {};
+}
+
 std::vector<ChangeNote> ParseChangeInfo(std::string_view xml) {
     std::vector<ChangeNote> notes;
     std::size_t at = 0;

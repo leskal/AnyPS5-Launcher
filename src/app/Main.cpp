@@ -583,6 +583,41 @@ AnyPS5State LoadAnyPS5(const std::string& folder, const std::filesystem::path& s
     return state;
 }
 
+// The font of the PS5/PS4 badge on game tiles, when one is beside the launcher:
+// fonts\<anything with "phatboy" in its name>.otf or .ttf (Phatboy Slim by
+// TracerTong Fontworks, which is not part of the launcher). nullptr: the badge
+// uses the launcher's own font.
+ImFont* PlatformFont = nullptr;
+
+void LoadPlatformFont(ImGuiIO& io) {
+    const char* base = SDL_GetBasePath();
+    if (base == nullptr) return;
+    const auto folder = FromUtf8(base) / "fonts";
+    std::error_code error;
+    if (!std::filesystem::is_directory(folder, error)) return;
+    std::vector<std::filesystem::path> found;
+    for (const auto& item : std::filesystem::directory_iterator(folder, error)) {
+        auto name = ToUtf8(item.path().filename());
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (name.find("phatboy") == std::string::npos) continue;
+        if (!name.ends_with(".otf") && !name.ends_with(".ttf")) continue;
+        found.push_back(item.path());
+    }
+    if (found.empty()) return;
+    // The plain weight: a name that says "regular", else the shortest name.
+    std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) {
+        auto rank = [](const std::filesystem::path& path) {
+            auto name = ToUtf8(path.filename());
+            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            const bool styled = name.find("italic") != std::string::npos || name.find("oblique") != std::string::npos;
+            return std::pair{(name.find("regular") != std::string::npos ? 0 : 1) + (styled ? 2 : 0), name.size()};
+        };
+        return rank(a) < rank(b);
+    });
+    ImFontConfig config;
+    PlatformFont = io.Fonts->AddFontFromFileTTF(ToUtf8(found.front()).c_str(), 17.0f, &config);
+}
+
 void LoadFonts(ImGuiIO& io) {
 #ifdef _WIN32
     std::string fonts = "C:\\Windows\\Fonts\\";
@@ -1882,6 +1917,23 @@ private:
         ImVec4 color;
     };
 
+    // "PS5" or "PS4" in a small dark tag, as the console's own home screen marks games.
+    // right: the tag's top-right corner. height: the tag's height.
+    void DrawPlatformTag(ImDrawList* draw, const GameEntry& game, ImVec2 topRight, float height) const {
+        const auto platform = PlatformOf(game.metadata.titleId);
+        if (platform.empty()) return;
+        ImFont* font = PlatformFont != nullptr ? PlatformFont : ImGui::GetFont();
+        const float size = height * (PlatformFont != nullptr ? 0.78f : 0.62f);
+        const ImVec2 text = font->CalcTextSizeA(size, FLT_MAX, 0.0f, platform.c_str());
+        const float padX = height * 0.36f;
+        const ImVec2 start(topRight.x - text.x - padX * 2, topRight.y);
+        const ImVec2 end(topRight.x, topRight.y + height);
+        draw->AddRectFilled(start, end, IM_COL32(12, 14, 18, 215), height * 0.28f);
+        const ImVec2 at(start.x + padX, start.y + (height - text.y) * 0.5f);
+        draw->AddText(font, size, at, IM_COL32(255, 255, 255, 240), platform.c_str());
+        if (PlatformFont == nullptr) draw->AddText(font, size, ImVec2(at.x + 0.6f * scale_, at.y), IM_COL32(255, 255, 255, 240), platform.c_str());  // bolder
+    }
+
     Badge BadgeFor(const GameEntry& game) const {
         if (IsRunning(game)) return {"Running", Accent};
         if (JobOn(game)) return {"Working...", Amber};
@@ -1997,6 +2049,7 @@ private:
                 draw->AddCircleFilled(ImVec2(start.x + pad.x + 3.0f * scale_, (start.y + end.y) * 0.5f), 3.5f * scale_, ImGui::GetColorU32(badge.color));
                 draw->AddText(ImVec2(start.x + pad.x + 10.0f * scale_, start.y + pad.y), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.92f)), badge.text);
             }
+            DrawPlatformTag(draw, game, ImVec2(at.x + tile - 8.0f * scale_, at.y + 8.0f * scale_), ImGui::GetTextLineHeight() + 6.0f * scale_);
             if (selected || hovered) {
                 draw->AddRect(at, ImVec2(at.x + tile, at.y + tile + textBlock), ImGui::GetColorU32(selected ? Accent : Fade(Accent, 0.45f)), rounding, 0, 2.0f * scale_);
             }
@@ -2817,6 +2870,7 @@ private:
             } else {
                 rowDraw->AddRectFilled(top, ImVec2(top.x + tile, top.y + tile), ImGui::GetColorU32(Placeholder), rounding);
             }
+            if (isSelected) DrawPlatformTag(rowDraw, game, ImVec2(top.x + tile - 8.0f * scale_, top.y + 8.0f * scale_), ImGui::GetTextLineHeight() + 6.0f * scale_);
             const auto badge = BadgeFor(game);
             if (badge.text != nullptr && !isSelected) rowDraw->AddCircleFilled(ImVec2(top.x + tile - 9 * scale_, top.y + 9 * scale_), 5 * scale_, ImGui::GetColorU32(badge.color));
             ImGui::PopID();
@@ -6169,6 +6223,7 @@ int main(int argc, char** argv) {
     style.ScaleAllSizes(scale);
     style.FontScaleDpi = scale;
     LoadFonts(io);
+    LoadPlatformFont(io);  // the main window's atlas only; the trophy card doesn't show it
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
 

@@ -20,6 +20,9 @@ struct GameMetadata {
 // "Europe" for EP, "USA" for UP, "Japan" for JP, "Asia" for HP, ... Empty when unknown.
 std::string RegionOf(std::string_view contentId);
 
+// "PS5" or "PS4" from a title ID's prefix (PPSA.. is PS5, CUSA.. is PS4); empty when unknown.
+std::string PlatformOf(std::string_view titleId);
+
 // Decodes &amp; &lt; &gt; &quot; &apos; and numeric references; leaves anything else as written.
 std::string DecodeXmlEntities(std::string_view text);
 
