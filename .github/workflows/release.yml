@@ -96,11 +96,20 @@ jobs:
           previous=$(git describe --tags --abbrev=0 --match 'v*' "$RELEASE_TAG^" 2>/dev/null || true)
           range="$RELEASE_TAG"
           [ -n "$previous" ] && range="$previous..$RELEASE_TAG"
+          git log --no-merges --format='%s' "$range" > dist/titles.txt
+          # "feat: ..." goes under New, "fix: ..." under Fixed, anything else under
+          # Other; the prefix (and a scope like "feat(ui):") is dropped.
+          section() {
+            grep -iE "^$1(\([^)]*\))?!?: " dist/titles.txt | sed -E 's/^[^:]*: *//; s/^./\u&/; s/^/- /'
+          }
+          new=$(section feat)
+          fixed=$(section fix)
+          other=$(grep -viE '^(feat|fix)(\([^)]*\))?!?: ' dist/titles.txt | sed -E 's/^[a-z]+(\([^)]*\))?!?: *//; s/^./\u&/; s/^/- /')
           {
-            echo "## What's new"
-            git log --no-merges --format='- %s' "$range"
+            if [ -n "$new" ]; then echo "## New"; echo "$new"; echo; fi
+            if [ -n "$fixed" ]; then echo "## Fixed"; echo "$fixed"; echo; fi
+            if [ -n "$other" ]; then echo "## Other changes"; echo "$other"; echo; fi
             if [ -n "$previous" ]; then
-              echo
               echo "**Full Changelog**: https://github.com/$GITHUB_REPOSITORY/compare/$previous...$RELEASE_TAG"
             fi
           } > dist/NOTES.md
