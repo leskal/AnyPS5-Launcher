@@ -77,8 +77,8 @@ void SwapLauncherExe(const std::filesystem::path& current, const std::filesystem
     }
 }
 
-std::vector<std::string> ReleaseNoteLines(std::string_view notes, std::size_t maxLines) {
-    std::vector<std::string> lines;
+std::vector<NoteLine> ReleaseNoteLines(std::string_view notes, std::size_t maxLines) {
+    std::vector<NoteLine> lines;
     std::size_t start = 0;
     while (start <= notes.size() && lines.size() < maxLines) {
         auto end = notes.find('\n', start);
@@ -96,19 +96,23 @@ std::vector<std::string> ReleaseNoteLines(std::string_view notes, std::size_t ma
         for (auto bold = line.find("**"); bold != std::string::npos; bold = line.find("**")) line.erase(bold, 2);
         std::size_t lead = line.find_first_not_of(" \t");
         if (lead == std::string::npos) {
-            if (!lines.empty() && !lines.back().empty()) lines.emplace_back();
+            if (!lines.empty() && !lines.back().text.empty()) lines.emplace_back();
             continue;
         }
         line.erase(0, lead);
+        const bool heading = !line.empty() && line.front() == '#';
         while (!line.empty() && line.front() == '#') line.erase(0, 1);
         if (line.size() > 1 && (line[0] == '*' || line[0] == '-') && line[1] == ' ') line = "\xE2\x80\xA2 " + line.substr(2);  // a bullet
         line.erase(0, std::min(line.find_first_not_of(' '), line.size()));
         while (!line.empty() && line.back() == ' ') line.pop_back();
         if (line.rfind("Full Changelog", 0) == 0) continue;
         if (line.empty()) continue;
-        lines.push_back(std::move(line));
+        // A heading after text gets a gap above it.
+        if (heading && !lines.empty() && !lines.back().text.empty()) lines.emplace_back();
+        if (lines.size() >= maxLines) break;
+        lines.push_back({std::move(line), heading});
     }
-    while (!lines.empty() && lines.back().empty()) lines.pop_back();
+    while (!lines.empty() && lines.back().text.empty()) lines.pop_back();
     return lines;
 }
 

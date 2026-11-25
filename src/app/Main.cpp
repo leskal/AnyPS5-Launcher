@@ -1651,16 +1651,31 @@ private:
             facts += connection == SDL_JOYSTICK_CONNECTION_WIRELESS ? "  \xC2\xB7  Bluetooth" : connection == SDL_JOYSTICK_CONNECTION_WIRED ? "  \xC2\xB7  USB" : "";
             if (power == SDL_POWERSTATE_CHARGING) facts += "  \xC2\xB7  charging";
             if (percent >= 0) facts += "  \xC2\xB7  battery " + std::to_string(percent) + "%";
-            ImGui::AlignTextToFramePadding();
+            // Name and facts on the left; Test and Vibrate on the right, like the other rows' buttons.
+            const auto& style = ImGui::GetStyle();
+            const float buttonWidth = ImGui::CalcTextSize("Stop test").x + style.FramePadding.x * 4.0f;
+            const float buttonsWidth = buttonWidth * 2.0f + style.ItemSpacing.x;
+            const float left = ImGui::GetCursorPosX();
+            const float right = left + ImGui::GetContentRegionAvail().x;
+            const float top = ImGui::GetCursorPosY();
+            ImGui::BeginGroup();
+            ImGui::PushTextWrapPos(right - buttonsWidth - style.ItemSpacing.x * 2.0f);
             ImGui::Text("%d. %s", player++, name != nullptr ? name : "Gamepad");
-            ImGui::SameLine();
             ImGui::TextColored(percent >= 0 && percent <= 15 && power != SDL_POWERSTATE_CHARGING ? Amber : Dim, "%s", facts.c_str());
-            if (ImGui::SmallButton(padTest_ == id ? "Hide test" : "Test buttons and sticks")) padTest_ = padTest_ == id ? 0 : id;
+            ImGui::PopTextWrapPos();
+            ImGui::EndGroup();
+            const float textHeight = ImGui::GetItemRectSize().y;
+            const float rowHeight = std::max(textHeight, ImGui::GetFrameHeight());
             ImGui::SameLine();
-            if (ImGui::SmallButton("Vibrate")) SDL_RumbleGamepad(pad, 0xC000, 0xC000, 500);
+            ImGui::SetCursorPos(ImVec2(right - buttonsWidth, top + (rowHeight - ImGui::GetFrameHeight()) * 0.5f));
+            if (ImGui::Button(padTest_ == id ? "Stop test" : "Test", ImVec2(buttonWidth, 0))) padTest_ = padTest_ == id ? 0 : id;
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Shows the buttons, sticks and triggers as you press them");
+            ImGui::SameLine();
+            if (ImGui::Button("Vibrate", ImVec2(buttonWidth, 0))) SDL_RumbleGamepad(pad, 0xC000, 0xC000, 500);
+            ImGui::SetCursorPosY(top + rowHeight + style.ItemSpacing.y);
             if (padTest_ == id) {
                 DrawPadTest(pad);
-                ImGui::TextColored(Dim, "%s", "While the test is open the pad only shows here; Hide test gives it back to the launcher.");
+                ImGui::TextColored(Dim, "%s", "While the test is open the pad only shows here; Stop test gives it back to the launcher.");
             }
             ImGui::Spacing();
             ImGui::PopID();
@@ -3196,8 +3211,16 @@ private:
         ImGui::PushTextWrapPos(0.0f);
         if (lines.empty()) ImGui::TextColored(Dim, "%s", "No notes for this release.");
         for (const auto& line : lines) {
-            if (line.empty()) ImGui::Spacing();
-            else ImGui::TextUnformatted(line.c_str());
+            if (line.text.empty()) {
+                ImGui::Spacing();
+            } else if (line.heading) {
+                // "New", "Fixed": larger and in the accent colour, so the groups stand out.
+                ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.15f);
+                ImGui::TextColored(Accent, "%s", line.text.c_str());
+                ImGui::PopFont();
+            } else {
+                ImGui::TextUnformatted(line.text.c_str());
+            }
         }
         ImGui::PopTextWrapPos();
         ImGui::Spacing();

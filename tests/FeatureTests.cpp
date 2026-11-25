@@ -285,9 +285,16 @@ TEST(ReleaseNotesBecomePlainLines) {
         "## What's Changed\r\n* **Faster** Game settings by [leskal](https://github.com/leskal)\r\n- Fix uninstall\r\n\r\n\r\n"
         "**Full Changelog**: https://github.com/x/y/compare/v0.1.3...v0.1.4\r\n");
     CHECK_EQ(lines.size(), std::size_t{3});
-    CHECK_EQ(lines[0], std::string("What's Changed"));
-    CHECK_EQ(lines[1], std::string("\xE2\x80\xA2 Faster Game settings by leskal"));
-    CHECK_EQ(lines[2], std::string("\xE2\x80\xA2 Fix uninstall"));
+    CHECK(lines[0] == (launcher::NoteLine{"What's Changed", true}));
+    CHECK(lines[1] == (launcher::NoteLine{"\xE2\x80\xA2 Faster Game settings by leskal", false}));
+    CHECK(lines[2] == (launcher::NoteLine{"\xE2\x80\xA2 Fix uninstall", false}));
+    // The notes the release workflow writes: New and Fixed, each a heading.
+    const auto grouped = launcher::ReleaseNoteLines("## New\n- Pad test\n## Fixed\n- Saves\n\n**Full Changelog**: https://x\n");
+    CHECK_EQ(grouped.size(), std::size_t{5});
+    CHECK(grouped[0] == (launcher::NoteLine{"New", true}));
+    CHECK(grouped[2].text.empty());
+    CHECK(grouped[3] == (launcher::NoteLine{"Fixed", true}));
+    CHECK_EQ(grouped[4].text, std::string("\xE2\x80\xA2 Saves"));
     CHECK(launcher::ReleaseNoteLines("").empty());
     CHECK_EQ(launcher::ReleaseNoteLines("a\nb\nc\nd", 2).size(), std::size_t{2});
 }

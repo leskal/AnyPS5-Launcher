@@ -42,8 +42,13 @@ void CleanUpLauncherUpdate(const std::filesystem::path& current, const std::file
 
 // A release's notes as plain lines to show: Markdown headings, bullets and bold
 // marks become plain text, links keep their text, and GitHub's "Full Changelog"
-// line and blank runs are dropped. At most maxLines lines.
-std::vector<std::string> ReleaseNoteLines(std::string_view notes, std::size_t maxLines = 40);
+// line and blank runs are dropped (an empty text is a gap). At most maxLines lines.
+struct NoteLine {
+    std::string text;
+    bool heading = false;  // was a "## ..." line, such as "New" or "Fixed"
+    bool operator==(const NoteLine&) const = default;
+};
+std::vector<NoteLine> ReleaseNoteLines(std::string_view notes, std::size_t maxLines = 40);
 
 // Where the launcher's window was, so the updated one opens in the same place:
 // passed as --window=x,y,width,height[,max].
