@@ -624,6 +624,28 @@ TEST(PlayMovesTheProfilesFoldersInAndBack) {
     CHECK(std::filesystem::is_directory(fixture.layout.Saves("PPSA00105") / "_sd"));
     CHECK_EQ(ReadText(layout.Saves("PPSA00105") / "_sd" / "slot.dat"), std::string("save"));
 
+    // A move back to another drive copied a folder but couldn't delete it beside the
+    // exe (the crashed game held a file): the next try only deletes that copy.
+    const auto again = PrepareRun(game, layout, {}, nullptr);
+    std::ofstream(home / "_sd_mem" / "mem.dat") << "memory";
+    std::filesystem::copy(home / "_sd_mem", layout.Saves("PPSA00105") / "_sd_mem", std::filesystem::copy_options::recursive);
+    CHECK(MoveOutSession(home).size() == 5);
+    CHECK(!HasSession(home));
+    CHECK(!std::filesystem::exists(home / "_sd_mem"));
+    CHECK_EQ(ReadText(layout.Saves("PPSA00105") / "_sd_mem" / "mem.dat"), std::string("memory"));
+    // A different folder there still stops it, and nothing is lost.
+    PrepareRun(game, layout, {}, nullptr);
+    std::ofstream(home / "_sd_mem" / "mem.dat") << "newer";
+    std::filesystem::create_directories(layout.Saves("PPSA00105") / "_sd_mem");
+    std::ofstream(layout.Saves("PPSA00105") / "_sd_mem" / "mem.dat") << "older";
+    CHECK_THROWS(MoveOutSession(home));
+    CHECK(HasSession(home));
+    CHECK_EQ(ReadText(home / "_sd_mem" / "mem.dat"), std::string("newer"));
+    std::filesystem::remove_all(layout.Saves("PPSA00105") / "_sd_mem");
+    CHECK(MoveOutSession(home).size() == 1);
+    CHECK_EQ(ReadText(layout.Saves("PPSA00105") / "_sd_mem" / "mem.dat"), std::string("newer"));
+    (void)again;
+
     // A folder with files beside the exe that no profile put there is never touched.
     fixture::WriteFolder(home / "_trophy", {{"stray.txt", fixture::Bytes("x")}});
     CHECK_THROWS(PrepareRun(game, layout, {}, nullptr));

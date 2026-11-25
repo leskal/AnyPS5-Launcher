@@ -20,6 +20,14 @@ void RenameNew(const std::filesystem::path& source, const std::filesystem::path&
 // complete. Never overwrites: the target must not exist.
 void MoveTree(const std::filesystem::path& source, const std::filesystem::path& target);
 
+// Deletes a file or folder tree, retrying for a few seconds while something still
+// holds a file and clearing read-only flags. Throws when it can't.
+void RemoveTree(const std::filesystem::path& path);
+
+// True when every file under `original` is also under `copy`, byte for byte
+// (`copy` may hold more).
+bool HoldsCopyOf(const std::filesystem::path& copy, const std::filesystem::path& original);
+
 void RequireFreeSpace(const std::filesystem::path& folder, std::uint64_t bytes);
 
 std::string FormatBytes(std::uint64_t bytes);

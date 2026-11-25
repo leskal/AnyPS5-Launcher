@@ -61,6 +61,12 @@ void MoveBack(const std::filesystem::path& home, const SessionItem& item) {
         std::filesystem::create_directories(item.origin, error);
         return;
     }
+    // An earlier move-back to another drive copied everything but couldn't delete the
+    // copy beside the exe (the crashed game still held a file): only that is left to do.
+    if (Exists(item.origin) && !std::filesystem::is_empty(item.origin, error) && HoldsCopyOf(item.origin, here)) {
+        RemoveTree(here);
+        return;
+    }
     ClearPlace(item.origin, "while the game's copy is still beside the exe");
     MoveTree(here, item.origin);
 }

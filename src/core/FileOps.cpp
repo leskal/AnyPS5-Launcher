@@ -5,6 +5,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <system_error>
+#include <vector>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -95,8 +96,52 @@ void MoveTree(const std::filesystem::path& source, const std::filesystem::path& 
         std::filesystem::remove_all(target, ignored);
         throw std::system_error(error, "cannot copy " + ToUtf8(source) + " to " + ToUtf8(target));
     }
-    std::filesystem::remove_all(source, error);
-    if (error) throw std::system_error(error, "copied " + ToUtf8(source) + " to " + ToUtf8(target) + " but cannot remove the original");
+    RemoveTree(source);
+}
+
+void RemoveTree(const std::filesystem::path& path) {
+    std::error_code error;
+    for (int attempt = 0; attempt < 20; ++attempt) {
+        if (attempt > 0) {
+#ifdef _WIN32
+            Sleep(150);  // a crashed game, the indexer or antivirus may still hold a file
+#endif
+            // Read-only files can't be deleted on Windows: make them writable first.
+            std::error_code ignored;
+            for (auto it = std::filesystem::recursive_directory_iterator(path, ignored); !ignored && it != std::filesystem::recursive_directory_iterator(); it.increment(ignored)) {
+                std::filesystem::permissions(it->path(), std::filesystem::perms::owner_write, std::filesystem::perm_options::add, ignored);
+                ignored.clear();
+            }
+            std::filesystem::permissions(path, std::filesystem::perms::owner_write, std::filesystem::perm_options::add, ignored);
+        }
+        error.clear();
+        std::filesystem::remove_all(path, error);
+        if (!error) return;
+    }
+    throw std::system_error(error, "cannot remove " + ToUtf8(path) + ": " + ReadableError(error));
+}
+
+bool HoldsCopyOf(const std::filesystem::path& copy, const std::filesystem::path& original) {
+    std::error_code error;
+    if (!std::filesystem::is_directory(original, error)) {
+        if (!std::filesystem::is_regular_file(original, error)) return false;
+        if (!std::filesystem::is_regular_file(copy, error)) return false;
+        if (std::filesystem::file_size(original, error) != std::filesystem::file_size(copy, error) || error) return false;
+        std::ifstream a(original, std::ios::binary), b(copy, std::ios::binary);
+        if (!a || !b) return false;
+        std::vector<char> x(1 << 16), y(1 << 16);
+        while (a && b) {
+            a.read(x.data(), static_cast<std::streamsize>(x.size()));
+            b.read(y.data(), static_cast<std::streamsize>(y.size()));
+            if (a.gcount() != b.gcount() || !std::equal(x.begin(), x.begin() + a.gcount(), y.begin())) return false;
+        }
+        return a.eof() && b.eof();
+    }
+    if (!std::filesystem::is_directory(copy, error)) return false;
+    for (auto it = std::filesystem::directory_iterator(original, error); !error && it != std::filesystem::directory_iterator(); it.increment(error)) {
+        if (!HoldsCopyOf(copy / it->path().filename(), it->path())) return false;
+    }
+    return !error;
 }
 
 void RequireFreeSpace(const std::filesystem::path& folder, std::uint64_t bytes) {

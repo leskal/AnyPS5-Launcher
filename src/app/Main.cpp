@@ -1449,6 +1449,21 @@ private:
 
     void StartGame(const GameEntry& game) {
         try {
+            // Saves an earlier run left beside the exe (the game crashed, or the launcher
+            // stopped): move them back now instead of waiting for a restart.
+            if (!session_ && !game.home.empty() && HasSession(game.home)) {
+#ifdef _WIN32
+                const auto exe = ExecutableIn(game.home, game.metadata.titleId).filename();
+                if (win::ProcessRunning(exe.c_str())) {
+                    throw std::runtime_error(ToUtf8(exe) + " is still running from the last time (it may hang after a crash); end it in Task Manager, then press Play again");
+                }
+#endif
+                try {
+                    MoveOutSession(game.home);
+                } catch (const std::exception& failure) {
+                    throw std::runtime_error(std::string("the saves of the last run are still beside the exe and can't be moved back: ") + failure.what());
+                }
+            }
             auto plan = PrepareRun(game, layout_, profileSettings_, TitleFor(game.metadata.titleId), LoadGameSettings(layout_.GameSettingsFile(game.metadata.titleId)));
             session_ = std::make_unique<GameSession>(game.metadata.titleId, game.metadata.name, std::move(plan));
             sessionLocation_ = ToUtf8(game.location);
@@ -1473,7 +1488,7 @@ private:
         try {
             report = FinishRun(session_->Plan());
         } catch (const std::exception& failure) {
-            message_ = Message{Red, "Saves of " + session_->Name() + " are still beside its exe", std::string(failure.what()) + ". The launcher tries again at its next start."};
+            message_ = Message{Red, "Saves of " + session_->Name() + " are still beside its exe", std::string(failure.what()) + ". The launcher tries again when you press Play, and at its next start."};
             session_.reset();
             return;
         }
