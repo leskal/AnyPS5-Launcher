@@ -367,7 +367,8 @@ TEST(FolderInstallMovesTheGameIntoApp0AndRelinks) {
     CHECK(installed.home == home);
     CHECK(installed.location == app0);
     CHECK(installed.format == PackageFormat::Folder);
-    CHECK_EQ(installed.modules.elf, 2);  // the list counts sce_module, sce_modules and prx; .guest.prx and .self aren't counted
+    CHECK_EQ(installed.modules.elf, 3);  // sce_module and the Media/Modules the scan found; .guest.prx and .self aren't counted
+    CHECK(installed.moduleDirs == (std::vector<std::string>{"Media/Modules"}));
     CHECK_EQ(installed.modules.self, 0);
     CHECK(ReadInstallManifest(home).has_value());
     CHECK(ReinstallReason(installed, *ReadInstallManifest(home), "abc123").empty());
@@ -730,6 +731,46 @@ TEST(Md5MatchesTheReferenceValues) {
     CHECK_EQ(pieces.HexDigest(), Md5Hex(data));
 }
 
+TEST(ModuleFoldersAreFoundAndRelinkedWithoutATitleEntry) {
+    InstallFixture fixture;
+    const auto folder = fixture.WriteConvertedGame("PPSA00120");
+    fixture.title = {};  // no tools/titles.json entry for this game
+    fixture::WriteFolder(folder, {{"Media/Plugins/unity.sprx", fixture::Elf64()},
+                                  {"Media/Plugins/readme.prx", fixture::Bytes("not a module")},
+                                  {"Media/Data/level.bin", fixture::Bytes("data")},
+                                  {"Engine/Bin/engine.prx", fixture::Elf64()},     // found when installing, not by the quick scan
+                                  {"a/b/c/d/e/deep.prx", fixture::Elf64()}});  // deeper than anything looks
+    const auto game = fixture.Scan();
+    CHECK(game.moduleDirs == (std::vector<std::string>{"Media/Modules", "Media/Plugins"}));
+    {
+        FolderPackage package(game.location);
+        CHECK(FindModuleDirectories(package) == (std::vector<std::string>{"Engine/Bin", "Media/Modules", "Media/Plugins"}));
+    }
+
+    FakeRelinker relinker;
+    const auto manifest = fixture.Install(game, relinker);
+    const auto& args = relinker.arguments;
+    const auto has = [&](const std::string& folderName) {
+        for (std::size_t index = 0; index + 1 < args.size(); ++index) {
+            if (args[index] == "--module-dir" && args[index + 1] == folderName) return true;
+        }
+        return false;
+    };
+    CHECK(has("Media/Modules"));
+    CHECK(has("Media/Plugins"));
+    CHECK(has("Engine/Bin"));
+    CHECK(!has("a/b/c/d/e"));
+    CHECK(std::find(args.begin(), args.end(), "--skip-sce-module") == args.end());
+    CHECK(std::filesystem::is_regular_file(folder / "app0" / "Media" / "Plugins" / "unity.sprx.guest.prx"));
+    const auto installed = fixture.Scan();
+    CHECK(ReinstallReason(installed, manifest, "abc123").empty());
+
+    // An install from before the scan found these folders asks to be done again.
+    auto older = manifest;
+    older.arguments = {"--windows", "--rpath", "x"};
+    CHECK_EQ(ReinstallReason(installed, older, "abc123"), std::string("the modules in Media/Modules weren't converted"));
+}
+
 TEST(ConvertSelfZipsTheOriginalsThenConvertsInPlace) {
     InstallFixture fixture;
     const auto folder = fixture.temp.Path() / "games" / "Game";
@@ -741,7 +782,7 @@ TEST(ConvertSelfZipsTheOriginalsThenConvertsInPlace) {
 
     const auto before = fixture.Scan();
     CHECK_EQ(before.modules.elf, 1);
-    CHECK_EQ(before.modules.self, 2);
+    CHECK_EQ(before.modules.self, 3);  // eboot aside: libSelf, libLocked and Media/Modules/plugin
     {
         // Only the library's originals folder counts; a zip beside the game is ignored.
         const auto library = fixture.temp.Path() / "library";
@@ -783,7 +824,7 @@ TEST(ConvertSelfZipsTheOriginalsThenConvertsInPlace) {
 
     const auto after = fixture.Scan();
     CHECK(after.executable.kind == ExecutableKind::Elf);
-    CHECK_EQ(after.modules.elf, 2);
+    CHECK_EQ(after.modules.elf, 3);
     CHECK_EQ(after.modules.self, 1);
 
     // Converting again adds only what is new; the locked module is still refused.

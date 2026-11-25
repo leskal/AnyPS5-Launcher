@@ -15,6 +15,64 @@ namespace launcher {
 
 namespace {
 
+bool HoldsModule(PackageReader& package, const std::string& folder, const std::vector<std::string>& files) {
+    for (const auto& name : files) {
+        if (IsSelfBackup(name) || IsGuestModule(name)) continue;
+        std::string low = name;
+        std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (!low.ends_with(".prx") && !low.ends_with(".sprx") && !low.ends_with(".suprx")) continue;
+        const auto head = package.ReadHead(folder + "/" + name, 4);
+        if (head && ModuleKindOf(*head) != ModuleKind::NotModule) return true;
+    }
+    return false;
+}
+
+}
+
+std::vector<std::string> KnownModuleDirectories(PackageReader& package) {
+    std::vector<std::string> found;
+    for (const char* folder : {"Media/Modules", "Media/Plugins"}) {
+        try {
+            if (package.IsDirectory(folder) && HoldsModule(package, folder, package.ListFiles(folder))) found.emplace_back(folder);
+        } catch (const std::exception&) {
+        }
+    }
+    return found;
+}
+
+std::vector<std::string> FindModuleDirectories(PackageReader& package) {
+    constexpr int MaxDepth = 4;
+    constexpr std::size_t MaxFolders = 4000;  // a big game's data folders aren't walked for ever
+    const auto standard = ModuleFolders();
+    std::vector<std::string> found;
+    std::vector<std::pair<std::string, int>> pending{{std::string(), 0}};
+    std::size_t visited = 0;
+    std::vector<std::string> files;
+    std::vector<std::string> children;
+    while (!pending.empty() && visited < MaxFolders) {
+        auto [folder, depth] = std::move(pending.back());
+        pending.pop_back();
+        ++visited;
+        try {
+            package.ListChildren(folder, files, children);
+        } catch (const std::exception&) {
+            continue;  // an unreadable folder holds nothing we can use
+        }
+        if (!folder.empty() && HoldsModule(package, folder, files)) found.push_back(folder);
+        if (depth >= MaxDepth) continue;
+        for (const auto& child : children) {
+            std::string low = child;
+            std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (folder.empty() && (low == "sce_sys" || std::find(standard.begin(), standard.end(), low) != standard.end())) continue;
+            pending.emplace_back(folder.empty() ? child : folder + "/" + child, depth + 1);
+        }
+    }
+    std::sort(found.begin(), found.end());
+    return found;
+}
+
+namespace {
+
 constexpr std::string_view ParamJson = "sce_sys/param.json";
 constexpr std::string_view ParamSfo = "sce_sys/param.sfo";
 constexpr std::string_view Icon = "sce_sys/icon0.png";
@@ -57,7 +115,8 @@ GameEntry ReadEntry(PackageReader& package, const ScanOptions& options) {
     };
     if (package.ReadHead(Eboot, ExecutableHeadSize)) entry.executable = classify(Eboot);
     if (package.ReadHead(UnwrappedEboot, ExecutableHeadSize)) entry.unwrapped = classify(UnwrappedEboot);
-    for (const auto& folder : ModuleFolders()) {
+    entry.moduleDirs = KnownModuleDirectories(package);
+    for (const auto& folder : ModuleFolders(entry.moduleDirs)) {
         if (!package.IsDirectory(folder)) continue;
         for (const auto& name : package.ListFiles(folder)) {
             if (IsSelfBackup(name) || IsGuestModule(name)) continue;

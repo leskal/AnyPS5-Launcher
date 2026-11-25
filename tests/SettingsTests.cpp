@@ -105,3 +105,28 @@ TEST(IntelFlagFollowsTheCpuUnlessSet) {
     CHECK(!loaded.settings.intelFlag.has_value());
     CHECK(!loaded.error.empty());
 }
+
+TEST(Ps5AndPs4GamesFolders) {
+    fixture::TempDir temp;
+    const auto file = temp.Path() / "anyps5-launcher.json";
+    launcher::Settings settings;
+    CHECK(launcher::GameFolders(settings).empty());
+    settings.gamesFolder = (temp.Path() / "PS5").string();
+    settings.ps4GamesFolder = (temp.Path() / "PS4").string();
+    SaveSettings(file, settings);
+    const auto loaded = LoadSettings(file).settings;
+    CHECK_EQ(loaded.ps4GamesFolder, settings.ps4GamesFolder);
+    CHECK(launcher::GameFolders(loaded) == (std::vector<std::filesystem::path>{temp.Path() / "PS5", temp.Path() / "PS4"}));
+
+    // Only PS4, the same folder twice, or one inside the other: no game shows twice.
+    settings.gamesFolder.clear();
+    CHECK(launcher::GameFolders(settings) == (std::vector<std::filesystem::path>{temp.Path() / "PS4"}));
+    settings.gamesFolder = settings.ps4GamesFolder;
+    CHECK_EQ(launcher::GameFolders(settings).size(), std::size_t{1});
+    settings.gamesFolder = (temp.Path() / "Games").string();
+    settings.ps4GamesFolder = (temp.Path() / "Games" / "PS4").string();
+    CHECK(launcher::GameFolders(settings) == (std::vector<std::filesystem::path>{temp.Path() / "Games"}));
+    settings.gamesFolder = (temp.Path() / "Games" / "PS5").string();
+    settings.ps4GamesFolder = (temp.Path() / "Games").string();
+    CHECK(launcher::GameFolders(settings) == (std::vector<std::filesystem::path>{temp.Path() / "Games"}));
+}

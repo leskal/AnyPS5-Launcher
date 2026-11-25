@@ -53,9 +53,22 @@ struct GameEntry {
     ExecutableInfo executable;
     std::optional<ExecutableInfo> unwrapped;
     ModuleSummary modules;
+    // Folders besides sce_module/sce_modules/prx that hold the game's own modules,
+    // such as Unity's Media/Modules and Media/Plugins: relinked with --module-dir.
+    std::vector<std::string> moduleDirs;
     std::vector<std::uint8_t> icon;
     std::vector<ChangeNote> changes;  // from sce_sys/changeinfo/changeinfo.xml, newest first
 };
+
+// The folders, relative to the game's root with "/", that hold modules (.prx, .sprx)
+// outside sce_module, sce_modules and prx: a Unity game's Media/Modules and
+// Media/Plugins, for example. Looks at most a few levels deep, so it takes a while
+// on a big game: Install and Convert SELF to ELF use it, not the scan. Sorted.
+std::vector<std::string> FindModuleDirectories(PackageReader& package);
+
+// The scan's quick look: only the folders where engines are known to keep modules
+// (Unity's Media/Modules and Media/Plugins).
+std::vector<std::string> KnownModuleDirectories(PackageReader& package);
 
 // Opens the game's files for reading: its folder, or its .zar (with innerPrefix).
 std::unique_ptr<PackageReader> OpenGamePackage(const GameEntry& game);

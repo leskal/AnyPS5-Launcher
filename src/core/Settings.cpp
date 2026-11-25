@@ -1,5 +1,6 @@
 #include "core/Settings.hpp"
 
+#include <algorithm>
 #include <utility>
 
 #include <fstream>
@@ -63,6 +64,7 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     ReadString(*document, "anyps5Folder", result.settings.anyps5Folder, result.error);
     ReadString(*document, "anyps5Version", result.settings.anyps5Version, result.error);
     ReadString(*document, "gamesFolder", result.settings.gamesFolder, result.error);
+    ReadString(*document, "ps4GamesFolder", result.settings.ps4GamesFolder, result.error);
     ReadString(*document, "libraryFolder", result.settings.libraryFolder, result.error);
     ReadString(*document, "userdataFolder", result.settings.userdataFolder, result.error);
     ReadString(*document, "profile", result.settings.profile, result.error);
@@ -88,6 +90,26 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     return result;
 }
 
+std::vector<std::filesystem::path> GameFolders(const Settings& settings) {
+    std::vector<std::filesystem::path> folders;
+    const auto inside = [](const std::filesystem::path& folder, const std::filesystem::path& parent) {
+        const auto relative = folder.lexically_relative(parent);
+        return !relative.empty() && ToUtf8(*relative.begin()) != "..";  // "." (the same folder) counts
+    };
+    for (const auto* text : {&settings.gamesFolder, &settings.ps4GamesFolder}) {
+        if (text->empty()) continue;
+        const auto folder = FromUtf8(*text).lexically_normal();
+        bool covered = false;
+        for (auto& kept : folders) {
+            if (inside(folder, kept)) covered = true;
+            else if (inside(kept, folder)) kept = folder;  // the wider folder takes its place
+        }
+        if (!covered) folders.push_back(folder);
+    }
+    folders.erase(std::unique(folders.begin(), folders.end()), folders.end());
+    return folders;
+}
+
 bool UseIntelFlag(const Settings& settings, bool hostIsIntel) {
     return settings.intelFlag.value_or(hostIsIntel);
 }
@@ -103,6 +125,7 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["anyps5Folder"] = settings.anyps5Folder;
     document["anyps5Version"] = settings.anyps5Version;
     document["gamesFolder"] = settings.gamesFolder;
+    document["ps4GamesFolder"] = settings.ps4GamesFolder;
     document["libraryFolder"] = settings.libraryFolder;
     document["userdataFolder"] = settings.userdataFolder;
     document["profile"] = settings.profile;

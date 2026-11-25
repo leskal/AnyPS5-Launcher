@@ -62,6 +62,30 @@ std::vector<std::string> FolderPackage::ListFiles(std::string_view directory) {
     return names;
 }
 
+std::vector<std::string> FolderPackage::ListDirectories(std::string_view directory) {
+    std::vector<std::string> names;
+    std::error_code error;
+    for (std::filesystem::directory_iterator it(root_ / FromUtf8(directory), error), end; !error && it != end; it.increment(error)) {
+        if (!it->is_symlink(error) && it->is_directory(error)) names.push_back(ToUtf8(it->path().filename()));
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+void FolderPackage::ListChildren(std::string_view directory, std::vector<std::string>& files, std::vector<std::string>& folders) {
+    files.clear();
+    folders.clear();
+    std::error_code error;
+    for (std::filesystem::directory_iterator it(root_ / FromUtf8(directory), error), end; !error && it != end; it.increment(error)) {
+        // The entry's type comes with the listing on Windows: no extra look per file.
+        if (it->is_symlink(error)) continue;
+        if (it->is_directory(error)) folders.push_back(ToUtf8(it->path().filename()));
+        else if (it->is_regular_file(error)) files.push_back(ToUtf8(it->path().filename()));
+    }
+    std::sort(files.begin(), files.end());
+    std::sort(folders.begin(), folders.end());
+}
+
 std::vector<std::string> FolderPackage::ListTree(std::string_view directory) {
     std::vector<std::string> paths;
     std::error_code error;
@@ -155,6 +179,16 @@ std::vector<std::string> ZarPackage::ListFiles(std::string_view directory) {
     std::vector<std::string> names;
     for (auto& entry : archive_->List(Join(prefix_, directory))) {
         if (!entry.isDirectory) names.push_back(std::move(entry.name));
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+std::vector<std::string> ZarPackage::ListDirectories(std::string_view directory) {
+    std::vector<std::string> names;
+    if (!IsDirectory(directory)) return names;
+    for (auto& entry : archive_->List(Join(prefix_, directory))) {
+        if (entry.isDirectory) names.push_back(std::move(entry.name));
     }
     std::sort(names.begin(), names.end());
     return names;

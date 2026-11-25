@@ -23,6 +23,13 @@ public:
     virtual std::vector<std::string> ListFiles(std::string_view directory) = 0;
     // Paths, relative to the package root, of every file under a folder, sorted.
     virtual std::vector<std::string> ListTree(std::string_view directory) = 0;
+    // Names of the folders directly inside a folder, sorted.
+    virtual std::vector<std::string> ListDirectories(std::string_view directory) = 0;
+    // Files and folders directly inside a folder in one look, each sorted.
+    virtual void ListChildren(std::string_view directory, std::vector<std::string>& files, std::vector<std::string>& folders) {
+        files = ListFiles(directory);
+        folders = ListDirectories(directory);
+    }
 
     std::optional<std::vector<std::uint8_t>> ReadAll(std::string_view relative, std::uint64_t maxSize);
     std::optional<std::vector<std::uint8_t>> ReadHead(std::string_view relative, std::uint64_t count);
@@ -37,6 +44,8 @@ public:
     bool IsDirectory(std::string_view relative) override;
     std::vector<std::string> ListFiles(std::string_view directory) override;
     std::vector<std::string> ListTree(std::string_view directory) override;
+    std::vector<std::string> ListDirectories(std::string_view directory) override;
+    void ListChildren(std::string_view directory, std::vector<std::string>& files, std::vector<std::string>& folders) override;
 
 private:
     std::filesystem::path root_;
@@ -76,6 +85,7 @@ public:
     bool IsDirectory(std::string_view relative) override;
     std::vector<std::string> ListFiles(std::string_view directory) override;
     std::vector<std::string> ListTree(std::string_view directory) override;
+    std::vector<std::string> ListDirectories(std::string_view directory) override;
 
 private:
     std::shared_ptr<ZarArchive> archive_;

@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace launcher {
 
@@ -11,7 +12,8 @@ inline constexpr const char* SettingsFileName = "anyps5-launcher.json";
 struct Settings {
     std::string anyps5Folder;   // the chosen AnyPS5 version's folder
     std::string anyps5Version;  // its id in <launcher>/anyps5/versions.json
-    std::string gamesFolder;
+    std::string gamesFolder;     // PS5 games
+    std::string ps4GamesFolder;  // PS4 games; empty: none
     // Empty means <launcher folder>/library and <launcher folder>/userdata.
     std::string libraryFolder;
     std::string userdataFolder;
@@ -27,6 +29,10 @@ struct Settings {
     // Relink games with AnyPS5's --to-intel. Unset: on for an Intel CPU, off otherwise.
     std::optional<bool> intelFlag;
 };
+
+// The games folders to scan: PS5 then PS4, the empty ones left out, and one that is
+// the same as or inside the other left out too (its games would show twice).
+std::vector<std::filesystem::path> GameFolders(const Settings& settings);
 
 // Whether installs pass --to-intel: the setting, or else whether the CPU is Intel.
 bool UseIntelFlag(const Settings& settings, bool hostIsIntel);

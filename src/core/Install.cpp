@@ -386,6 +386,10 @@ std::string QueryRelinkerVersion(const AnyPS5Runtime& anyps5, const ProcessRunne
 std::string ReinstallReason(const GameEntry& game, const InstallManifest& manifest, const std::string& relinkerVersion) {
     if (manifest.contentVersion != game.metadata.contentVersion) return "installed version " + manifest.contentVersion;
     if (!relinkerVersion.empty() && manifest.relinkerVersion != relinkerVersion) return "converted with AnyPS5 " + manifest.relinkerVersion;
+    const auto converted = ModuleDirArguments(manifest.arguments);
+    for (const auto& folder : game.moduleDirs) {
+        if (std::find(converted.begin(), converted.end(), folder) == converted.end()) return "the modules in " + folder + " weren't converted";
+    }
     return {};
 }
 
@@ -401,7 +405,24 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
     if (!game.home.empty() && HasSession(home)) throw std::runtime_error("the game's folder still holds a profile's saves from the last run; restart the launcher to move them back");
     const auto titleModuleFolders = request.title != nullptr ? ModuleDirectories(*request.title) : std::vector<std::string>{};
     const auto executables = request.title != nullptr ? request.title->executables : std::vector<std::string>{};
-    const auto moduleFolders = ModuleFolders(titleModuleFolders);
+    // The title's own --module-dir folders, and every folder the game keeps modules in
+    // (looked for here, as a full look is too slow for every scan).
+    auto searched = game.moduleDirs;
+    try {
+        if (auto package = OpenGamePackage(game)) {
+            for (auto& folder : FindModuleDirectories(*package)) searched.push_back(std::move(folder));
+        }
+    } catch (const std::exception&) {
+    }
+    std::sort(searched.begin(), searched.end());
+    searched.erase(std::unique(searched.begin(), searched.end()), searched.end());
+    std::vector<std::string> foundModuleFolders;
+    for (const auto& folder : searched) {
+        if (std::find(titleModuleFolders.begin(), titleModuleFolders.end(), folder) == titleModuleFolders.end()) foundModuleFolders.push_back(folder);
+    }
+    auto extraModuleFolders = titleModuleFolders;
+    extraModuleFolders.insert(extraModuleFolders.end(), foundModuleFolders.begin(), foundModuleFolders.end());
+    const auto moduleFolders = ModuleFolders(extraModuleFolders);
     const auto rpath = RunPath(request.anyps5);
 
     InstallManifest manifest;
@@ -495,6 +516,10 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
     const auto before = TopLevelNames(home);
 
     manifest.arguments = RelinkArguments(request.title != nullptr ? *request.title : TitleEntry{}, request.windows, request.intelHost);
+    for (const auto& folder : foundModuleFolders) {
+        manifest.arguments.push_back("--module-dir");
+        manifest.arguments.push_back(folder);
+    }
     manifest.arguments.push_back("--rpath");
     manifest.arguments.push_back(rpath);
     const bool anyModuleFolder = std::any_of(moduleFolders.begin(), moduleFolders.end(), [&](const std::string& folder) { return std::filesystem::is_directory(app0 / FromUtf8(folder), error); });

@@ -967,7 +967,7 @@ public:
 #endif
         if (settings_.checkUpdates) CheckLauncherUpdate();
         if (!loaded.existed) OpenSetup();
-        else if (settings_.gamesFolder.empty()) OpenSettings();
+        else if (GameFolders(settings_).empty()) OpenSettings();
         else StartScan();
     }
 
@@ -1269,9 +1269,9 @@ private:
     }
 
     void StartScan() {
-        if (settings_.gamesFolder.empty()) return;
         ScanOptions options;
-        options.roots.push_back(FromUtf8(settings_.gamesFolder));
+        options.roots = GameFolders(settings_);  // PS5 and PS4
+        if (options.roots.empty()) return;
         options.excluded = {layout_.library, layout_.userdata};
         scan_.Start([options] {
             ScanResult result;
@@ -1507,9 +1507,14 @@ private:
         const auto folder = game.location;
         const auto zip = OriginalsZipFor(game, layout_.library);
         const auto* title = TitleFor(game.metadata.titleId);
-        const auto moduleFolders = ModuleFolders(title != nullptr ? ModuleDirectories(*title) : std::vector<std::string>{});
+        auto extraFolders = title != nullptr ? ModuleDirectories(*title) : std::vector<std::string>{};
+        extraFolders.insert(extraFolders.end(), game.moduleDirs.begin(), game.moduleDirs.end());
         const auto executables = title != nullptr ? title->executables : std::vector<std::string>{};
-        job_.Start("SELF to ELF: " + game.metadata.name, true, [folder, zip, moduleFolders, executables](JobControl& control) {
+        job_.Start("SELF to ELF: " + game.metadata.name, true, [folder, zip, extraFolders, executables](JobControl& control) mutable {
+            // Every folder the game keeps modules in, looked for now rather than at each scan.
+            FolderPackage package(folder);
+            for (auto& found : FindModuleDirectories(package)) extraFolders.push_back(std::move(found));
+            const auto moduleFolders = ModuleFolders(extraFolders);  // drops repeats
             const auto result = ConvertGameSelfFiles(folder, zip, moduleFolders, executables, control);
             std::vector<std::string> done;
             if (result.eboot) done.push_back("eboot.bin");
@@ -1822,8 +1827,9 @@ private:
         if (IconButton("versions", TopIcon::Versions, session_ != nullptr ? "AnyPS5 versions (not while a game runs)" : "AnyPS5 versions", session_ != nullptr)) OpenVersions();
         ImGui::SameLine();
         ImGui::SetCursorPosY(iconY);
-        const char* rescanTip = scan_.Running() ? "Scanning..." : settings_.gamesFolder.empty() ? "Rescan (set a games folder in Settings first)" : "Rescan the games folder";
-        if (IconButton("rescan", TopIcon::Rescan, rescanTip, scan_.Running() || job_.Busy() || settings_.gamesFolder.empty(), scan_.Running())) StartScan();
+        const bool noFolder = GameFolders(settings_).empty();
+        const char* rescanTip = scan_.Running() ? "Scanning..." : noFolder ? "Rescan (set a games folder in Settings first)" : "Rescan the games folders";
+        if (IconButton("rescan", TopIcon::Rescan, rescanTip, scan_.Running() || job_.Busy() || noFolder, scan_.Running())) StartScan();
         ImGui::SameLine();
         ImGui::SetCursorPosY(iconY);
         if (IconButton("settings", TopIcon::Settings, session_ != nullptr ? "Settings (not while a game runs)" : "Settings", session_ != nullptr || job_.Busy())) OpenSettings();
@@ -1898,7 +1904,12 @@ private:
             if (ImGui::IsItemClicked()) StartLauncherUpdate();
         }
         ImGui::SameLine();
-        ImGui::TextColored(Dim, "%s", settings_.gamesFolder.empty() ? "No games folder set" : settings_.gamesFolder.c_str());
+        {
+            std::string folders;
+            if (!settings_.gamesFolder.empty()) folders = "PS5 " + settings_.gamesFolder;
+            if (!settings_.ps4GamesFolder.empty()) folders += (folders.empty() ? "" : "   \xC2\xB7   ") + std::string("PS4 ") + settings_.ps4GamesFolder;
+            ImGui::TextColored(Dim, "%s", folders.empty() ? "No games folder set" : folders.c_str());
+        }
         if (!settingsError_.empty()) ImGui::TextColored(Red, "Settings: %s", settingsError_.c_str());
         if (!profileError_.empty()) ImGui::TextColored(Red, "Profile: %s", profileError_.c_str());
         ImGui::Spacing();
@@ -1981,7 +1992,7 @@ private:
 
     void DrawEmptyDetails() {
         ImGui::Spacing();
-        ImGui::TextColored(Dim, "%s", scan_.Running() ? "Looking for games..." : settings_.gamesFolder.empty() ? "Set your games folder in Settings." : "No games found.");
+        ImGui::TextColored(Dim, "%s", scan_.Running() ? "Looking for games..." : GameFolders(settings_).empty() ? "Set your games folder in Settings." : "No games found.");
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextColored(Dim, "Game folders (with eboot.bin and sce_sys) and .zar archives in the games folder show up here.");
         ImGui::PopTextWrapPos();
@@ -5758,7 +5769,10 @@ private:
         switch (settingsPage_) {
         case SettingsPage::Library:
             CardBlock("folders", [&](float inner) {
-                FolderField("Games", "Scanned for game folders and .zar archives.", "##games", "the folder that holds your games", draft_.gamesFolder, inner);
+                FolderField("PS5 games", "Scanned for game folders and .zar archives.", "##games", "the folder that holds your PS5 games", draft_.gamesFolder, inner);
+                ImGui::Spacing();
+                FolderField("PS4 games", "Optional: a second folder, for your PS4 games. Both show in the library together.", "##ps4games", "the folder that holds your PS4 games",
+                            draft_.ps4GamesFolder, inner);
                 ImGui::Spacing();
                 FolderField("Library", "Logs and shader caches; safe to delete, it is rebuilt.", "##library", ToUtf8(launcherFolder_ / "library"), draft_.libraryFolder, inner);
                 ImGui::Spacing();
@@ -5961,12 +5975,11 @@ private:
             try {
                 const auto library = EffectiveLibrary(draft_, launcherFolder_);
                 const auto userdata = EffectiveUserdata(draft_, launcherFolder_);
-                if (!draft_.gamesFolder.empty()) {
-                    const auto games = FromUtf8(draft_.gamesFolder).lexically_normal();
+                for (const auto& games : GameFolders(draft_)) {
                     for (const auto& [label, folder] : {std::pair{"library", library}, std::pair{"userdata", userdata}}) {
                         const auto relative = folder.lexically_normal().lexically_relative(games);
                         if (!relative.empty() && ToUtf8(*relative.begin()) != "..") {
-                            throw std::runtime_error(std::string("the ") + label + " folder is inside the games folder; choose another place");
+                            throw std::runtime_error(std::string("the ") + label + " folder is inside a games folder (" + ToUtf8(games) + "); choose another place");
                         }
                     }
                 }
@@ -5974,7 +5987,7 @@ private:
                 draft_.anyps5Folder = settings_.anyps5Folder;
                 draft_.anyps5Version = settings_.anyps5Version;
                 SaveSettings(settingsFile_, draft_);
-                const bool gamesChanged = draft_.gamesFolder != settings_.gamesFolder;
+                const bool gamesChanged = draft_.gamesFolder != settings_.gamesFolder || draft_.ps4GamesFolder != settings_.ps4GamesFolder;
                 settings_ = draft_;
                 settingsError_.clear();
                 ApplySettings();
