@@ -3323,10 +3323,6 @@ private:
             }
         }
         ImGui::PopTextWrapPos();
-        ImGui::Spacing();
-        if (ImGui::SmallButton("All changes on GitHub")) {
-            SDL_OpenURL(("https://github.com/" + std::string(LauncherRepository) + "/releases/tag/" + release.tag).c_str());
-        }
         ImGui::EndChild();
 
         // What happens next, in one line.
@@ -3344,6 +3340,12 @@ private:
         ImGui::Spacing();
         const float buttonWidth = ImGui::GetFontSize() * 7.5f;
         const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+        // On the left, the same size as Later and Restart now.
+        if (ImGui::Button("All changes on GitHub", ImVec2(ImGui::CalcTextSize("All changes on GitHub").x + ImGui::GetFontSize() * 2.0f, buttonHeight))) {
+            SDL_OpenURL(("https://github.com/" + std::string(LauncherRepository) + "/releases/tag/" + release.tag).c_str());
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("This release's page, in your browser");
+        ImGui::SameLine();
         if (stagedLauncher_ && !stagedLauncher_->error.empty() && !launcherStager_.Running()) {
             if (ImGui::Button("Try again", ImVec2(buttonWidth, buttonHeight))) {
                 stagedLauncher_.reset();
