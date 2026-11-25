@@ -41,6 +41,7 @@
 #include "core/Launch.hpp"
 #include "core/Modules.hpp"
 #include "core/PatchInfo.hpp"
+#include "core/Playtime.hpp"
 #include "core/Profiles.hpp"
 #include "core/LaunchLinks.hpp"
 #include "core/SaveBackup.hpp"
@@ -941,6 +942,7 @@ public:
     }
 
     ~LauncherApp() {
+        FlushPlaytime();
         if (session_) session_->Stop();
         // A downloaded update goes in place as the launcher closes, so the next start is the new one.
         ApplyLauncherUpdate(false);
@@ -1068,6 +1070,7 @@ public:
             StageLauncher();  // download it quietly; it's put in place on restart or when the launcher closes
         }
         if (auto staged = launcherStager_.Take()) stagedLauncher_ = std::move(*staged);
+        TrackPlaytime();
         if (session_ && !session_->Running()) FinishSession();
         if (rescanWanted_ && !scan_.Running()) {
             rescanWanted_ = false;
@@ -1130,6 +1133,51 @@ private:
             profileSettings_ = {};
             profileError_ = failure.what();
         }
+        playtimes_ = LoadPlaytimes(layout_.PlaytimeFile());
+    }
+
+    // ---- play time: from the game's window showing to its exit, saved every minute ----
+
+    void TrackPlaytime() {
+        if (!session_ || !session_->Running()) return;
+        const auto now = SDL_GetTicks();
+        if (windowSeenAt_ == 0) {
+            if (now - windowCheckedAt_ < 500) return;
+            windowCheckedAt_ = now;
+            int x = 0, y = 0, w = 0, h = 0;
+            if (session_->WindowRect(x, y, w, h) && w > 0) windowSeenAt_ = now;
+            // Where the window can't be found, count from the start once it has run a while.
+            else if (now - sessionStartedAt_ > 25000) windowSeenAt_ = sessionStartedAt_;
+            return;
+        }
+        if (now - (countedUntil_ != 0 ? countedUntil_ : windowSeenAt_) >= 60000) FlushPlaytime();
+    }
+
+    // Adds the time not yet counted to the profile's file.
+    void FlushPlaytime() {
+        if (!session_ || windowSeenAt_ == 0) return;
+        const auto now = SDL_GetTicks();
+        const auto from = countedUntil_ != 0 ? countedUntil_ : windowSeenAt_;
+        const auto seconds = (now - from) / 1000;
+        if (seconds == 0) return;
+        try {
+            playtimes_[session_->TitleId()] = AddPlaytime(layout_.PlaytimeFile(), session_->TitleId(), seconds, !sessionCounted_, UnixNow());
+            countedUntil_ = from + seconds * 1000;
+            sessionCounted_ = true;
+        } catch (const std::exception&) {
+            // Tried again at the next minute; the time isn't lost while the game runs.
+        }
+    }
+
+    // Counted time plus what the running session has added since.
+    std::uint64_t PlayedSeconds(const std::string& serial) const {
+        std::uint64_t seconds = 0;
+        if (const auto found = playtimes_.find(serial); found != playtimes_.end()) seconds = found->second.seconds;
+        if (session_ && session_->TitleId() == serial && windowSeenAt_ != 0) {
+            const auto from = countedUntil_ != 0 ? countedUntil_ : windowSeenAt_;
+            seconds += (SDL_GetTicks() - from) / 1000;
+        }
+        return seconds;
     }
 
     void SwitchProfile(const std::string& name) {
@@ -1346,6 +1394,11 @@ private:
             auto plan = PrepareRun(game, layout_, profileSettings_, TitleFor(game.metadata.titleId), LoadGameSettings(layout_.GameSettingsFile(game.metadata.titleId)));
             session_ = std::make_unique<GameSession>(game.metadata.titleId, game.metadata.name, std::move(plan));
             sessionLocation_ = ToUtf8(game.location);
+            sessionStartedAt_ = SDL_GetTicks();
+            windowSeenAt_ = 0;
+            windowCheckedAt_ = 0;
+            countedUntil_ = 0;
+            sessionCounted_ = false;
             message_ = Message{Green, "Playing " + game.metadata.name, "Profile " + layout_.profile};
             launching_ = true;
             launchStarted_ = SDL_GetTicks();
@@ -1355,6 +1408,7 @@ private:
     }
 
     void FinishSession() {
+        FlushPlaytime();  // the last minutes, before the session goes
         WatchTrophies(true);  // an unlock in the last moments
         watchPrimed_ = false;
         std::optional<RunReport> report;
@@ -4611,6 +4665,18 @@ private:
         } else {
             ImGui::TextColored(Dim, "Not installed");
         }
+        if (const auto played = PlayedSeconds(serial); played > 0 || playtimes_.count(serial) != 0) {
+            std::string text = "Played " + FormatPlaytime(played);
+            if (const auto found = playtimes_.find(serial); found != playtimes_.end() && found->second.lastPlayed > 0 && !IsRunning(game)) {
+                text += "  \xC2\xB7  last " + LocalDate(found->second.lastPlayed).substr(0, 10);
+            }
+            ImGui::TextColored(Dim, "%s", text.c_str());
+            if (ImGui::IsItemHovered()) {
+                const auto found = playtimes_.find(serial);
+                const int sessions = found == playtimes_.end() ? 0 : found->second.sessions;
+                ImGui::SetTooltip("%d session%s with profile %s, counted from when the game's window shows", sessions, sessions == 1 ? "" : "s", layout_.profile.c_str());
+            }
+        }
         if (const auto found = diagnoses_.find(serial); found != diagnoses_.end() && !IsRunning(game)) {
             const auto& diagnosis = found->second;
             ImGui::PushTextWrapPos(0.0f);
@@ -4621,10 +4687,10 @@ private:
             ImGui::PopTextWrapPos();
             if (problem) {
                 if (ImGui::SmallButton("Make a report")) MakeReport(game);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)");
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Open an issue")) OpenIssue(game);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Opens a new issue on github.com/boykopovar/AnyPS5 with the facts filled in; you check it and submit it");
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)");
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Open log")) OpenLatestLog(serial);
             }
@@ -5632,6 +5698,12 @@ private:
     std::string jobLocation_;  // the copy the job works on; empty: every copy of jobSerial_
     std::unique_ptr<GameSession> session_;
     std::string sessionLocation_;  // the copy that runs (its location), as two copies share a title ID
+    Playtimes playtimes_;           // the current profile's
+    std::uint64_t sessionStartedAt_ = 0;  // SDL ticks
+    std::uint64_t windowSeenAt_ = 0;      // 0: no window yet
+    std::uint64_t windowCheckedAt_ = 0;
+    std::uint64_t countedUntil_ = 0;      // counted up to here; 0: nothing yet
+    bool sessionCounted_ = false;         // this session is in the session count
     ScanResult result_;
     bool scanned_ = false;
     bool rescanWanted_ = false;

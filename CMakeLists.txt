@@ -36,6 +36,7 @@ add_library(launcher_core STATIC
     src/core/InputMapping.cpp
     src/core/Trophies.cpp
     src/core/PatchInfo.cpp
+    src/core/Playtime.cpp
     src/core/Profiles.cpp
     src/core/SaveBackup.cpp
     src/core/SaveSync.cpp

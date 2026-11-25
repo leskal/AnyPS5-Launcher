@@ -18,6 +18,7 @@ inline constexpr const char* DefaultProfileName = "Player";
 //   <userdata>/profiles/<profile>/_trophy/<serial>
 //   <userdata>/profiles/<profile>/input/anyps5-input.ini (+ anyps5-input.<serial>.ini)
 //   <userdata>/profiles/<profile>/screenshots/<serial>
+//   <userdata>/profiles/<profile>/playtime.json
 //   <userdata>/games/<serial>/data, download0, anyps5-entitlements.ini
 //   <library>/<serial>/                      <serial>.exe and folder links only:
 //                                            app0 -> game folder, libs -> AnyPS5 libs,
@@ -40,6 +41,8 @@ struct Layout {
     // One game's own settings (window, frame rate, overlay, language, ...).
     std::filesystem::path GameSettingsFile(std::string_view serial) const { return Profile() / "settings" / (std::string(serial) + ".json"); }
     std::filesystem::path Screenshots(std::string_view serial) const { return Profile() / "screenshots" / std::string(serial); }
+    // How long this profile played each game.
+    std::filesystem::path PlaytimeFile() const { return Profile() / "playtime.json"; }
     std::filesystem::path GameData(std::string_view serial) const { return userdata / "games" / std::string(serial); }
     std::filesystem::path Logs(std::string_view serial) const { return library / "logs" / std::string(serial); }
     std::filesystem::path ShaderCache(std::string_view serial) const { return library / "shader-cache" / std::string(serial); }

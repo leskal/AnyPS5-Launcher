@@ -159,6 +159,7 @@ TEST(SavesAreBackedUpAndRestored) {
 #include "core/LaunchLinks.hpp"
 #include "core/SaveSync.hpp"
 #include "core/SelfUpdate.hpp"
+#include "core/Playtime.hpp"
 #include "core/Versions.hpp"
 
 TEST(LinksAndArguments) {
@@ -205,6 +206,40 @@ TEST(SwapsTheLauncherExe) {
     launcher::CleanUpLauncherUpdate(current, temp.Path());
     CHECK(!std::filesystem::exists(temp.Path() / "anyps5-launcher.exe.old"));
     CHECK(!std::filesystem::exists(temp.Path() / "update"));
+}
+
+TEST(PlaytimeAddsUpAndSurvivesBadFiles) {
+    fixture::TempDir temp;
+    const auto file = temp.Path() / "profile" / "playtime.json";
+    CHECK(launcher::LoadPlaytimes(file).empty());
+    auto record = launcher::AddPlaytime(file, "PPSA01001", 125, true, 1795000000);
+    CHECK_EQ(record.seconds, std::uint64_t{125});
+    CHECK_EQ(record.sessions, 1);
+    record = launcher::AddPlaytime(file, "PPSA01001", 60, false, 1795000060);  // same session, a minute later
+    CHECK_EQ(record.seconds, std::uint64_t{185});
+    CHECK_EQ(record.sessions, 1);
+    launcher::AddPlaytime(file, "PPSA01002", 30, true, 1795000100);
+    const auto loaded = launcher::LoadPlaytimes(file);
+    CHECK_EQ(loaded.size(), std::size_t{2});
+    CHECK_EQ(loaded.at("PPSA01001").seconds, std::uint64_t{185});
+    CHECK_EQ(loaded.at("PPSA01001").lastPlayed, std::int64_t{1795000060});
+    CHECK(!std::filesystem::exists(temp.Path() / "profile" / "playtime.json.partial"));
+
+    WriteText(file, R"({"games": {"PPSA1": {"seconds": -5}, "PPSA2": {"seconds": 90, "sessions": 2}, "PPSA3": "x"}})");
+    const auto mixed = launcher::LoadPlaytimes(file);
+    CHECK_EQ(mixed.size(), std::size_t{1});
+    CHECK_EQ(mixed.at("PPSA2").sessions, 2);
+    WriteText(file, "not json");
+    CHECK(launcher::LoadPlaytimes(file).empty());
+}
+
+TEST(PlaytimeReadsLikeAPerson) {
+    CHECK_EQ(launcher::FormatPlaytime(0), std::string("Under a minute"));
+    CHECK_EQ(launcher::FormatPlaytime(59), std::string("Under a minute"));
+    CHECK_EQ(launcher::FormatPlaytime(45 * 60 + 30), std::string("45 min"));
+    CHECK_EQ(launcher::FormatPlaytime(3 * 3600), std::string("3 h"));
+    CHECK_EQ(launcher::FormatPlaytime(3 * 3600 + 10 * 60), std::string("3 h 10 min"));
+    CHECK_EQ(launcher::FormatPlaytime(120 * 3600 + 59 * 60), std::string("120 h"));
 }
 
 TEST(ReleaseNotesBecomePlainLines) {
