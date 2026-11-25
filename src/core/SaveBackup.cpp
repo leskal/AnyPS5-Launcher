@@ -78,12 +78,17 @@ bool HasSaves(const Layout& layout, std::string_view serial) {
 
 std::filesystem::path ZipFolders(const std::vector<std::pair<std::string, std::filesystem::path>>& roots, const std::filesystem::path& folder,
                                  const std::string& suffix, JobControl& control) {
-    const auto files = FilesUnder(roots);
-    if (files.empty()) throw std::runtime_error("there is nothing to back up");
     std::filesystem::create_directories(folder);
     const auto stamp = Stamp();
     auto target = folder / (stamp + suffix + ".zip");
     for (int n = 2; std::filesystem::exists(target); ++n) target = folder / (stamp + suffix + "-" + std::to_string(n) + ".zip");
+    ZipFoldersTo(roots, target, control);
+    return target;
+}
+
+void ZipFoldersTo(const std::vector<std::pair<std::string, std::filesystem::path>>& roots, const std::filesystem::path& target, JobControl& control) {
+    const auto files = FilesUnder(roots);
+    if (files.empty()) throw std::runtime_error("there is nothing to back up");
     std::uint64_t total = 0;
     std::error_code error;
     for (const auto& [name, file] : files) total += std::filesystem::file_size(file, error);
@@ -100,13 +105,44 @@ std::filesystem::path ZipFolders(const std::vector<std::pair<std::string, std::f
             ZipReader check(partial);  // a backup that can't be read back is no backup
             if (check.Entries().size() != files.size()) throw std::runtime_error("the backup zip didn't read back whole");
         }
+        // The user may pick an existing file to overwrite: it goes only once the new one reads back.
+        std::filesystem::remove(target, error);
         RenameNew(partial, target);
     } catch (...) {
         std::filesystem::remove(partial, error);
         throw;
     }
     control.Advance(1);
-    return target;
+}
+
+AllSavesBackup BackUpAllSaves(const std::filesystem::path& userdata, const std::vector<std::string>& profiles, const std::filesystem::path& target,
+                              JobControl& control) {
+    AllSavesBackup result;
+    std::vector<std::pair<std::string, std::filesystem::path>> roots;
+    for (const auto& profile : profiles) {
+        const Layout layout{userdata, {}, profile};
+        std::vector<std::string> serials;
+        std::error_code error;
+        for (const auto& folder : {layout.Profile() / "saves", layout.Profile() / "_trophy"}) {
+            for (std::filesystem::directory_iterator it(folder, error), end; !error && it != end; it.increment(error)) {
+                if (it->is_directory(error)) serials.push_back(ToUtf8(it->path().filename()));
+            }
+            error.clear();
+        }
+        std::sort(serials.begin(), serials.end());
+        serials.erase(std::unique(serials.begin(), serials.end()), serials.end());
+        bool any = false;
+        for (const auto& serial : serials) {
+            if (!HasSaves(layout, serial)) continue;
+            for (const auto& [name, folder] : SaveRoots(layout, serial)) roots.emplace_back(profile + "/" + serial + "/" + name, folder);
+            ++result.games;
+            any = true;
+        }
+        if (any) ++result.profiles;
+    }
+    if (roots.empty()) throw std::runtime_error(profiles.size() == 1 ? "this profile has no saves yet" : "no profile has saves yet");
+    ZipFoldersTo(roots, target, control);
+    return result;
 }
 
 std::filesystem::path BackUpSaves(const Layout& layout, std::string_view serial, JobControl& control) {

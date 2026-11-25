@@ -232,7 +232,9 @@ void Section(const char* id, const char* title, const char* note, Body body) {
 bool Segmented(const char* id, const char* const* labels, int count, int& current) {
     ImGui::PushID(id);
     bool changed = false;
-    const float width = std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * 9.0f * static_cast<float>(count));
+    float widest = ImGui::GetFontSize() * 9.0f;  // every part as wide as the longest label needs
+    for (int index = 0; index < count; ++index) widest = std::max(widest, ImGui::CalcTextSize(labels[index]).x + ImGui::GetStyle().FramePadding.x * 4);
+    const float width = std::min(ImGui::GetContentRegionAvail().x, widest * static_cast<float>(count));
     const float each = (width - ImGui::GetStyle().ItemSpacing.x * 0.25f * static_cast<float>(count - 1)) / static_cast<float>(count);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x * 0.25f, ImGui::GetStyle().ItemSpacing.y));
     for (int index = 0; index < count; ++index) {
@@ -1037,6 +1039,10 @@ public:
                 message_ = Message{Red, "Can't add that AnyPS5", failure.what()};
             }
         }
+        if (!backupPick_.empty() && !Picker().IsOpen()) {
+            StartBackupAllSaves(FromUtf8(backupPick_));
+            backupPick_.clear();
+        }
         if (!exportPick_.empty() && !Picker().IsOpen()) {
             ExportGameSettings(FromUtf8(exportPick_));
             exportPick_.clear();
@@ -1500,6 +1506,17 @@ private:
             const auto result = PushSaves(layout, serial, root, control);
             if (result.action == SyncResult::Action::Pushed) return std::string("Saves sent to the sync folder");
             return std::string("The sync folder already has these saves");
+        });
+    }
+
+    void StartBackupAllSaves(std::filesystem::path target) {
+        if (job_.Busy() || session_) return;
+        if (target.extension() != ".zip") target += ".zip";
+        const auto profiles = backupAllProfiles_ ? profiles_ : std::vector<std::string>{layout_.profile};
+        job_.Start("Back up saves", true, [userdata = layout_.userdata, profiles, target](JobControl& control) {
+            const auto result = BackUpAllSaves(userdata, profiles, target, control);
+            return "Saves of " + std::to_string(result.games) + (result.games == 1 ? " game" : " games") +
+                   (result.profiles > 1 ? " from " + std::to_string(result.profiles) + " profiles" : std::string()) + " in " + ToUtf8(target);
         });
     }
 
@@ -5615,6 +5632,33 @@ private:
         }
     }
 
+    // A square button with an eye: open when shown is true, struck through when not.
+    bool EyeButton(const char* id, bool shown) {
+        const float size = ImGui::GetFrameHeight();
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(id, ImVec2(size, size));
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered) ImGui::SetTooltip("%s", shown ? "Hide the key" : "Show the key");
+        auto* draw = ImGui::GetWindowDrawList();
+        const auto& colors = ImGui::GetStyle().Colors;
+        draw->AddRectFilled(at, ImVec2(at.x + size, at.y + size), ImGui::GetColorU32(hovered ? colors[ImGuiCol_ButtonHovered] : WindowColor), ImGui::GetStyle().FrameRounding);
+        const ImVec2 c(at.x + size * 0.5f, at.y + size * 0.5f);
+        const float w = size * 0.32f;
+        const float h = size * 0.18f;
+        const ImU32 ink = ImGui::GetColorU32(hovered ? colors[ImGuiCol_Text] : Dim);
+        const float line = std::max(1.3f, 1.5f * scale_);
+        // The eye's outline: two curves meeting at the corners.
+        draw->AddBezierQuadratic(ImVec2(c.x - w, c.y), ImVec2(c.x, c.y - h * 2.0f), ImVec2(c.x + w, c.y), ink, line, 16);
+        draw->AddBezierQuadratic(ImVec2(c.x - w, c.y), ImVec2(c.x, c.y + h * 2.0f), ImVec2(c.x + w, c.y), ink, line, 16);
+        draw->AddCircleFilled(c, h * 0.75f, ink);
+        if (!shown) {
+            draw->AddLine(ImVec2(c.x - w * 0.9f, c.y + h * 1.6f), ImVec2(c.x + w * 0.9f, c.y - h * 1.6f), ImGui::GetColorU32(WindowColor), line * 3.0f);
+            draw->AddLine(ImVec2(c.x - w * 0.9f, c.y + h * 1.6f), ImVec2(c.x + w * 0.9f, c.y - h * 1.6f), ink, line);
+        }
+        if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        return pressed;
+    }
+
     // An on/off switch with a short slide. Returns true when flipped.
     bool Toggle(const char* id, bool* value) {
         const float s = scale_;
@@ -5831,8 +5875,11 @@ private:
                                                               : "Not a key: it needs 32 hex digits (0-9, A-F).";
                 const float field = ImGui::GetFontSize() * 17.0f;
                 SettingRow("ps4key", "PS4 trophy key", note, field, [&] {
-                    ImGui::SetNextItemWidth(field);
-                    ImGui::InputTextWithHint("##ps4key", "32 hex digits", &draft_.ps4TrophyKey, ImGuiInputTextFlags_Password);
+                    const float eye = ImGui::GetFrameHeight();
+                    ImGui::SetNextItemWidth(field - eye - ImGui::GetStyle().ItemSpacing.x);
+                    ImGui::InputTextWithHint("##ps4key", "32 hex digits", &draft_.ps4TrophyKey, showTrophyKey_ ? ImGuiInputTextFlags_None : ImGuiInputTextFlags_Password);
+                    ImGui::SameLine();
+                    if (EyeButton("##eye", showTrophyKey_)) showTrophyKey_ = !showTrophyKey_;
                 });
             }
             GroupLabel("Online");
@@ -5915,6 +5962,36 @@ private:
                 ImGui::Spacing();
                 if (draft_.syncFolder.empty()) ImGui::TextColored(Dim, "%s", "Off");
                 else ImGui::TextColored(Green, "%s", "On: saves of each profile go to <folder>\\<profile>\\<title ID>");
+            });
+            GroupLabel("Backup");
+            CardBlock("allsaves", [&](float) {
+                ImGui::TextUnformatted("Back up saves to a zip");
+                ImGui::TextColored(Dim, "%s",
+                                   "One zip with the saves and trophies of every game, in a folder per profile and game (<profile>\\<title ID>\\_sd, _sd_mem, _trophy), "
+                                   "the same layout as a game's own backups. Keep it anywhere: another drive, a USB stick, the cloud.");
+                ImGui::Spacing();
+                const std::string mine = "This profile (" + layout_.profile + ")";
+                const std::string all = "All profiles (" + std::to_string(profiles_.size()) + ")";
+                const char* labels[] = {mine.c_str(), all.c_str()};
+                int scope = backupAllProfiles_ ? 1 : 0;
+                if (Segmented("backup-scope", labels, 2, scope)) backupAllProfiles_ = scope == 1;
+                ImGui::Spacing();
+                ImGui::BeginDisabled(job_.Busy() || session_ != nullptr || Picker().IsOpen());
+                if (PrimaryButton("Back up to a zip...")) {
+                    std::string day = LocalDate(UnixNow()).substr(0, 10);
+                    backupPick_ = "AnyPS5 saves " + (backupAllProfiles_ ? std::string("all profiles") : layout_.profile) + " " + day + ".zip";
+                    Picker().SaveFile(window_, &backupPick_, "Zip archive", "zip");
+                }
+                ImGui::EndDisabled();
+                if (session_ != nullptr) {
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextColored(Dim, "%s", "After the game closes: its saves are with it while it runs.");
+                } else if (job_.Busy() && job_.Title().rfind("Back up saves", 0) == 0) {
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextColored(Dim, "%s", "Backing up...");
+                }
             });
             break;
         case SettingsPage::Playing:
@@ -6181,6 +6258,9 @@ private:
     bool factsWanted_ = false;
     Background<GameFacts> factsLoader_;
     std::string exportPick_;
+    std::string backupPick_;          // where Back up to a zip writes
+    bool backupAllProfiles_ = false;
+    bool showTrophyKey_ = false;
     std::string importPick_;
     // Screenshots window.
     bool openScreenshots_ = false;

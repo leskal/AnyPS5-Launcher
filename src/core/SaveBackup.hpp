@@ -32,6 +32,20 @@ std::vector<std::pair<std::string, std::filesystem::path>> SaveRoots(const Layou
 std::filesystem::path ZipFolders(const std::vector<std::pair<std::string, std::filesystem::path>>& roots, const std::filesystem::path& folder,
                                  const std::string& suffix, JobControl& control);
 
+// Zips the files under roots into exactly target (a .partial beside it until it reads back).
+void ZipFoldersTo(const std::vector<std::pair<std::string, std::filesystem::path>>& roots, const std::filesystem::path& target, JobControl& control);
+
+struct AllSavesBackup {
+    int profiles = 0;  // that had anything saved
+    int games = 0;     // profile and title ID pairs
+};
+
+// Every game's saves and trophies of the given profiles in one zip, in folders
+// <profile>/<title ID>/_sd, _sd_mem and _trophy: the layout of a game's own backups
+// under one folder per profile and game. Throws when none of them has anything saved.
+AllSavesBackup BackUpAllSaves(const std::filesystem::path& userdata, const std::vector<std::string>& profiles, const std::filesystem::path& target,
+                              JobControl& control);
+
 // True when the profile has anything saved for the game.
 bool HasSaves(const Layout& layout, std::string_view serial);
 

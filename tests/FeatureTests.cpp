@@ -161,6 +161,7 @@ TEST(SavesAreBackedUpAndRestored) {
 #include "core/SelfUpdate.hpp"
 #include "core/Playtime.hpp"
 #include "core/Versions.hpp"
+#include "core/ZipStore.hpp"
 
 TEST(LinksAndArguments) {
     using Kind = launcher::LaunchRequest::Kind;
@@ -240,6 +241,43 @@ TEST(PlaytimeReadsLikeAPerson) {
     CHECK_EQ(launcher::FormatPlaytime(3 * 3600), std::string("3 h"));
     CHECK_EQ(launcher::FormatPlaytime(3 * 3600 + 10 * 60), std::string("3 h 10 min"));
     CHECK_EQ(launcher::FormatPlaytime(120 * 3600 + 59 * 60), std::string("120 h"));
+}
+
+TEST(AllSavesGoInOneZip) {
+    fixture::TempDir temp;
+    const auto userdata = temp.Path() / "userdata";
+    launcher::Layout player{userdata, temp.Path() / "library", "Player"};
+    launcher::Layout guest{userdata, temp.Path() / "library", "Guest"};
+    launcher::JobControl control;
+    const auto zip = temp.Path() / "out" / "saves.zip";
+    std::filesystem::create_directories(zip.parent_path());
+    CHECK_THROWS(launcher::BackUpAllSaves(userdata, {"Player"}, zip, control));
+
+    WriteText(player.Saves("PPSA00001") / "_sd" / "SAVE0" / "data", "one");
+    WriteText(player.Trophies("PPSA00002") / "1_0.txt", "3 63000000000000000\n");  // trophies only
+    WriteText(guest.Saves("PPSA00001") / "_sd_mem" / "mem.bin", "guest");
+    std::filesystem::create_directories(guest.Saves("PPSA00009"));  // an empty folder isn't a game with saves
+
+    auto result = launcher::BackUpAllSaves(userdata, {"Player"}, zip, control);
+    CHECK_EQ(result.profiles, 1);
+    CHECK_EQ(result.games, 2);
+    {
+        launcher::ZipReader reader(zip);
+        CHECK(reader.Find("Player/PPSA00001/_sd/SAVE0/data") != nullptr);
+        CHECK(reader.Find("Player/PPSA00002/_trophy/1_0.txt") != nullptr);
+        CHECK(reader.Find("Guest/PPSA00001/_sd_mem/mem.bin") == nullptr);
+    }
+    // All profiles, over the same file.
+    result = launcher::BackUpAllSaves(userdata, {"Guest", "Player"}, zip, control);
+    CHECK_EQ(result.profiles, 2);
+    CHECK_EQ(result.games, 3);
+    launcher::ZipReader reader(zip);
+    CHECK_EQ(reader.Entries().size(), std::size_t{3});
+    const auto* guestSave = reader.Find("Guest/PPSA00001/_sd_mem/mem.bin");
+    CHECK(guestSave != nullptr);
+    const auto bytes = reader.ReadAll(*guestSave);
+    CHECK_EQ(std::string(bytes.begin(), bytes.end()), std::string("guest"));
+    CHECK(!std::filesystem::exists(temp.Path() / "out" / "saves.zip.partial"));
 }
 
 TEST(ReleaseNotesBecomePlainLines) {
