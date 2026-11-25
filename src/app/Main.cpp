@@ -1153,6 +1153,16 @@ public:
     bool TakeEvent(const SDL_Event& event) { return CaptureEvent(event); }
 
     // Runs every loop, even while the launcher is minimized: trophy cards over the game.
+    // While a pad's test is on screen the pad only shows there: it doesn't move
+    // around Settings or press anything (the mouse and keyboard still do).
+    void BeforeFrame() {
+        auto& io = ImGui::GetIO();
+        const bool testing = padTestDrawn_;
+        padTestDrawn_ = false;
+        if (testing) io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+        else io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    }
+
     void Tick() {
         WatchTrophies(false);
         toast_->Frame();
@@ -1633,7 +1643,10 @@ private:
             if (ImGui::SmallButton(padTest_ == id ? "Hide test" : "Test buttons and sticks")) padTest_ = padTest_ == id ? 0 : id;
             ImGui::SameLine();
             if (ImGui::SmallButton("Vibrate")) SDL_RumbleGamepad(pad, 0xC000, 0xC000, 500);
-            if (padTest_ == id) DrawPadTest(pad);
+            if (padTest_ == id) {
+                DrawPadTest(pad);
+                ImGui::TextColored(Dim, "%s", "While the test is open the pad only shows here; Hide test gives it back to the launcher.");
+            }
             ImGui::Spacing();
             ImGui::PopID();
         }
@@ -1662,6 +1675,7 @@ private:
 
     // A live picture of the pad: face buttons, shoulders, d-pad, both sticks and the triggers.
     void DrawPadTest(SDL_Gamepad* pad) {
+        padTestDrawn_ = true;
         const float scale = scale_;
         const float width = std::min(ImGui::GetContentRegionAvail().x, 440.0f * scale);
         const float height = width * 0.5f;
@@ -6274,6 +6288,7 @@ private:
     // Controllers in Settings.
     std::map<SDL_JoystickID, SDL_Gamepad*> pads_;
     SDL_JoystickID padTest_ = 0;
+    bool padTestDrawn_ = false;  // the test was on screen in the last frame
     Background<OnlineLookup> onlineLoader_;
     std::map<std::string, TitleOnlineInfo> online_;
     std::map<std::string, std::string> onlineErrors_;
@@ -6386,6 +6401,7 @@ int main(int argc, char** argv) {
             }
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
+            app.BeforeFrame();
             ImGui::NewFrame();
             app.Frame();
             ImGui::Render();
