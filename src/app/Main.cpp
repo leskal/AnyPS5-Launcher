@@ -1616,7 +1616,7 @@ private:
     }
 
     // The connected pads with their kind, connection and battery; a live test and vibration.
-    void DrawControllers() {
+    void DrawControllers(float width) {
         int count = 0;
         SDL_JoystickID* ids = SDL_GetGamepads(&count);
         std::set<SDL_JoystickID> present;
@@ -1656,7 +1656,7 @@ private:
             const float buttonWidth = ImGui::CalcTextSize("Stop test").x + style.FramePadding.x * 4.0f;
             const float buttonsWidth = buttonWidth * 2.0f + style.ItemSpacing.x;
             const float left = ImGui::GetCursorPosX();
-            const float right = left + ImGui::GetContentRegionAvail().x;
+            const float right = left + width;  // the card's inner edge, where Edit... ends
             const float top = ImGui::GetCursorPosY();
             ImGui::BeginGroup();
             ImGui::PushTextWrapPos(right - buttonsWidth - style.ItemSpacing.x * 2.0f);
@@ -1667,16 +1667,18 @@ private:
             const float textHeight = ImGui::GetItemRectSize().y;
             const float rowHeight = std::max(textHeight, ImGui::GetFrameHeight());
             ImGui::SameLine();
-            ImGui::SetCursorPos(ImVec2(right - buttonsWidth, top + (rowHeight - ImGui::GetFrameHeight()) * 0.5f));
+            const float buttonY = top + (rowHeight - ImGui::GetFrameHeight()) * 0.5f;
+            ImGui::SetCursorPos(ImVec2(right - buttonsWidth, buttonY));
             if (ImGui::Button(padTest_ == id ? "Stop test" : "Test", ImVec2(buttonWidth, 0))) padTest_ = padTest_ == id ? 0 : id;
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Shows the buttons, sticks and triggers as you press them");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", padTest_ == id ? "While the test is open the pad only shows here; Stop test gives it back to the launcher."
+                                                       : "Shows the buttons, sticks and triggers as you press them");
+            }
             ImGui::SameLine();
+            ImGui::SetCursorPos(ImVec2(right - buttonWidth, buttonY));  // same height as Test
             if (ImGui::Button("Vibrate", ImVec2(buttonWidth, 0))) SDL_RumbleGamepad(pad, 0xC000, 0xC000, 500);
             ImGui::SetCursorPosY(top + rowHeight + style.ItemSpacing.y);
-            if (padTest_ == id) {
-                DrawPadTest(pad);
-                ImGui::TextColored(Dim, "%s", "While the test is open the pad only shows here; Stop test gives it back to the launcher.");
-            }
+            if (padTest_ == id) DrawPadTest(pad);
             ImGui::Spacing();
             ImGui::PopID();
         }
@@ -1707,8 +1709,20 @@ private:
     void DrawPadTest(SDL_Gamepad* pad) {
         padTestDrawn_ = true;
         const float scale = scale_;
-        const float width = std::min(ImGui::GetContentRegionAvail().x, 440.0f * scale);
+        // As big as fits in what's left of the page, so it never needs scrolling:
+        // the space down to the window's bottom, less the card's padding.
+        const float avail = ImGui::GetContentRegionAvail().x;
+        // Below the test come the card's bottom padding (16), the gap after the card (10)
+        // and a few item spacings; all of it has to fit too.
+        const auto& style = ImGui::GetStyle();
+        // Measured in the page's own coordinates, so a page already scrolled down
+        // doesn't make the test bigger and keep the scroll bar.
+        const float bottom = ImGui::GetWindowHeight() - style.WindowPadding.y - (16.0f + 10.0f + 6.0f) * scale - style.ItemSpacing.y * 3.0f;
+        const float room = bottom - ImGui::GetCursorPosY();
+        const float width = std::min(std::max(std::min(room * 2.0f, 440.0f * scale), 200.0f * scale), avail);
         const float height = width * 0.5f;
+        // Centred under the pad's row.
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x + (avail - width) * 0.5f, ImGui::GetCursorScreenPos().y));
         const ImVec2 at = ImGui::GetCursorScreenPos();
         ImGui::Dummy(ImVec2(width, height));
         auto* draw = ImGui::GetWindowDrawList();
@@ -5998,10 +6012,10 @@ private:
                 if (ImGui::Button("Edit...", ImVec2(button, 0))) OpenProfileControls();
             });
             GroupLabel("Controllers");
-            CardBlock("pads", [&](float) {
+            CardBlock("pads", [&](float inner) {
                 ImGui::TextColored(Dim, "%s", "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (\xE2\x9C\x95 plays, \xE2\x96\xB3 opens a game's actions).");
                 ImGui::Spacing();
-                DrawControllers();
+                DrawControllers(inner);
             });
             break;
         case SettingsPage::Saves:
