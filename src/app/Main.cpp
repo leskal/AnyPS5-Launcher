@@ -4072,7 +4072,7 @@ private:
         if (width <= 0 || height <= 0) return;
         const ImVec2 at = ImGui::GetWindowPos();
         const ImVec2 size = ImGui::GetWindowSize();
-        const float shown = std::min(size.y, size.x * 0.75f);  // the top of the panel only
+        const float shown = std::floor(std::min(size.y, size.x * 0.75f));  // the top of the panel only, on a whole pixel
         // Cover: crop the picture to the shown area's shape.
         ImVec2 uv0(0, 0);
         ImVec2 uv1(1, 1);
@@ -4095,6 +4095,9 @@ private:
         const ImU32 clear = ImGui::GetColorU32(Fade(Card, 0.25f));
         const ImU32 solid = ImGui::GetColorU32(Card);
         draw->AddRectFilledMultiColor(ImVec2(at.x, at.y + shown * 0.35f), ImVec2(at.x + size.x, at.y + shown), clear, clear, solid, solid);
+        // The picture's anti-aliased edge reaches a pixel or two below `shown`, past the
+        // fade: cover it with the card colour, or it shows as a bright line.
+        draw->AddRectFilled(ImVec2(at.x, at.y + shown - 1.0f), ImVec2(at.x + size.x, at.y + shown + 3.0f * scale_), solid);
         draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + shown * 0.35f), clear, rounding, ImDrawFlags_RoundCornersTop);
         draw->PopClipRect();
     }
