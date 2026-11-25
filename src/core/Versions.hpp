@@ -62,8 +62,10 @@ struct VersionEntry {
     std::string tag;         // empty for a local version
     std::filesystem::path folder;
     std::string addedAt;
+    std::string name;  // a local version's own name; empty: its folder's name
 
     bool Local() const { return repository.empty(); }
+    // A release: its tag (and fork). A local version: its name, never its full path.
     std::string Label() const;
 };
 
@@ -94,6 +96,10 @@ VersionEntry DownloadRelease(const std::filesystem::path& root, const std::strin
 // clone that holds build/core/relinker/<relinker> (build layout). Throws with the
 // probe's problem when it isn't usable.
 VersionEntry LocalVersion(const std::filesystem::path& relinkerOrFolder);
+
+// Names a local version (trimmed, at most 40 characters; empty goes back to the
+// folder's name). Throws for an unknown id or a downloaded release.
+void RenameVersion(VersionStore& store, std::string_view id, std::string_view name);
 
 // Removes the entry; a downloaded version's folder is deleted too, a local one never is.
 void RemoveVersion(const std::filesystem::path& root, VersionStore& store, std::string_view id);

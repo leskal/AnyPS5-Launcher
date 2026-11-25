@@ -198,7 +198,11 @@ std::optional<ReleaseFiles> FilesFor(const Release& release, std::string* proble
 }
 
 std::string VersionEntry::Label() const {
-    if (Local()) return "local: " + ToUtf8(folder);
+    if (Local()) {
+        if (!name.empty()) return name;
+        const auto leaf = ToUtf8(folder.filename());
+        return leaf.empty() ? std::string("Local build") : leaf;
+    }
     return tag + (repository == OfficialRepository ? std::string() : " (" + repository + ")");
 }
 
@@ -221,6 +225,7 @@ VersionStore LoadVersions(const std::filesystem::path& root) {
             entry.repository = Text(item, "repository");
             entry.tag = Text(item, "tag");
             entry.addedAt = Text(item, "addedAt");
+            entry.name = Text(item, "name");
             const auto folder = Text(item, "folder");
             if (entry.id.empty() || folder.empty()) continue;
             entry.folder = FromUtf8(folder);
@@ -250,7 +255,9 @@ void SaveVersions(const std::filesystem::path& root, const VersionStore& store) 
             const auto relative = entry.folder.lexically_relative(root);
             if (!relative.empty() && *relative.begin() != "..") folder = relative;
         }
-        versions.push_back({{"id", entry.id}, {"repository", entry.repository}, {"tag", entry.tag}, {"folder", ToUtf8(folder.generic_u8string())}, {"addedAt", entry.addedAt}});
+        nlohmann::json item = {{"id", entry.id}, {"repository", entry.repository}, {"tag", entry.tag}, {"folder", ToUtf8(folder.generic_u8string())}, {"addedAt", entry.addedAt}};
+        if (!entry.name.empty()) item["name"] = entry.name;
+        versions.push_back(std::move(item));
     }
     std::error_code error;
     std::filesystem::create_directories(root, error);
@@ -269,11 +276,33 @@ const VersionEntry* FindVersion(const VersionStore& store, std::string_view id) 
 void PutVersion(VersionStore& store, VersionEntry entry) {
     for (auto& existing : store.versions) {
         if (existing.id == entry.id) {
+            if (entry.name.empty()) entry.name = existing.name;  // adding the same folder again keeps its name
             existing = std::move(entry);
             return;
         }
     }
     store.versions.push_back(std::move(entry));
+}
+
+void RenameVersion(VersionStore& store, std::string_view id, std::string_view name) {
+    for (auto& entry : store.versions) {
+        if (entry.id != id) continue;
+        if (!entry.Local()) throw std::runtime_error("only a local version can be renamed");
+        std::string text(name);
+        const auto first = text.find_first_not_of(" \t");
+        text = first == std::string::npos ? std::string() : text.substr(first, text.find_last_not_of(" \t") - first + 1);
+        for (char& c : text) {
+            if (static_cast<unsigned char>(c) < 0x20) c = ' ';
+        }
+        if (text.size() > 40) {
+            text.resize(40);
+            while (!text.empty() && (static_cast<unsigned char>(text.back()) & 0xC0) == 0x80) text.pop_back();  // no half character
+            if (!text.empty() && static_cast<unsigned char>(text.back()) >= 0xC0) text.pop_back();
+        }
+        entry.name = text;
+        return;
+    }
+    throw std::runtime_error("no AnyPS5 version " + std::string(id));
 }
 
 VersionEntry DownloadRelease(const std::filesystem::path& root, const std::string& repository, const Release& release,

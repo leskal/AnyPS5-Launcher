@@ -285,6 +285,40 @@ TEST(VersionPinsAreKept) {
     CHECK(loaded.pins.empty());
 }
 
+TEST(LocalVersionsHaveNamesNotPaths) {
+    fixture::TempDir temp;
+    launcher::VersionStore store;
+    launcher::VersionEntry local;
+    local.id = "local:H:/Games/PS5/AnyPS5/anyps5/leskal/AnyPS5";
+    local.folder = temp.Path() / "builds" / "AnyPS5";
+    store.versions.push_back(local);
+    launcher::VersionEntry release;
+    release.id = "boykopovar/AnyPS5@v0.1.5";
+    release.repository = "boykopovar/AnyPS5";
+    release.tag = "v0.1.5";
+    release.folder = temp.Path() / "boykopovar" / "AnyPS5" / "v0.1.5";
+    store.versions.push_back(release);
+
+    CHECK_EQ(store.versions[0].Label(), std::string("AnyPS5"));  // the folder's name, not the path
+    launcher::RenameVersion(store, local.id, "  My nightly build  ");
+    CHECK_EQ(store.versions[0].Label(), std::string("My nightly build"));
+    launcher::SaveVersions(temp.Path(), store);
+    auto loaded = launcher::LoadVersions(temp.Path());
+    CHECK_EQ(loaded.versions[0].name, std::string("My nightly build"));
+    CHECK(loaded.versions[1].name.empty());
+
+    // Adding the same folder again keeps the name.
+    launcher::PutVersion(loaded, local);
+    CHECK_EQ(launcher::FindVersion(loaded, local.id)->Label(), std::string("My nightly build"));
+
+    launcher::RenameVersion(loaded, local.id, std::string(60, 'x'));
+    CHECK_EQ(launcher::FindVersion(loaded, local.id)->name.size(), std::size_t{40});
+    launcher::RenameVersion(loaded, local.id, "   ");
+    CHECK_EQ(launcher::FindVersion(loaded, local.id)->Label(), std::string("AnyPS5"));
+    CHECK_THROWS(launcher::RenameVersion(loaded, release.id, "x"));
+    CHECK_THROWS(launcher::RenameVersion(loaded, "local:nowhere", "x"));
+}
+
 TEST(SavesSyncThroughAFolder) {
     fixture::TempDir temp;
     launcher::JobControl control;

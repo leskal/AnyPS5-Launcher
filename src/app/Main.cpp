@@ -986,10 +986,17 @@ public:
             try {
                 auto entry = LocalVersion(FromUtf8(picked));
                 const auto id = entry.id;
+                const bool known = FindVersion(versions_, id) != nullptr;
                 PutVersion(versions_, std::move(entry));
                 SaveVersions(versionsRoot_, versions_);
                 SelectVersion(id);
                 versionsError_.clear();
+                if (!known) {
+                    // A new build: offer to name it straight away.
+                    renamingVersion_ = id;
+                    renameText_ = FindVersion(versions_, id)->Label();
+                    renameFocus_ = true;
+                }
             } catch (const std::exception& failure) {
                 versionsError_ = failure.what();
                 message_ = Message{Red, "Can't add that AnyPS5", failure.what()};
@@ -1095,7 +1102,7 @@ public:
         DrawScreenshots();
         DrawLaunchScreen();
         DrawMissingRelinker();
-        DrawVersions();
+        if (!versionsInSettings_) DrawVersions();
         DrawSettings();
         DrawTrophies();
         if (controlsScope_ == 0) DrawControls();  // the profile's controls are drawn over Settings
@@ -4666,7 +4673,7 @@ private:
             ImGui::TextColored(Dim, "Not installed");
         }
         if (const auto played = PlayedSeconds(serial); played > 0 || playtimes_.count(serial) != 0) {
-            std::string text = "Played " + FormatPlaytime(played);
+            std::string text = played < 60 ? std::string("Played less than a minute") : "Played " + FormatPlaytime(played);
             if (const auto found = playtimes_.find(serial); found != playtimes_.end() && found->second.lastPlayed > 0 && !IsRunning(game)) {
                 text += "  \xC2\xB7  last " + LocalDate(found->second.lastPlayed).substr(0, 10);
             }
@@ -5089,7 +5096,9 @@ private:
 
     std::string CurrentVersionLabel() const {
         if (const auto* entry = FindVersion(versions_, settings_.anyps5Version)) return entry->Label();
-        return settings_.anyps5Folder.empty() ? std::string("none") : "local: " + settings_.anyps5Folder;
+        if (settings_.anyps5Folder.empty()) return "none";
+        const auto leaf = ToUtf8(FromUtf8(settings_.anyps5Folder).filename());
+        return leaf.empty() ? std::string("your own build") : leaf;
     }
 
     void SelectVersion(const std::string& id) {
@@ -5210,10 +5219,46 @@ private:
                     ImGui::TableNextRow(ImGuiTableRowFlags_None, ImGui::GetFrameHeight() * 2.0f);
                     if (selected) ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(Fade(Accent, 0.10f)));
                     ImGui::TableNextColumn();
-                    ImGui::PushFont(nullptr, style.FontSizeBase * 1.08f);
-                    ImGui::TextUnformatted(entry.Local() ? "Local build" : entry.tag.c_str());
-                    ImGui::PopFont();
-                    ImGui::TextColored(Dim, "%s", Elide(entry.Local() ? ToUtf8(entry.folder) : entry.repository, ImGui::GetContentRegionAvail().x).c_str());
+                    if (entry.Local() && renamingVersion_ == entry.id) {
+                        // Naming it in place: Enter or clicking away keeps the name, Esc drops it.
+                        ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * 16.0f));
+                        if (ImGui::IsWindowAppearing() || renameFocus_) {
+                            ImGui::SetKeyboardFocusHere();
+                            renameFocus_ = false;
+                        }
+                        const bool entered = ImGui::InputTextWithHint("##name", "A name for this build", &renameText_, ImGuiInputTextFlags_EnterReturnsTrue);
+                        if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                            renamingVersion_.clear();
+                        } else if (entered || ImGui::IsItemDeactivated()) {
+                            try {
+                                RenameVersion(versions_, entry.id, renameText_);
+                                SaveVersions(versionsRoot_, versions_);
+                            } catch (const std::exception& failure) {
+                                versionsError_ = failure.what();
+                            }
+                            renamingVersion_.clear();
+                        }
+                    } else {
+                        ImGui::PushFont(nullptr, style.FontSizeBase * 1.08f);
+                        ImGui::TextUnformatted(entry.Label().c_str());
+                        ImGui::PopFont();
+                        if (entry.Local() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ToUtf8(entry.folder).c_str());
+                    }
+                    if (entry.Local()) {
+                        ImGui::TextColored(Dim, "%s", "Your own build");
+                        ImGui::SameLine();
+                        ImGui::BeginDisabled(!renamingVersion_.empty());
+                        if (ImGui::SmallButton("Rename")) {
+                            renamingVersion_ = entry.id;
+                            renameText_ = entry.name.empty() ? entry.Label() : entry.name;
+                            renameFocus_ = true;
+                        }
+                        ImGui::EndDisabled();
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Open folder")) OpenFolder(entry.folder);
+                    } else {
+                        ImGui::TextColored(Dim, "%s", Elide(entry.repository, ImGui::GetContentRegionAvail().x).c_str());
+                    }
                     ImGui::TableNextColumn();
                     ImGui::AlignTextToFramePadding();
                     if (probe.runtime) {
@@ -5392,12 +5437,14 @@ private:
         ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     }
 
-    void FolderField(const char* label, const char* note, const char* id, const std::string& hint, std::string& value) {
+    // width: the whole row, field and Browse... together; 0: up to the window's edge.
+    void FolderField(const char* label, const char* note, const char* id, const std::string& hint, std::string& value, float width = 0.0f) {
         ImGui::TextUnformatted(label);
         if (note != nullptr) ImGui::TextColored(Dim, "%s", note);
         const auto& style = ImGui::GetStyle();
         const float browse = ImGui::CalcTextSize("Browse...").x + style.FramePadding.x * 2 + style.ItemSpacing.x;
-        ImGui::SetNextItemWidth(-browse);
+        if (width > 0.0f) ImGui::SetNextItemWidth(width - browse);
+        else ImGui::SetNextItemWidth(-browse);
         ImGui::InputTextWithHint(id, hint.c_str(), &value);
         ImGui::SameLine();
         ImGui::PushID(id);
@@ -5407,116 +5454,454 @@ private:
         ImGui::PopID();
     }
 
+    // ---- settings: pages in a sidebar, each setting a row with its control on the right ----
+
+    enum class SettingsPage { Library, Games, Appearance, Controls, Saves, Playing, Launcher };
+
+    struct SettingsPageText {
+        SettingsPage page;
+        const char* title;
+        const char* note;
+    };
+
+    static constexpr SettingsPageText SettingsPages[] = {
+        {SettingsPage::Library, "Library", "Where your games are, and where the launcher keeps its own files."},
+        {SettingsPage::Games, "Games", "How games are converted, and what the launcher looks up about them."},
+        {SettingsPage::Appearance, "Appearance", "How the launcher looks. A theme shows at once; Save keeps it."},
+        {SettingsPage::Controls, "Controls", "Keys for every game of this profile, and the pads the launcher sees."},
+        {SettingsPage::Saves, "Saves", "Keep saves and trophies the same on your other PCs."},
+        {SettingsPage::Playing, "While playing", "What the launcher does while a game runs."},
+        {SettingsPage::Launcher, "About", "This launcher's version and its updates."},
+    };
+
+    // A small line icon for each page, drawn in code like the top bar's.
+    void DrawPageGlyph(ImDrawList* draw, SettingsPage page, ImVec2 c, float r, ImU32 ink) {
+        const float s = scale_;
+        const float line = 1.6f * s;
+        switch (page) {
+        case SettingsPage::Library:  // a folder
+            draw->AddRect(ImVec2(c.x - r, c.y - r * 0.55f), ImVec2(c.x + r, c.y + r * 0.75f), ink, 2 * s, 0, line);
+            draw->AddLine(ImVec2(c.x - r, c.y - r * 0.55f), ImVec2(c.x - r * 0.15f, c.y - r * 0.55f), ink, line * 1.8f);
+            break;
+        case SettingsPage::Games:  // a play triangle in a circle
+            draw->AddCircle(c, r, ink, 0, line);
+            draw->AddTriangleFilled(ImVec2(c.x - r * 0.3f, c.y - r * 0.45f), ImVec2(c.x - r * 0.3f, c.y + r * 0.45f), ImVec2(c.x + r * 0.5f, c.y), ink);
+            break;
+        case SettingsPage::Appearance:  // half a moon in a circle
+            draw->AddCircle(c, r, ink, 0, line);
+            draw->PathArcTo(c, r, -1.5707963f, 1.5707963f, 16);
+            draw->PathFillConvex(ink);
+            break;
+        case SettingsPage::Controls:  // a pad: body and two buttons
+            draw->AddRect(ImVec2(c.x - r * 1.1f, c.y - r * 0.55f), ImVec2(c.x + r * 1.1f, c.y + r * 0.6f), ink, r * 0.5f, 0, line);
+            draw->AddLine(ImVec2(c.x - r * 0.75f, c.y), ImVec2(c.x - r * 0.25f, c.y), ink, line);
+            draw->AddLine(ImVec2(c.x - r * 0.5f, c.y - r * 0.25f), ImVec2(c.x - r * 0.5f, c.y + r * 0.25f), ink, line);
+            draw->AddCircleFilled(ImVec2(c.x + r * 0.5f, c.y), r * 0.15f, ink);
+            break;
+        case SettingsPage::Saves: {  // two arrows going round
+            draw->PathArcTo(c, r * 0.85f, 3.4f, 5.9f, 12);
+            draw->PathStroke(ink, 0, line);
+            draw->PathArcTo(c, r * 0.85f, 0.25f, 2.75f, 12);
+            draw->PathStroke(ink, 0, line);
+            const ImVec2 a(c.x + std::cos(5.9f) * r * 0.85f, c.y + std::sin(5.9f) * r * 0.85f);
+            const ImVec2 b(c.x + std::cos(2.75f) * r * 0.85f, c.y + std::sin(2.75f) * r * 0.85f);
+            draw->AddTriangleFilled(ImVec2(a.x - r * 0.3f, a.y - r * 0.15f), ImVec2(a.x + r * 0.25f, a.y - r * 0.2f), ImVec2(a.x, a.y + r * 0.3f), ink);
+            draw->AddTriangleFilled(ImVec2(b.x + r * 0.3f, b.y + r * 0.15f), ImVec2(b.x - r * 0.25f, b.y + r * 0.2f), ImVec2(b.x, b.y - r * 0.3f), ink);
+            break;
+        }
+        case SettingsPage::Playing:  // a trophy cup
+            draw->AddRectFilled(ImVec2(c.x - r * 0.6f, c.y - r * 0.8f), ImVec2(c.x + r * 0.6f, c.y + r * 0.05f), ink, r * 0.5f, ImDrawFlags_RoundCornersBottom);
+            draw->AddLine(ImVec2(c.x, c.y), ImVec2(c.x, c.y + r * 0.55f), ink, line);
+            draw->AddLine(ImVec2(c.x - r * 0.45f, c.y + r * 0.7f), ImVec2(c.x + r * 0.45f, c.y + r * 0.7f), ink, line * 1.3f);
+            break;
+        case SettingsPage::Launcher:  // an i in a circle
+            draw->AddCircle(c, r, ink, 0, line);
+            draw->AddCircleFilled(ImVec2(c.x, c.y - r * 0.42f), r * 0.13f, ink);
+            draw->AddLine(ImVec2(c.x, c.y - r * 0.1f), ImVec2(c.x, c.y + r * 0.5f), ink, line * 1.2f);
+            break;
+        }
+    }
+
+    // An on/off switch with a short slide. Returns true when flipped.
+    bool Toggle(const char* id, bool* value) {
+        const float s = scale_;
+        const float h = 22.0f * s;
+        const float w = 40.0f * s;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float frame = ImGui::GetFrameHeight();
+        const bool pressed = ImGui::InvisibleButton(id, ImVec2(w, std::max(h, frame)));
+        if (pressed) *value = !*value;
+        const bool hovered = ImGui::IsItemHovered();
+        const bool disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
+        auto* storage = ImGui::GetStateStorage();
+        const ImGuiID key = ImGui::GetItemID();
+        float t = storage->GetFloat(key, *value ? 1.0f : 0.0f);
+        const float target = *value ? 1.0f : 0.0f;
+        t += (target - t) * std::min(1.0f, ImGui::GetIO().DeltaTime * 18.0f);
+        if (std::fabs(target - t) < 0.01f) t = target;
+        storage->SetFloat(key, t);
+        auto* draw = ImGui::GetWindowDrawList();
+        const float top = at.y + (std::max(h, frame) - h) * 0.5f;
+        const ImVec4 off = Fade(Dim, hovered ? 0.6f : 0.45f);
+        ImVec4 track(off.x + (Accent.x - off.x) * t, off.y + (Accent.y - off.y) * t, off.z + (Accent.z - off.z) * t, 1.0f);
+        if (disabled) track.w = 0.45f;
+        draw->AddRectFilled(ImVec2(at.x, top), ImVec2(at.x + w, top + h), ImGui::GetColorU32(track), h * 0.5f);
+        const float knob = h * 0.5f - 3.0f * s;
+        const ImVec2 kc(at.x + h * 0.5f + (w - h) * t, top + h * 0.5f);
+        draw->AddCircleFilled(ImVec2(kc.x, kc.y + 1.0f * s), knob, IM_COL32(0, 0, 0, 40));
+        draw->AddCircleFilled(kc, knob, disabled ? IM_COL32(255, 255, 255, 150) : IM_COL32_WHITE);
+        if (hovered && !disabled) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        return pressed;
+    }
+
+    // A rounded card behind whatever body draws, as wide as the page.
+    template <typename Body>
+    void CardBlock(const char* id, Body body) {
+        const float s = scale_;
+        const float pad = 16.0f * s;
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float width = ImGui::GetContentRegionAvail().x;
+        ImGui::PushID(id);
+        draw->ChannelsSplit(2);
+        draw->ChannelsSetCurrent(1);
+        ImGui::SetCursorScreenPos(ImVec2(at.x + pad, at.y + pad));
+        ImGui::BeginGroup();
+        ImGui::PushItemWidth(width - pad * 2);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - pad * 2);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, WindowColor);
+        ImGui::PushStyleColor(ImGuiCol_Button, WindowColor);
+        body(width - pad * 2);
+        ImGui::PopStyleColor(2);
+        ImGui::PopTextWrapPos();
+        ImGui::PopItemWidth();
+        ImGui::EndGroup();
+        const float bottom = ImGui::GetItemRectMax().y + pad;
+        draw->ChannelsSetCurrent(0);
+        draw->AddRectFilled(at, ImVec2(at.x + width, bottom), ImGui::GetColorU32(CardHover), 12.0f * s);
+        draw->ChannelsMerge();
+        ImGui::PopID();
+        ImGui::SetCursorScreenPos(ImVec2(at.x, bottom));
+        ImGui::Dummy(ImVec2(width, 10.0f * s));
+    }
+
+    // One setting: its name and a line about it on the left, its control on the right.
+    template <typename Control>
+    void SettingRow(const char* id, const char* title, const char* note, float controlWidth, Control control) {
+        const float s = scale_;
+        const float pad = 16.0f * s;
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float width = ImGui::GetContentRegionAvail().x;
+        ImGui::PushID(id);
+        draw->ChannelsSplit(2);
+        draw->ChannelsSetCurrent(1);
+        const float textWidth = width - pad * 3 - controlWidth;
+        const float textHeight = ImGui::GetTextLineHeight() + (note != nullptr && note[0] != 0 ? ImGui::CalcTextSize(note, nullptr, false, textWidth).y + 3.0f * s : 0.0f);
+        const float inner = std::max(textHeight, ImGui::GetFrameHeight());
+        ImGui::SetCursorScreenPos(ImVec2(at.x + pad, at.y + pad + (inner - textHeight) * 0.5f));
+        ImGui::BeginGroup();
+        ImGui::TextUnformatted(title);
+        if (note != nullptr && note[0] != 0) {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + textWidth);
+            ImGui::TextColored(Dim, "%s", note);
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::EndGroup();
+        ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - controlWidth, at.y + pad + (inner - ImGui::GetFrameHeight()) * 0.5f));
+        ImGui::BeginGroup();
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, WindowColor);
+        ImGui::PushStyleColor(ImGuiCol_Button, WindowColor);
+        control();
+        ImGui::PopStyleColor(2);
+        ImGui::EndGroup();
+        const float bottom = at.y + pad * 2 + inner;
+        draw->ChannelsSetCurrent(0);
+        draw->AddRectFilled(at, ImVec2(at.x + width, bottom), ImGui::GetColorU32(CardHover), 12.0f * s);
+        draw->ChannelsMerge();
+        ImGui::PopID();
+        ImGui::SetCursorScreenPos(ImVec2(at.x, bottom));
+        ImGui::Dummy(ImVec2(width, 8.0f * s));
+    }
+
+    void ToggleRow(const char* id, const char* title, const char* note, bool* value) {
+        SettingRow(id, title, note, 40.0f * scale_, [&] { Toggle("##toggle", value); });
+    }
+
+    // A label above a group of rows.
+    void GroupLabel(const char* text) {
+        ImGui::Dummy(ImVec2(0, 4.0f * scale_));
+        ImGui::TextColored(Dim, "%s", text);
+        ImGui::Dummy(ImVec2(0, 2.0f * scale_));
+    }
+
+    void DrawSettingsNav(float width) {
+        ImGui::BeginChild("settings-nav", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 origin = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        const float s = scale_;
+        draw->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), ImGui::GetColorU32(Card), 14.0f * s);
+        const float pad = 14.0f * s;
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + pad + 6 * s, origin.y + pad + 4 * s));
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.35f);
+        ImGui::TextUnformatted("Settings");
+        ImGui::PopFont();
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + pad + 6 * s, ImGui::GetCursorScreenPos().y));
+        ImGui::TextColored(Dim, "Profile %s", layout_.profile.c_str());
+        float y = ImGui::GetCursorScreenPos().y + 12 * s;
+        const float rowHeight = 38.0f * s;
+        for (const auto& page : SettingsPages) {
+            const ImVec2 at(origin.x + pad * 0.6f, y);
+            const ImVec2 end(origin.x + size.x - pad * 0.6f, y + rowHeight);
+            ImGui::SetCursorScreenPos(at);
+            ImGui::PushID(static_cast<int>(page.page));
+            const bool clicked = ImGui::InvisibleButton("page", ImVec2(end.x - at.x, rowHeight));
+            const bool hovered = ImGui::IsItemHovered();
+            ImGui::PopID();
+            if (clicked) settingsPage_ = page.page;
+            const bool current = settingsPage_ == page.page;
+            if (current) {
+                draw->AddRectFilled(at, end, ImGui::GetColorU32(Fade(Accent, 0.18f)), 9 * s);
+                draw->AddRectFilled(ImVec2(at.x, at.y + rowHeight * 0.25f), ImVec2(at.x + 3 * s, at.y + rowHeight * 0.75f), ImGui::GetColorU32(Accent), 2 * s);
+            } else if (hovered) {
+                draw->AddRectFilled(at, end, ImGui::GetColorU32(CardHover), 9 * s);
+            }
+            const ImU32 ink = ImGui::GetColorU32(current ? Accent : Dim);
+            DrawPageGlyph(draw, page.page, ImVec2(at.x + 22 * s, at.y + rowHeight * 0.5f), 7.5f * s, ink);
+            draw->AddText(ImVec2(at.x + 42 * s, at.y + (rowHeight - ImGui::GetTextLineHeight()) * 0.5f), ImGui::GetColorU32(current ? ImGuiCol_Text : ImGuiCol_Text),
+                          page.title);
+            y += rowHeight + 2 * s;
+        }
+        ImGui::EndChild();
+    }
+
+    // One width for the About page's buttons: the widest label fits.
+    static float AboutButtonWidth() {
+        float widest = ImGui::GetFontSize() * 9.0f;
+        for (const char* label : {"Check for updates", "Launcher on GitHub", "AnyPS5 on GitHub", "Update to v00.00.00"}) {
+            widest = std::max(widest, ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 4);
+        }
+        return widest;
+    }
+
+    void DrawSettingsPage(float width) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const SettingsPageText* text = &SettingsPages[0];
+        for (const auto& page : SettingsPages) {
+            if (page.page == settingsPage_) text = &page;
+        }
+        ImGui::PushFont(nullptr, style.FontSizeBase * 1.7f);
+        ImGui::TextUnformatted(text->title);
+        ImGui::PopFont();
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(Dim, "%s", text->note);
+        ImGui::PopTextWrapPos();
+        ImGui::Dummy(ImVec2(0, 10 * s));
+        const float button = ImGui::GetFontSize() * 9.0f;
+
+        switch (settingsPage_) {
+        case SettingsPage::Library:
+            CardBlock("folders", [&](float inner) {
+                FolderField("Games", "Scanned for game folders and .zar archives.", "##games", "the folder that holds your games", draft_.gamesFolder, inner);
+                ImGui::Spacing();
+                FolderField("Library", "Logs and shader caches; safe to delete, it is rebuilt.", "##library", ToUtf8(launcherFolder_ / "library"), draft_.libraryFolder, inner);
+                ImGui::Spacing();
+                FolderField("Userdata", "Profiles, saves and trophies: back this up. Keep it on the same drive as your games, so saves move instantly for each run.",
+                            "##userdata", ToUtf8(launcherFolder_ / "userdata"), draft_.userdataFolder, inner);
+            });
+            break;
+        case SettingsPage::Games: {
+            GroupLabel("Converting");
+            SettingRow("versions", "AnyPS5 version", ("Converts games at Install. Now: " + CurrentVersionLabel() + ".").c_str(), button, [&] {
+                if (ImGui::Button("Manage...", ImVec2(button, 0))) {
+                    openVersions_ = true;
+                    versionsInSettings_ = true;
+                }
+            });
+            bool intel = UseIntelFlag(draft_, hostIntel_);
+            const std::string cpu = cpuName_.empty() ? std::string(hostIntel_ ? "an Intel CPU" : "a CPU that isn't Intel") : cpuName_;
+            const std::string note = "This PC has " + cpu + ". " + (hostIntel_ ? "On by default for Intel CPUs." : "Off by default; Intel CPUs need it.") +
+                                     (draft_.intelFlag ? " Changed from the default." : "") + " Applies to games you install from now on.";
+            SettingRow("intel", "Intel flag (--to-intel)", note.c_str(), 40.0f * s, [&] {
+                if (Toggle("##intel", &intel)) draft_.intelFlag = intel == hostIntel_ ? std::nullopt : std::optional<bool>(intel);
+            });
+            GroupLabel("Online");
+            ToggleRow("online", "Look up game updates", "Asks PROSPEROPatches.com for the selected game's region, publisher and newest update. Only the title ID is sent; answers are kept for a day.",
+                      &draft_.onlineInfo);
+            break;
+        }
+        case SettingsPage::Appearance: {
+            GroupLabel("Theme");
+            const float gap = 12.0f * s;
+            const float cardWidth = std::min(190.0f * s, (width - gap * 2) / 3.0f);
+            const ImVec2 card(cardWidth, cardWidth * 0.50f + ImGui::GetTextLineHeight() + 20 * s);
+            const char* names[] = {"Follow Windows", "Dark", "Light"};
+            const char* values[] = {"system", "dark", "light"};
+            for (int i = 0; i < 3; ++i) {
+                if (i > 0) ImGui::SameLine(0, gap);
+                ImGui::PushID(i);
+                if (ChoiceCard("theme", card, draft_.theme == values[i], [&](ImDrawList* draw, ImVec2 at, ImVec2 end) {
+                        const ImVec2 previewAt(at.x + 10 * s, at.y + 10 * s);
+                        const ImVec2 previewEnd(end.x - 10 * s, at.y + cardWidth * 0.50f);
+                        if (i == 0) {
+                            const float mid = (previewAt.x + previewEnd.x) * 0.5f;
+                            draw->PushClipRect(previewAt, ImVec2(mid, previewEnd.y), true);
+                            DrawMiniWindow(draw, previewAt, previewEnd, DarkPalette);
+                            draw->PopClipRect();
+                            draw->PushClipRect(ImVec2(mid, previewAt.y), previewEnd, true);
+                            DrawMiniWindow(draw, previewAt, previewEnd, LightPalette);
+                            draw->PopClipRect();
+                        } else {
+                            DrawMiniWindow(draw, previewAt, previewEnd, i == 1 ? DarkPalette : LightPalette);
+                        }
+                        draw->AddText(ImVec2(at.x + 12 * s, end.y - ImGui::GetTextLineHeight() - 9 * s), ImGui::GetColorU32(ImGuiCol_Text), names[i]);
+                    })) {
+                    draft_.theme = values[i];
+                    auto& imguiStyle = ImGui::GetStyle();
+                    ApplyTheme(imguiStyle, WantDark(draft_.theme));
+                    imguiStyle.ScaleAllSizes(scale_);
+                    imguiStyle.FontScaleDpi = scale_;
+                }
+                ImGui::PopID();
+            }
+            ImGui::Dummy(ImVec2(0, 6 * s));
+            GroupLabel("Library view");
+            const float viewWidth = std::min(290.0f * s, (width - gap) / 2.0f);
+            const char* viewNames[] = {"Grid", "Home row"};
+            const char* viewNotes[] = {"Covers in a grid, details on the side", "Big artwork, one game at a time"};
+            const ImVec2 viewCard(viewWidth, ImGui::GetTextLineHeightWithSpacing() * 2 + 26 * s);
+            for (int i = 0; i < 2; ++i) {
+                if (i > 0) ImGui::SameLine(0, gap);
+                ImGui::PushID(10 + i);
+                if (ChoiceCard("view", viewCard, (draft_.view == "home") == (i == 1), [&](ImDrawList* draw, ImVec2 at, ImVec2) {
+                        draw->AddText(ImVec2(at.x + 14 * s, at.y + 13 * s), ImGui::GetColorU32(ImGuiCol_Text), viewNames[i]);
+                        draw->AddText(ImVec2(at.x + 14 * s, at.y + 13 * s + ImGui::GetTextLineHeightWithSpacing()), ImGui::GetColorU32(Dim), viewNotes[i]);
+                    })) {
+                    draft_.view = i == 1 ? "home" : "grid";
+                }
+                ImGui::PopID();
+            }
+            break;
+        }
+        case SettingsPage::Controls:
+            GroupLabel("Keyboard and mouse");
+            SettingRow("keys", "Keys for all games", "Every game of this profile starts from these. A game can change some of them for itself under Controls in its details.", button, [&] {
+                if (ImGui::Button("Edit...", ImVec2(button, 0))) OpenProfileControls();
+            });
+            GroupLabel("Controllers");
+            CardBlock("pads", [&](float) {
+                ImGui::TextColored(Dim, "%s", "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (\xE2\x9C\x95 plays, \xE2\x96\xB3 opens a game's actions).");
+                ImGui::Spacing();
+                DrawControllers();
+            });
+            break;
+        case SettingsPage::Saves:
+            CardBlock("sync", [&](float inner) {
+                ImGui::TextUnformatted("Save sync");
+                ImGui::TextColored(Dim, "%s",
+                                   "Through a folder your PCs all see (OneDrive, Dropbox, a USB stick, a network share). Before a game starts newer saves come in; after it ends this PC's go out. Whatever gets replaced is kept in the save backups first.");
+                ImGui::Spacing();
+                FolderField("Sync folder", "Empty: off.", "##sync", "e.g. C:\\Users\\you\\OneDrive\\AnyPS5 saves", draft_.syncFolder, inner);
+                ImGui::Spacing();
+                if (draft_.syncFolder.empty()) ImGui::TextColored(Dim, "%s", "Off");
+                else ImGui::TextColored(Green, "%s", "On: saves of each profile go to <folder>\\<profile>\\<title ID>");
+            });
+            break;
+        case SettingsPage::Playing:
+            ToggleRow("hide", "Minimize the launcher", "Once the game's window shows. It comes back when the game ends.", &draft_.hideWhilePlaying);
+            GroupLabel("Trophies");
+            ToggleRow("cards", "Trophy cards", "A card at the top of the game's window when a trophy is earned. It never takes the keyboard or the mouse from the game.", &draft_.trophyPopups);
+            ImGui::BeginDisabled(!draft_.trophyPopups);
+            ToggleRow("sound", "Play a sound with it", nullptr, &draft_.trophySound);
+            ImGui::EndDisabled();
+            break;
+        case SettingsPage::Launcher: {
+            CardBlock("about", [&](float inner) {
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                const float logo = 52.0f * s;
+                DrawLogo(ImGui::GetWindowDrawList(), at, logo);
+                ImGui::SetCursorScreenPos(ImVec2(at.x + logo + 16 * s, at.y + 4 * s));
+                ImGui::BeginGroup();
+                ImGui::PushFont(nullptr, style.FontSizeBase * 1.3f);
+                ImGui::TextUnformatted("AnyPS5 Launcher");
+                ImGui::PopFont();
+#ifdef LAUNCHER_VERSION
+                ImGui::TextColored(Dim, "Version %s  \xC2\xB7  GPL-2.0", LAUNCHER_VERSION);
+#endif
+                ImGui::EndGroup();
+                // The update state on the right.
+                const float right = at.x + inner;
+                const float buttonWidth = AboutButtonWidth();
+                ImGui::SetCursorScreenPos(ImVec2(right - buttonWidth, at.y + (logo - ImGui::GetFrameHeight()) * 0.5f));
+                if (launcherUpdate_) {
+                    ImGui::BeginDisabled(job_.Busy() || session_ != nullptr);
+                    if (PrimaryButton((LauncherUpdateReady() ? "Update to " + launcherUpdate_->release.tag : "See " + launcherUpdate_->release.tag).c_str(), ImVec2(buttonWidth, 0))) {
+                        StartLauncherUpdate();
+                    }
+                    ImGui::EndDisabled();
+                } else {
+                    ImGui::BeginDisabled(launcherReleases_.Running());
+                    if (ImGui::Button(launcherReleases_.Running() ? "Checking..." : "Check for updates", ImVec2(buttonWidth, 0))) CheckLauncherUpdate();
+                    ImGui::EndDisabled();
+                }
+                ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + logo + 10 * s));
+                if (launcherUpdate_) ImGui::TextColored(Green, "%s is out.", launcherUpdate_->release.tag.c_str());
+                else if (!launcherCheckError_.empty()) ImGui::TextColored(Amber, "%s", Elide(launcherCheckError_, inner).c_str());
+                else if (launcherChecked_) ImGui::TextColored(Green, "%s", "Up to date.");
+                else ImGui::TextColored(Dim, "%s", "Not checked yet.");
+            });
+            ToggleRow("check", "Check for updates at start", "Looks at github.com/leskal/AnyPS5-Launcher/releases and downloads a new version in the background.", &draft_.checkUpdates);
+            GroupLabel("Links");
+            CardBlock("links", [&](float) {
+                ImGui::TextColored(Dim, "%s", "Links like anyps5://play/PPSA01234 start a game from anywhere: a shortcut, a browser, another app. Copy link is in a game's actions.");
+                ImGui::Spacing();
+                const ImVec2 linkButton(AboutButtonWidth(), 0);  // the size of Check for updates
+                if (ImGui::Button("Launcher on GitHub", linkButton)) SDL_OpenURL(("https://github.com/" + std::string(LauncherRepository)).c_str());
+                ImGui::SameLine();
+                if (ImGui::Button("AnyPS5 on GitHub", linkButton)) SDL_OpenURL("https://github.com/boykopovar/AnyPS5");
+            });
+            break;
+        }
+        }
+    }
+
     void DrawSettings() {
         if (openSettings_) {
             ImGui::OpenPopup("Settings");
             openSettings_ = false;
         }
         // Follows the launcher's window every frame: resizing or maximising it resizes
-        // Settings, and the form scrolls when there isn't room.
+        // Settings, and the page scrolls when there isn't room.
         FollowWindow(0.8f, 0.86f);
         if (!BeginDialog("Settings")) return;
         const auto& style = ImGui::GetStyle();
-        bool cancel = DialogHeader("Settings", "Changes take effect when you save.");
-        const float footer = ImGui::GetFrameHeight() * 1.3f + style.ItemSpacing.y * 3 + (saveError_.empty() ? 0.0f : ImGui::GetTextLineHeightWithSpacing());
-        ImGui::BeginChild("settings-body", ImVec2(0, -footer));
+        const float s = scale_;
+        bool cancel = false;
+        const float side = std::clamp(ImGui::GetContentRegionAvail().x * 0.24f, 190.0f * s, 250.0f * s);
+        DrawSettingsNav(side);
+        ImGui::SameLine(0, 22.0f * s);
 
-        Section("folders", "Folders", nullptr, [&] {
-            FolderField("Games", "Scanned for game folders and .zar archives.", "##games", "the folder that holds your games", draft_.gamesFolder);
-            ImGui::Spacing();
-            FolderField("Library", "Logs and shader caches; safe to delete, it is rebuilt.", "##library", ToUtf8(launcherFolder_ / "library"), draft_.libraryFolder);
-            ImGui::Spacing();
-            FolderField("Userdata", "Profiles, saves and trophies: back this up. Keep it on the same drive as your games, so saves move instantly for each run.",
-                        "##userdata", ToUtf8(launcherFolder_ / "userdata"), draft_.userdataFolder);
-        });
-
-        Section("converting", "Converting games", "How the relinker converts games at Install. A change applies to games you install from now on; reinstall an installed game to change it.", [&] {
-            bool intel = UseIntelFlag(draft_, hostIntel_);
-            if (ImGui::Checkbox("Use the Intel flag (--to-intel)", &intel)) {
-                draft_.intelFlag = intel == hostIntel_ ? std::nullopt : std::optional<bool>(intel);
-            }
-            const std::string cpu = cpuName_.empty() ? std::string(hostIntel_ ? "an Intel CPU" : "a CPU that isn't Intel") : cpuName_;
-            const std::string note = "This PC: " + cpu + ". " + (hostIntel_ ? "On by default for Intel CPUs." : "Off by default; Intel CPUs need it.") +
-                                     (draft_.intelFlag ? " Changed from the default." : "");
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextColored(Dim, "%s", note.c_str());
-            ImGui::PopTextWrapPos();
-        });
-
-        Section("appearance", "Appearance", "Follow Windows switches with Windows' light or dark mode.", [&] {
-            const char* labels[] = {"Follow Windows", "Dark", "Light"};
-            const char* values[] = {"system", "dark", "light"};
-            int current = 0;
-            for (int index = 0; index < 3; ++index) {
-                if (draft_.theme == values[index]) current = index;
-            }
-            if (Segmented("theme", labels, 3, current)) {
-                draft_.theme = values[current];
-                ApplyTheme(ImGui::GetStyle(), WantDark(draft_.theme));
-                ImGui::GetStyle().ScaleAllSizes(scale_);
-            }
-        });
-
-        Section("controls", "Controls", "Keyboard and mouse keys for every game of this profile. Each game can change some of them for itself under Controls in its details.", [&] {
-            if (ImGui::Button("Controls for all games...")) OpenProfileControls();
-            ImGui::SameLine();
-            ImGui::TextColored(Dim, "%s", ToUtf8(layout_.InputConfig()).c_str());
-        });
-
-        Section("controllers", "Controllers", "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (✕ plays, △ opens a game's actions).", [&] {
-            DrawControllers();
-        });
-
-        Section("sync", "Save sync", "Keep saves and trophies the same on your other PCs through a folder they all see (OneDrive, Dropbox, a USB stick, a network share). Before a game starts newer saves come in; after it ends this PC's go out. Whatever gets replaced is kept in the save backups first.", [&] {
-            FolderField("Sync folder", "Empty: off.", "##sync", "e.g. C:\\Users\\you\\OneDrive\\AnyPS5 saves", draft_.syncFolder);
-        });
-
-        Section("launcher", "Launcher", nullptr, [&] {
-#ifdef LAUNCHER_VERSION
-            ImGui::Text("AnyPS5 Launcher %s", LAUNCHER_VERSION);
-#endif
-            ImGui::Checkbox("Check for a newer launcher at start", &draft_.checkUpdates);
-            ImGui::BeginDisabled(launcherReleases_.Running());
-            if (ImGui::Button("Check now")) CheckLauncherUpdate();
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (launcherReleases_.Running()) {
-                ImGui::TextColored(Dim, "Checking...");
-            } else if (launcherUpdate_) {
-                ImGui::BeginDisabled(job_.Busy() || session_ != nullptr);
-                if (PrimaryButton((LauncherUpdateReady() ? "Update to " + launcherUpdate_->release.tag + "..." : "See " + launcherUpdate_->release.tag + "...").c_str())) StartLauncherUpdate();
-                ImGui::EndDisabled();
-            } else if (!launcherCheckError_.empty()) {
-                ImGui::TextColored(Amber, "%s", Elide(launcherCheckError_, ImGui::GetContentRegionAvail().x).c_str());
-            } else if (launcherChecked_) {
-                ImGui::TextColored(Green, "Up to date");
-            }
-            ImGui::TextColored(Dim, "Updates come from github.com/%s/releases. Links like anyps5://play/PPSA01234 open the launcher (Copy link in a game's actions).", LauncherRepository);
-        });
-
-        Section("trophy-cards", "While playing", "The trophy card shows at the top of the game's window and never takes the keyboard or the mouse from the game.", [&] {
-            ImGui::Checkbox("Minimize the launcher once the game's window shows", &draft_.hideWhilePlaying);
-            ImGui::Checkbox("Show a card when a trophy is earned", &draft_.trophyPopups);
-            ImGui::BeginDisabled(!draft_.trophyPopups);
-            ImGui::Checkbox("Play a sound with it", &draft_.trophySound);
-            ImGui::EndDisabled();
-        });
-
-        Section("online", "Online", "Looks up the selected game on PROSPEROPatches.com for its update list and publisher. Only the title ID is sent; answers are kept for a day.", [&] {
-            ImGui::Checkbox("Look up game updates online", &draft_.onlineInfo);
-        });
-
+        ImGui::BeginGroup();
+        const float pageLeft = ImGui::GetCursorScreenPos().x;
+        const float width = ImGui::GetContentRegionAvail().x;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+        const float footer = buttonHeight + style.ItemSpacing.y * 3 + 4.0f + (saveError_.empty() ? 0.0f : ImGui::GetTextLineHeightWithSpacing());
+        ImGui::BeginChild("settings-page", ImVec2(width, -footer), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        DrawSettingsPage(ImGui::GetContentRegionAvail().x - style.ScrollbarSize * 0.5f);
         ImGui::EndChild();
 
-        if (!saveError_.empty()) ImGui::TextColored(Red, "%s", Elide(saveError_, ImGui::GetContentRegionAvail().x).c_str());
+        if (!saveError_.empty()) ImGui::TextColored(Red, "%s", Elide(saveError_, width).c_str());
         ImGui::Spacing();
-        const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
         const float buttonWidth = ImGui::GetFontSize() * 6.5f;
         ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(Dim, "%s", Elide("Saved in " + ToUtf8(settingsFile_), ImGui::GetContentRegionAvail().x - buttonWidth * 2 - style.ItemSpacing.x * 3).c_str());
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - buttonWidth * 2 - style.ItemSpacing.x);
+        ImGui::TextColored(Dim, "%s", "Changes take effect when you save.");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Saved in %s", ToUtf8(settingsFile_).c_str());
+        ImGui::SameLine();
+        ImGui::SetCursorScreenPos(ImVec2(pageLeft + width - buttonWidth * 2 - style.ItemSpacing.x, ImGui::GetCursorScreenPos().y));
         ImGui::BeginDisabled(Picker().IsOpen());
-        if (ImGui::Button("Cancel", ImVec2(buttonWidth, buttonHeight))) cancel = true;
+        if (ImGui::Button("Cancel", ImVec2(buttonWidth, buttonHeight)) || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive())) cancel = true;
         ImGui::SameLine();
         if (PrimaryButton("Save", ImVec2(buttonWidth, buttonHeight))) {
             try {
@@ -5560,7 +5945,13 @@ private:
             ApplyCurrentTheme();  // undo a previewed appearance
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndGroup();
         if (controlsScope_ == 1) DrawControls();
+        // Opened from the Games page: on top of Settings, so the unsaved changes stay.
+        if (versionsInSettings_) {
+            DrawVersions();
+            if (!openVersions_ && !ImGui::IsPopupOpen("AnyPS5 versions")) versionsInSettings_ = false;
+        }
         ImGui::EndPopup();
     }
 
@@ -5597,6 +5988,11 @@ private:
     std::string newRepository_;
     std::string versionsError_;
     std::string localPick_;
+    std::string renamingVersion_;  // the local version being named in AnyPS5 versions
+    std::string renameText_;
+    bool renameFocus_ = false;
+    SettingsPage settingsPage_ = SettingsPage::Library;
+    bool versionsInSettings_ = false;
     std::map<std::string, AnyPS5Probe> versionProbes_;
     std::shared_ptr<std::optional<VersionEntry>> downloaded_;
     bool openVersions_ = false;
