@@ -257,6 +257,61 @@ bool Segmented(const char* id, const char* const* labels, int count, int& curren
     return changed;
 }
 
+enum class ChipIcon { Report, Issue, Log };
+
+// A pill button with a small icon drawn in code before its label: for actions
+// that sit in a row under some text, like the last run's Make a report.
+bool ChipButton(const char* label, ChipIcon icon, ImVec4 tint) {
+    const auto& style = ImGui::GetStyle();
+    const float height = ImGui::GetFrameHeight();
+    const float glyph = ImGui::GetFontSize() * 0.9f;
+    const float padX = ImGui::GetFontSize() * 0.75f;
+    const ImVec2 text = ImGui::CalcTextSize(label, nullptr, true);
+    const float width = padX + glyph + ImGui::GetFontSize() * 0.45f + text.x + padX;
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const bool pressed = ImGui::InvisibleButton(label, ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool held = ImGui::IsItemActive();
+    auto* draw = ImGui::GetWindowDrawList();
+    const float alpha = held ? 0.34f : hovered ? 0.24f : 0.12f;
+    draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(ImVec4(tint.x, tint.y, tint.z, alpha)), height * 0.5f);
+    draw->AddRect(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(ImVec4(tint.x, tint.y, tint.z, hovered ? 0.55f : 0.30f)), height * 0.5f, 0, 1.0f);
+    if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible) {
+        draw->AddRect(ImVec2(at.x - 2, at.y - 2), ImVec2(at.x + width + 2, at.y + height + 2), ImGui::GetColorU32(ImGuiCol_NavCursor), height * 0.5f + 2, 0, 2.0f);
+    }
+    const ImU32 ink = ImGui::GetColorU32(tint);
+    const float line = std::max(1.3f, glyph * 0.09f);
+    const ImVec2 g(at.x + padX, at.y + (height - glyph) * 0.5f);  // the icon's top left
+    const float u = glyph;
+    switch (icon) {
+    case ChipIcon::Report: {
+        // A page with a folded corner and two lines of text.
+        const ImVec2 pts[] = {{g.x + u * 0.15f, g.y}, {g.x + u * 0.62f, g.y}, {g.x + u * 0.85f, g.y + u * 0.23f}, {g.x + u * 0.85f, g.y + u}, {g.x + u * 0.15f, g.y + u}};
+        draw->AddPolyline(pts, 5, ink, ImDrawFlags_Closed, line);
+        draw->AddLine(ImVec2(g.x + u * 0.32f, g.y + u * 0.5f), ImVec2(g.x + u * 0.68f, g.y + u * 0.5f), ink, line);
+        draw->AddLine(ImVec2(g.x + u * 0.32f, g.y + u * 0.72f), ImVec2(g.x + u * 0.68f, g.y + u * 0.72f), ink, line);
+        break;
+    }
+    case ChipIcon::Issue: {
+        // A ring with a dot in it, like GitHub's issue mark.
+        const ImVec2 c(g.x + u * 0.5f, g.y + u * 0.5f);
+        draw->AddCircle(c, u * 0.46f, ink, 0, line);
+        draw->AddCircleFilled(c, u * 0.13f, ink);
+        break;
+    }
+    case ChipIcon::Log:
+        // Lines of text of different lengths.
+        for (int i = 0; i < 4; ++i) {
+            const float y = g.y + u * (0.14f + 0.24f * static_cast<float>(i));
+            const float end = i % 2 == 0 ? 0.92f : 0.62f;
+            draw->AddLine(ImVec2(g.x + u * 0.08f, y), ImVec2(g.x + u * end, y), ink, line);
+        }
+        break;
+    }
+    draw->AddText(ImVec2(g.x + glyph + ImGui::GetFontSize() * 0.45f, at.y + (height - text.y) * 0.5f), ImGui::GetColorU32(style.Colors[ImGuiCol_Text]), label);
+    return pressed;
+}
+
 enum class TopIcon { Versions, Rescan, Settings, Grid, Home };
 
 // A round icon button for the top bar, the icon drawn in code. Returns true when pressed.
@@ -2055,7 +2110,15 @@ private:
         DrawGrid();
         ImGui::EndChild();
         ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, Card);
+        // The card and the game's artwork go behind the panel, in this window's draw
+        // list: the panel's own scroll bar is then drawn on top of them.
+        {
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y + height);
+            ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(Card), style.ChildRounding);
+            if (const auto* game = SelectedGame()) DrawArtwork(*game, at, size);
+        }
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * scale_, 16.0f * scale_));
         ImGui::BeginChild("details", ImVec2(0, height), ImGuiChildFlags_AlwaysUseWindowPadding);
         if (const auto* game = SelectedGame()) DrawDetails(*game);
@@ -4061,7 +4124,7 @@ private:
     }
 
     // The game's pic0.png behind the details panel, faded into the card toward the bottom.
-    void DrawArtwork(const GameEntry& game) {
+    void DrawArtwork(const GameEntry& game, ImVec2 at, ImVec2 size) {
         const auto found = art_.find(GameKey(game));
         if (found == art_.end() || found->second.empty()) return;
         auto* texture = icons_->Get(game.location / "pic0.png", found->second);
@@ -4070,8 +4133,6 @@ private:
         float height = 0;
         SDL_GetTextureSize(texture, &width, &height);
         if (width <= 0 || height <= 0) return;
-        const ImVec2 at = ImGui::GetWindowPos();
-        const ImVec2 size = ImGui::GetWindowSize();
         const float shown = std::floor(std::min(size.y, size.x * 0.75f));  // the top of the panel only, on a whole pixel
         // Cover: crop the picture to the shown area's shape.
         ImVec2 uv0(0, 0);
@@ -4088,17 +4149,24 @@ private:
         }
         auto* draw = ImGui::GetWindowDrawList();
         draw->PushClipRect(at, ImVec2(at.x + size.x, at.y + size.y), false);
-        const float rounding = ImGui::GetStyle().ChildRounding * scale_;
+        const float rounding = ImGui::GetStyle().ChildRounding;
         const bool dark = WantDark(settings_.theme);
         draw->AddImageRounded(static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(texture)), at, ImVec2(at.x + size.x, at.y + shown), uv0, uv1,
                               ImGui::GetColorU32(ImVec4(1, 1, 1, dark ? 0.55f : 0.40f)), rounding, ImDrawFlags_RoundCornersTop);
         const ImU32 clear = ImGui::GetColorU32(Fade(Card, 0.25f));
         const ImU32 solid = ImGui::GetColorU32(Card);
-        draw->AddRectFilledMultiColor(ImVec2(at.x, at.y + shown * 0.35f), ImVec2(at.x + size.x, at.y + shown), clear, clear, solid, solid);
+        // The wash over the top part and the fade below it meet on one whole pixel, and
+        // the wash is drawn without a soft edge: its anti-aliased bottom edge left a
+        // lighter line across the picture where the two met.
+        const float washEnd = std::floor(shown * 0.35f);
+        const auto flags = draw->Flags;
+        draw->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + washEnd), clear, rounding, ImDrawFlags_RoundCornersTop);
+        draw->Flags = flags;
+        draw->AddRectFilledMultiColor(ImVec2(at.x, at.y + washEnd), ImVec2(at.x + size.x, at.y + shown), clear, clear, solid, solid);
         // The picture's anti-aliased edge reaches a pixel or two below `shown`, past the
         // fade: cover it with the card colour, or it shows as a bright line.
         draw->AddRectFilled(ImVec2(at.x, at.y + shown - 1.0f), ImVec2(at.x + size.x, at.y + shown + 3.0f * scale_), solid);
-        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + shown * 0.35f), clear, rounding, ImDrawFlags_RoundCornersTop);
         draw->PopClipRect();
     }
 
@@ -4751,7 +4819,6 @@ private:
 
     void DrawDetailsBody(const GameEntry& game) {
         const auto& style = ImGui::GetStyle();
-        DrawArtwork(game);
         const float width = ImGui::GetContentRegionAvail().x;
         const float art = std::min(width, 280.0f * scale_);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (width - art) * 0.5f);
@@ -4895,13 +4962,23 @@ private:
             if (problem && !diagnosis.hint.empty()) ImGui::TextColored(Amber, "%s", diagnosis.hint.c_str());
             ImGui::PopTextWrapPos();
             if (problem) {
-                if (ImGui::SmallButton("Make a report")) MakeReport(game);
+                // Pills with icons; one wraps to the next line when the panel is narrow.
+                ImGui::Dummy(ImVec2(0, ImGui::GetStyle().ItemSpacing.y * 0.5f));
+                const float gap = ImGui::GetFontSize() * 0.5f;
+                const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+                const auto next = [&](const char* label) {
+                    const float width = ImGui::GetFontSize() * 2.85f + ImGui::CalcTextSize(label).x;  // as ChipButton measures it
+                    ImGui::SameLine(0.0f, gap);
+                    if (ImGui::GetCursorScreenPos().x + width > right) ImGui::NewLine();
+                };
+                if (ChipButton("Make a report", ChipIcon::Report, Accent)) MakeReport(game);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)");
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Open an issue")) OpenIssue(game);
+                next("Open an issue");
+                if (ChipButton("Open an issue", ChipIcon::Issue, Accent)) OpenIssue(game);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Opens a new issue on github.com/boykopovar/AnyPS5 with the facts filled in; you check it and submit it");
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Open log")) OpenLatestLog(serial);
+                next("Open log");
+                if (ChipButton("Open log", ChipIcon::Log, ImGui::GetStyle().Colors[ImGuiCol_Text])) OpenLatestLog(serial);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("The game's newest log, in the app that opens .log files");
             }
         }
     }
