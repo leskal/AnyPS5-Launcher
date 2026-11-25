@@ -44,6 +44,59 @@ const char* const PatchJson = R"({"success":true,"titleid":"PPSA21402","patches"
 {"is_latest":true,"content_ver":"01.015.000","filesize":"250.1 MB","required_firmware":"10.60.00.06","import_date":"2025-06-19 11:55:04"},
 {"is_latest":false,"content_ver":"01.009.000","filesize":"240 MB","required_firmware":"9.00","import_date":"2024-01-01 00:00:00"}],"count":3})";
 
+
+// Trimmed from https://orbispatches.com/CUSA01715 and its update list (November 2026).
+const char* const Ps4TitleHtml = R"(<!doctype html><html><head><title>CUSA01715: God of War&reg; III Remastered | ORBISPatches.com</title></head><body>
+<ul>
+	<li class="bd-links-group py-2">
+		<strong class="bd-links-heading d-flex w-100 align-items-center fw-semibold">
+			Region <small class="ms-2 fw-normal"><a href="#">Switch</a></small>						</strong>
+		EU					</li>
+</ul>
+<a href="#" class="view-toggle-btn" data-id="dynpatch">Game Updates</a>
+<div id="dynpatch" data-loadparams="{ 'titleid': 'CUSA01715', 'key': 'dbff9adb553544297f6f76bf1b5a726fc3c80c99facfafe76d983d047ebdb6c6' }">
+</body></html>)";
+
+const char* const Ps4PatchJson = R"({"success":true,"titleid":"CUSA01715","patches":[
+{"is_latest":true,"version":"01.02","filesize":"9.4MB","required_firmware":"7.55","creation_date":"2020-09-25","changelog_preview":"Various bug fixes.","changelog_charcount":18},
+{"is_latest":false,"version":"01.01","filesize":"9.4MB","required_firmware":"2.00","creation_date":"2015-06-03","changelog_preview":"Best available audio mode","changelog_charcount":57}],
+"name":"God of War\u00ae III Remastered","count":2})";
+
+}
+
+TEST(Ps4TitlesUseOrbisPatches) {
+    CHECK_EQ(launcher::PatchPageUrl("CUSA01715"), std::string("https://orbispatches.com/CUSA01715"));
+    CHECK_EQ(launcher::PatchPageUrl("PPSA21402"), std::string("https://prosperopatches.com/PPSA21402"));
+    CHECK_EQ(launcher::PatchSiteName("CUSA01715"), std::string("ORBISPatches"));
+    const auto page = launcher::ParseTitlePage(Ps4TitleHtml);
+    CHECK_EQ(page.name, std::string("God of War\xC2\xAE III Remastered"));
+    CHECK_EQ(page.region, std::string("EU"));
+    CHECK_EQ(page.key, std::string("dbff9adb553544297f6f76bf1b5a726fc3c80c99facfafe76d983d047ebdb6c6"));
+
+    std::string postedUrl;
+    const launcher::TextFetcher get = [](const std::string& url) {
+        if (url != "https://orbispatches.com/CUSA01715") throw std::runtime_error("unexpected " + url);
+        return std::string(Ps4TitleHtml);
+    };
+    const launcher::TextPoster post = [&](const std::string& url, const std::string& body, const std::string&) {
+        postedUrl = url;
+        CHECK(body.find("dbff9adb") != std::string::npos);
+        return std::string(Ps4PatchJson);
+    };
+    const auto info = launcher::FetchTitleOnline("CUSA01715", get, post, 1000);
+    CHECK_EQ(postedUrl, std::string("https://orbispatches.com/api/internal/loadpatches"));
+    CHECK_EQ(info.patches.size(), std::size_t{2});
+    CHECK_EQ(info.patches[0].contentVersion, std::string("01.02"));
+    CHECK_EQ(info.patches[0].importDate, std::string("2020-09-25"));
+    CHECK_EQ(info.patches[0].notes, std::string("Various bug fixes."));
+    CHECK_EQ(info.patches[1].notesLength, 57);
+
+    fixture::TempDir temp;
+    launcher::SaveCachedTitle(temp.Path(), info);
+    const auto loaded = launcher::LoadCachedTitle(temp.Path(), "CUSA01715", 2000, 86400);
+    CHECK(loaded.has_value());
+    CHECK_EQ(loaded->patches[1].notes, std::string("Best available audio mode"));
+    CHECK_EQ(loaded->patches[1].notesLength, 57);
 }
 
 TEST(ParsesTitlePageDetails) {

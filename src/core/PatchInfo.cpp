@@ -17,7 +17,7 @@ namespace launcher {
 
 namespace {
 
-constexpr int CacheVersion = 2;  // 1 could hold an empty update list (wrong key)
+constexpr int CacheVersion = 3;  // 1 could hold an empty update list (wrong key); 2 asked PROSPEROPatches for PS4 titles
 
 bool IsSpace(char c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
@@ -31,6 +31,10 @@ std::string PlainText(std::string_view html) {
         if (c == '<') inTag = true;
         else if (c == '>') inTag = false;
         else if (!inTag) text += c;
+    }
+    // HTML names XML doesn't have; titles carry ® and ™ often.
+    for (const auto& [name, utf8] : {std::pair<std::string_view, std::string_view>{"&reg;", "\xC2\xAE"}, {"&trade;", "\xE2\x84\xA2"}, {"&copy;", "\xC2\xA9"}, {"&nbsp;", " "}}) {
+        for (auto at = text.find(name); at != std::string::npos; at = text.find(name, at + utf8.size())) text.replace(at, name.size(), utf8);
     }
     text = DecodeXmlEntities(text);
     std::string out;
@@ -83,8 +87,16 @@ bool IsAsciiAlnum(char c) {
 
 }
 
+std::string PatchSiteFor(std::string_view titleId) {
+    return PlatformOf(titleId) == "PS4" ? Ps4PatchSite : Ps5PatchSite;
+}
+
+std::string PatchSiteName(std::string_view titleId) {
+    return PlatformOf(titleId) == "PS4" ? "ORBISPatches" : "PROSPEROPatches";
+}
+
 std::string PatchPageUrl(std::string_view titleId) {
-    return std::string(PatchSite) + "/" + std::string(titleId);
+    return PatchSiteFor(titleId) + "/" + std::string(titleId);
 }
 
 TitlePage ParseTitlePage(std::string_view html) {
@@ -93,6 +105,7 @@ TitlePage ParseTitlePage(std::string_view html) {
         const auto end = html.find("</title>", title);
         auto text = PlainText(html.substr(title + 7, end == std::string_view::npos ? 0 : end - title - 7));
         if (const auto colon = text.find(": "); colon != std::string::npos) text = text.substr(colon + 2);
+        if (const auto bar = text.rfind(" | "); bar != std::string::npos) text = text.substr(0, bar);  // "... | ORBISPatches.com"
         page.name = text;
     }
     // Each detail is <li><strong class="bd-links-heading ...">Label</strong> value</li>.
@@ -118,18 +131,29 @@ TitlePage ParseTitlePage(std::string_view html) {
         if (list > 0 && html[list - 1] != ' ' && html[list - 1] != '\t' && html[list - 1] != '\n') continue;
         const auto start = html.rfind('<', list);
         const auto end = html.find('>', list);
-        if (start != std::string_view::npos && end != std::string_view::npos) page.key = Attribute(html.substr(start, end - start), "data-key");
+        if (start == std::string_view::npos || end == std::string_view::npos) continue;
+        const auto tag = html.substr(start, end - start);
+        page.key = Attribute(tag, "data-key");
+        // ORBISPatches: data-loadparams="{ 'titleid': 'CUSA01715', 'key': '...' }".
+        if (page.key.empty()) {
+            const auto params = Attribute(tag, "data-loadparams");
+            if (const auto at = params.find("'key'"); at != std::string::npos) {
+                const auto open = params.find('\'', params.find(':', at));
+                const auto close = open == std::string::npos ? std::string::npos : params.find('\'', open + 1);
+                if (close != std::string::npos) page.key = params.substr(open + 1, close - open - 1);
+            }
+        }
     }
     return page;
 }
 
 std::vector<PatchRelease> ParsePatchList(std::string_view json) {
     const auto document = nlohmann::json::parse(json.begin(), json.end(), nullptr, false);
-    if (document.is_discarded() || !document.is_object()) throw std::runtime_error("the update list from PROSPEROPatches is not valid JSON");
+    if (document.is_discarded() || !document.is_object()) throw std::runtime_error("the update list from the patch site is not valid JSON");
     const auto success = document.find("success");
     if (success == document.end() || !success->is_boolean() || !success->get<bool>()) {
         const auto message = Text(document, "message");
-        throw std::runtime_error("PROSPEROPatches refused the update list" + (message.empty() ? std::string() : ": " + message));
+        throw std::runtime_error("the patch site refused the update list" + (message.empty() ? std::string() : ": " + message));
     }
     std::vector<PatchRelease> patches;
     const auto list = document.find("patches");
@@ -138,10 +162,14 @@ std::vector<PatchRelease> ParsePatchList(std::string_view json) {
         if (!item.is_object()) continue;
         PatchRelease patch;
         patch.contentVersion = Text(item, "content_ver");
+        if (patch.contentVersion.empty()) patch.contentVersion = Text(item, "version");  // ORBISPatches
         if (patch.contentVersion.empty()) continue;
         patch.size = Text(item, "filesize");
         patch.requiredFirmware = Text(item, "required_firmware");
         patch.importDate = Text(item, "import_date");
+        if (patch.importDate.empty()) patch.importDate = Text(item, "creation_date");
+        patch.notes = Text(item, "changelog_preview");
+        if (const auto length = item.find("changelog_charcount"); length != item.end() && length->is_number_integer()) patch.notesLength = length->get<int>();
         if (const auto latest = item.find("is_latest"); latest != item.end() && latest->is_boolean()) patch.latest = latest->get<bool>();
         patches.push_back(std::move(patch));
     }
@@ -181,7 +209,7 @@ TitleOnlineInfo FetchTitleOnline(std::string_view titleId, const TextFetcher& ge
     info.region = page.region;
     if (!page.key.empty()) {
         const nlohmann::json request = {{"titleid", info.titleId}, {"key", page.key}};
-        info.patches = ParsePatchList(post(std::string(PatchSite) + "/api/internal/loadpatches", request.dump(), "application/x-www-form-urlencoded; charset=UTF-8"));
+        info.patches = ParsePatchList(post(PatchSiteFor(titleId) + "/api/internal/loadpatches", request.dump(), "application/x-www-form-urlencoded; charset=UTF-8"));
     }
     return info;
 }
@@ -214,6 +242,8 @@ std::optional<TitleOnlineInfo> LoadCachedTitle(const std::filesystem::path& fold
             patch.size = Text(item, "size");
             patch.requiredFirmware = Text(item, "requiredFirmware");
             patch.importDate = Text(item, "importDate");
+            patch.notes = Text(item, "notes");
+            if (const auto length = item.find("notesLength"); length != item.end() && length->is_number_integer()) patch.notesLength = length->get<int>();
             if (const auto latest = item.find("latest"); latest != item.end() && latest->is_boolean()) patch.latest = latest->get<bool>();
             if (!patch.contentVersion.empty()) info.patches.push_back(std::move(patch));
         }
@@ -228,6 +258,8 @@ void SaveCachedTitle(const std::filesystem::path& folder, const TitleOnlineInfo&
                            {"size", patch.size},
                            {"requiredFirmware", patch.requiredFirmware},
                            {"importDate", patch.importDate},
+                           {"notes", patch.notes},
+                           {"notesLength", patch.notesLength},
                            {"latest", patch.latest}});
     }
     const nlohmann::json document = {{"version", CacheVersion},   {"titleId", info.titleId}, {"fetchedAt", info.fetchedAt},

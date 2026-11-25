@@ -11,16 +11,25 @@
 
 namespace launcher {
 
-// What PROSPEROPatches.com knows about a title: the details on its page and
-// the list of updates Sony has published. Changelogs are not included: the
-// site puts them behind a CAPTCHA, so the launcher links to the page instead.
-inline constexpr const char* PatchSite = "https://prosperopatches.com";
+// What PROSPEROPatches.com (PS5) or ORBISPatches.com (PS4) knows about a title:
+// the details on its page and the list of updates Sony has published. ORBISPatches
+// adds the start of each update's notes to the list; the whole notes, on either
+// site, are behind a CAPTCHA, so the launcher links to the page for them.
+inline constexpr const char* Ps5PatchSite = "https://prosperopatches.com";
+inline constexpr const char* Ps4PatchSite = "https://orbispatches.com";
+
+// The site for a title ID: ORBISPatches for PS4 titles, PROSPEROPatches otherwise.
+std::string PatchSiteFor(std::string_view titleId);
+// "ORBISPatches" or "PROSPEROPatches", for the interface.
+std::string PatchSiteName(std::string_view titleId);
 
 struct PatchRelease {
     std::string contentVersion;  // "01.015.000"
     std::string size;            // as the site writes it: "250.1 MB"
     std::string requiredFirmware;
-    std::string importDate;      // "2025-06-19 11:55:04"
+    std::string importDate;      // "2025-06-19 11:55:04"; ORBISPatches: the creation date "2020-09-25"
+    std::string notes;           // ORBISPatches: the update's notes, or their start
+    int notesLength = 0;         // the whole notes' length; more than notes' when cut
     bool latest = false;
 };
 

@@ -535,7 +535,7 @@ std::string LocalDate(std::int64_t seconds) {
     return text;
 }
 
-// The answer for one title from PROSPEROPatches, or why there is none.
+// The answer for one title from PROSPEROPatches or ORBISPatches, or why there is none.
 struct OnlineLookup {
     std::string titleId;
     std::optional<TitleOnlineInfo> info;
@@ -2156,7 +2156,7 @@ private:
         return layout_.library / "cache" / "prosperopatches";
     }
 
-    // Looks up the selected game on PROSPEROPatches, one title at a time.
+    // Looks up the selected game on PROSPEROPatches (PS5) or ORBISPatches (PS4), one title at a time.
     void StartOnlineLookup() {
         if (!settings_.onlineInfo || selected_.empty() || onlineLoader_.Running()) return;
         const auto* game = SelectedGame();
@@ -2191,6 +2191,11 @@ private:
         });
     }
 
+    // ORBISPatches sends the start of long notes: the length says there's more.
+    static bool PatchNotesCut(const PatchRelease& patch) {
+        return patch.notesLength > static_cast<int>(patch.notes.size()) + 3;
+    }
+
     void DrawStore(const GameEntry& game) {
         const auto& titleId = game.metadata.titleId;
         const auto found = online_.find(titleId);
@@ -2216,7 +2221,7 @@ private:
                 ImGui::TextColored(Dim, "Looking up updates...");
             }
         } else if (!info->found) {
-            ImGui::TextColored(Dim, "PROSPEROPatches doesn't list this title.");
+            ImGui::TextColored(Dim, "%s doesn't list this title.", PatchSiteName(titleId).c_str());
         } else if (const auto* newest = NewestPatch(*info)) {
             const int order = CompareVersions(game.metadata.contentVersion, newest->contentVersion);
             if (order < 0) {
@@ -2226,14 +2231,23 @@ private:
             } else {
                 ImGui::TextColored(Dim, "Newer than the newest listed update (%s)", newest->contentVersion.c_str());
             }
+            // ORBISPatches gives each update's notes: the newest one's, under its version.
+            if (!newest->notes.empty()) {
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextColored(Dim, "%s%s", newest->notes.c_str(), PatchNotesCut(*newest) ? "..." : "");
+                ImGui::PopTextWrapPos();
+            }
             const std::string header = "All updates (" + std::to_string(info->patches.size()) + ")###updates";
             if (ImGui::CollapsingHeader(header.c_str())) {
                 ImGui::PushTextWrapPos(-1.0f);  // one line per update, even in a narrow panel
-                if (ImGui::BeginTable("updates", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+                const bool withNotes = std::any_of(info->patches.begin(), info->patches.end(), [](const PatchRelease& patch) { return !patch.notes.empty(); });
+                // With notes the first four columns keep their width and Notes takes the rest.
+                if (ImGui::BeginTable("updates", withNotes ? 5 : 4, ImGuiTableFlags_RowBg | (withNotes ? ImGuiTableFlags_SizingFixedFit : ImGuiTableFlags_SizingStretchProp))) {
                     ImGui::TableSetupColumn("Version");
                     ImGui::TableSetupColumn("Size");
                     ImGui::TableSetupColumn("Firmware");
-                    ImGui::TableSetupColumn("Added");
+                    ImGui::TableSetupColumn(PlatformOf(titleId) == "PS4" ? "Made" : "Added");
+                    if (withNotes) ImGui::TableSetupColumn("Notes", ImGuiTableColumnFlags_WidthStretch);
                     ImGui::TableHeadersRow();
                     for (const auto& patch : info->patches) {
                         ImGui::TableNextRow();
@@ -2252,6 +2266,14 @@ private:
                         ImGui::TextUnformatted(patch.requiredFirmware.c_str());
                         ImGui::TableNextColumn();
                         ImGui::TextUnformatted(patch.importDate.substr(0, 10).c_str());
+                        if (withNotes) {
+                            // The whole note, wrapped inside its column: the row grows to fit it.
+                            ImGui::TableNextColumn();
+                            ImGui::PushTextWrapPos(0.0f);
+                            ImGui::TextUnformatted(patch.notes.c_str());
+                            if (PatchNotesCut(patch)) ImGui::TextColored(Dim, "%s", "... the rest is on ORBISPatches");
+                            ImGui::PopTextWrapPos();
+                        }
                         if (current) ImGui::PopStyleColor();
                     }
                     ImGui::EndTable();
@@ -2261,8 +2283,9 @@ private:
         } else {
             ImGui::TextColored(Dim, "No updates are listed for this title.");
         }
-        if (ImGui::Button("View on PROSPEROPatches")) SDL_OpenURL(PatchPageUrl(titleId).c_str());
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Changelogs, update downloads and add-ons, in your browser");
+        const std::string view = "View on " + PatchSiteName(titleId);
+        if (ImGui::Button(view.c_str())) SDL_OpenURL(PatchPageUrl(titleId).c_str());
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Whole changelogs, update downloads and add-ons, in your browser");
         if (settings_.onlineInfo) {
             ImGui::SameLine();
             ImGui::BeginDisabled(onlineLoader_.Running());
@@ -5949,7 +5972,7 @@ private:
                 });
             }
             GroupLabel("Online");
-            ToggleRow("online", "Look up game updates", "Asks PROSPEROPatches.com for the selected game's region, publisher and newest update. Only the title ID is sent; answers are kept for a day.",
+            ToggleRow("online", "Look up game updates", "Asks PROSPEROPatches.com (PS5) or ORBISPatches.com (PS4) for the selected game's region, publisher and newest update, with update notes for PS4 games. Only the title ID is sent; answers are kept for a day.",
                       &draft_.onlineInfo);
             break;
         }
