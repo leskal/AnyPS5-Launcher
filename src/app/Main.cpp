@@ -319,7 +319,8 @@ bool ChipButton(const char* label, ChipIcon icon, ImVec4 tint) {
 enum class TopIcon { Versions, Rescan, Settings, Grid, Home };
 
 // A round icon button for the top bar, the icon drawn in code. Returns true when pressed.
-bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled, bool spinning = false) {
+// surface: the colour under the button when it sits in a group (no circle of its own until hovered).
+bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled, bool spinning = false, const ImVec4* surface = nullptr) {
     const float scale = ImGui::GetStyle().FontScaleDpi;
     const float size = ImGui::GetFrameHeight() * 1.2f;
     ImGui::BeginDisabled(disabled);
@@ -331,7 +332,7 @@ bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled
     if (hovered) ImGui::SetTooltip("%s", tooltip);
     auto* draw = ImGui::GetWindowDrawList();
     const ImVec2 c(at.x + size * 0.5f, at.y + size * 0.5f);
-    const ImVec4 base = ImGui::GetStyle().Colors[ImGuiCol_Button];
+    const ImVec4 base = surface != nullptr ? *surface : ImGui::GetStyle().Colors[ImGuiCol_Button];
     const ImVec4 back = held ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] : hovered && !disabled ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : base;
     draw->AddCircleFilled(c, size * 0.5f, ImGui::GetColorU32(back));
     const ImU32 ink = ImGui::GetColorU32(disabled ? ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] : ImGui::GetStyle().Colors[ImGuiCol_Text]);
@@ -1832,15 +1833,63 @@ private:
         button(ImVec2(at.x + u * 11, at.y + u * 5.6f), u * 0.4f, SDL_GAMEPAD_BUTTON_GUIDE);
     }
 
+    // The search box: rounded, a magnifier on the left, a clear button once something is typed.
+    void DrawSearchField(float width, float height) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const float glyph = ImGui::GetFontSize() * 0.9f;
+        const float padX = height * 0.42f + glyph + 6.0f * s;
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, height * 0.5f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padX, (height - ImGui::GetFontSize()) * 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, style.Colors[ImGuiCol_Button]);
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, style.Colors[ImGuiCol_ButtonHovered]);
+        ImGui::SetNextItemWidth(width);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::SetNextItemAllowOverlap();
+        ImGui::InputTextWithHint("##search", "Search games by name or serial", &search_);
+        const bool focused = ImGui::IsItemActive();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+        auto* draw = ImGui::GetWindowDrawList();
+        if (focused) draw->AddRect(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(Fade(Accent, 0.8f)), height * 0.5f, 0, 1.5f * s);
+        // The magnifier: a ring and a handle.
+        const ImU32 ink = ImGui::GetColorU32(focused ? Accent : Dim);
+        const float r = glyph * 0.34f;
+        const ImVec2 c(at.x + height * 0.42f + r, at.y + height * 0.5f - r * 0.25f);
+        draw->AddCircle(c, r, ink, 0, 1.6f * s);
+        draw->AddLine(ImVec2(c.x + r * 0.72f, c.y + r * 0.72f), ImVec2(c.x + r * 1.65f, c.y + r * 1.65f), ink, 1.8f * s);
+        if (!search_.empty()) {
+            // A round x that empties the field.
+            const float size = height * 0.62f;
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - size - (height - size) * 0.5f, at.y + (height - size) * 0.5f));
+            if (ImGui::InvisibleButton("##clear-search", ImVec2(size, size))) search_.clear();
+            const bool hovered = ImGui::IsItemHovered();
+            if (hovered) ImGui::SetTooltip("%s", "Clear");
+            const ImVec2 b = ImGui::GetItemRectMin();
+            const ImVec2 m(b.x + size * 0.5f, b.y + size * 0.5f);
+            if (hovered) draw->AddCircleFilled(m, size * 0.5f, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
+            const float k = size * 0.2f;
+            const ImU32 x = ImGui::GetColorU32(hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+            draw->AddLine(ImVec2(m.x - k, m.y - k), ImVec2(m.x + k, m.y + k), x, 1.6f * s);
+            draw->AddLine(ImVec2(m.x + k, m.y - k), ImVec2(m.x - k, m.y + k), x, 1.6f * s);
+        }
+    }
+
+    float ProfileSelectorWidth() const {
+        const float scale = ImGui::GetStyle().FontScaleDpi;
+        const float avatar = ImGui::GetFrameHeight() * 1.2f - 8.0f * scale;
+        const float nameWidth = std::min(ImGui::CalcTextSize(layout_.profile.c_str()).x, ImGui::GetFontSize() * 9);
+        return 4.0f * scale + avatar + 8.0f * scale + nameWidth + 10.0f * scale + ImGui::GetFontSize() * 0.6f + 12.0f * scale;
+    }
+
     void DrawProfileSelector() {
         const auto& style = ImGui::GetStyle();
         const float scale = style.FontScaleDpi;
         const float height = ImGui::GetFrameHeight() * 1.2f;
         const float avatar = height - 8.0f * scale;
         const float nameWidth = std::min(ImGui::CalcTextSize(layout_.profile.c_str()).x, ImGui::GetFontSize() * 9);
-        const float width = 4.0f * scale + avatar + 8.0f * scale + nameWidth + 10.0f * scale + ImGui::GetFontSize() * 0.6f + 12.0f * scale;
+        const float width = ProfileSelectorWidth();
         const bool locked = session_ != nullptr;
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - (height - ImGui::GetFrameHeight()) * 0.5f);
         const ImVec2 at = ImGui::GetCursorScreenPos();
         ImGui::BeginDisabled(locked);
         const bool pressed = ImGui::InvisibleButton("profile", ImVec2(width, height));
@@ -1858,7 +1907,8 @@ private:
         const float textX = at.x + 4.0f * scale + avatar + 8.0f * scale;
         draw->AddText(ImVec2(textX, at.y + (height - ImGui::GetFontSize()) * 0.5f), ink, Elide(layout_.profile, nameWidth).c_str());
         Chevron(ImVec2(end.x - 12.0f * scale - ImGui::GetFontSize() * 0.3f, at.y + height * 0.5f), ImGui::GetFontSize() * 0.28f, ImGui::GetColorU32(Dim));
-        ImGui::SetNextWindowPos(ImVec2(at.x, end.y + 4.0f * scale));
+        // The menu opens under it, its right edge on the button's (it sits at the window's right).
+        ImGui::SetNextWindowPos(ImVec2(end.x, end.y + 4.0f * scale), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * scale, 8.0f * scale));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 12.0f * scale);
         if (ImGui::BeginPopup("profile-menu")) {
@@ -1925,52 +1975,65 @@ private:
 
     void DrawTopBar() {
         const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const float height = ImGui::GetFrameHeight() * 1.2f;
+        const float top = ImGui::GetCursorPosY();
+        const float right = ImGui::GetContentRegionMax().x;
+
+        // Left: the page's name.
+        ImGui::SetCursorPosY(top + (height - ImGui::GetFontSize() * 1.45f) * 0.5f);
         ImGui::PushFont(nullptr, style.FontSizeBase * 1.45f);
-        ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted("Library");
         ImGui::PopFont();
-        ImGui::SameLine(0, style.ItemSpacing.x * 2);
+        ImGui::SameLine(0, 24.0f * s);
+        const float searchLeft = ImGui::GetCursorPosX();
 
-        DrawProfileSelector();
-        // The search box takes the room left before the buttons, and its own row when there's too little.
-        const float buttons = ImGui::GetFrameHeight() * 1.2f * 4 + style.ItemSpacing.x * 3;
-        ImGui::SameLine();
-        const float room = ImGui::GetContentRegionMax().x - buttons - ImGui::GetCursorPosX() - style.ItemSpacing.x;
-        const bool searchInline = room >= ImGui::GetFontSize() * 7;
-        if (searchInline) {
-            ImGui::SetNextItemWidth(std::min(room, ImGui::GetFontSize() * 16));
-            ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
-            ImGui::SameLine();
-        }
-        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - buttons));
-        // The icons sit a little lower so their centres line up with the search box.
-        const float iconY = ImGui::GetCursorPosY() - (ImGui::GetFrameHeight() * 1.2f - ImGui::GetFrameHeight()) * 0.5f;
-        ImGui::SetCursorPosY(iconY);
+        // Right: the tools in one rounded group, then the profile.
+        const float icon = height;
+        const float groupPad = 4.0f * s;
+        const float tools = icon * 4.0f + groupPad * 2.0f;
+        const float profile = ProfileSelectorWidth();
+        const float profileLeft = right - profile;
+        const float toolsLeft = profileLeft - 12.0f * s - tools;
         {
+            ImGui::SetCursorPos(ImVec2(toolsLeft, top));
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            auto* draw = ImGui::GetWindowDrawList();
+            const ImVec4 surface = style.Colors[ImGuiCol_Button];
+            draw->AddRectFilled(at, ImVec2(at.x + tools, at.y + height), ImGui::GetColorU32(surface), height * 0.5f);
+            // Each placed by hand: SameLine would line them up with the title's text.
+            int slot = 0;
+            const auto place = [&] { ImGui::SetCursorPos(ImVec2(toolsLeft + groupPad + icon * static_cast<float>(slot++), top)); };
+            place();
             const bool home = settings_.view == "home";
-            if (IconButton("view", home ? TopIcon::Grid : TopIcon::Home, home ? "Show the games as a grid" : "Show the games as a row, the selected one large", false)) {
+            if (IconButton("view", home ? TopIcon::Grid : TopIcon::Home, home ? "Show the games as a grid" : "Show the games as a row, the selected one large", false, false, &surface)) {
                 settings_.view = home ? "grid" : "home";
                 try {
                     SaveSettings(settingsFile_, settings_);
                 } catch (const std::exception&) {
                 }
             }
-            ImGui::SameLine();
-            ImGui::SetCursorPosY(iconY);
+            place();
+            if (IconButton("versions", TopIcon::Versions, session_ != nullptr ? "AnyPS5 versions (not while a game runs)" : "AnyPS5 versions", session_ != nullptr, false, &surface)) OpenVersions();
+            place();
+            const bool noFolder = GameFolders(settings_).empty();
+            const char* rescanTip = scan_.Running() ? "Scanning..." : noFolder ? "Rescan (set a games folder in Settings first)" : "Rescan the games folders";
+            if (IconButton("rescan", TopIcon::Rescan, rescanTip, scan_.Running() || job_.Busy() || noFolder, scan_.Running(), &surface)) StartScan();
+            place();
+            if (IconButton("settings", TopIcon::Settings, session_ != nullptr ? "Settings (not while a game runs)" : "Settings", session_ != nullptr || job_.Busy(), false, &surface)) OpenSettings();
         }
-        if (IconButton("versions", TopIcon::Versions, session_ != nullptr ? "AnyPS5 versions (not while a game runs)" : "AnyPS5 versions", session_ != nullptr)) OpenVersions();
-        ImGui::SameLine();
-        ImGui::SetCursorPosY(iconY);
-        const bool noFolder = GameFolders(settings_).empty();
-        const char* rescanTip = scan_.Running() ? "Scanning..." : noFolder ? "Rescan (set a games folder in Settings first)" : "Rescan the games folders";
-        if (IconButton("rescan", TopIcon::Rescan, rescanTip, scan_.Running() || job_.Busy() || noFolder, scan_.Running())) StartScan();
-        ImGui::SameLine();
-        ImGui::SetCursorPosY(iconY);
-        if (IconButton("settings", TopIcon::Settings, session_ != nullptr ? "Settings (not while a game runs)" : "Settings", session_ != nullptr || job_.Busy())) OpenSettings();
-        if (!searchInline) {
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            ImGui::InputTextWithHint("##search", "Search name or serial", &search_);
-        }
+        ImGui::SetCursorPos(ImVec2(profileLeft, top));
+        DrawProfileSelector();
+
+        // Middle: a rounded search field with a magnifier, as wide as fits.
+        const float room = toolsLeft - 16.0f * s - searchLeft;
+        const bool searchInline = room >= ImGui::GetFontSize() * 9.0f;
+        const float searchWidth = searchInline ? std::min(room, ImGui::GetFontSize() * 26.0f) : right - ImGui::GetCursorStartPos().x;
+        if (searchInline) ImGui::SetCursorPos(ImVec2(searchLeft, top));
+        else ImGui::SetCursorPosY(top + height + style.ItemSpacing.y);
+        DrawSearchField(searchWidth, height);
+        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), top + height + style.ItemSpacing.y));
+        ImGui::Dummy(ImVec2(0, 2.0f * s));
 
         // Status line: counts, AnyPS5, problems.
         if (scan_.Running()) {
@@ -1989,7 +2052,11 @@ private:
         } else {
             const std::string label = "AnyPS5 " + CurrentVersionLabel();
             Pill(label.c_str(), Accent);
-            if (ImGui::IsItemHovered() && !anyps5_.version.empty()) ImGui::SetTooltip("relinker %s", anyps5_.version.c_str());
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("%s%sClick for AnyPS5 versions", anyps5_.version.empty() ? "" : ("relinker " + anyps5_.version).c_str(), anyps5_.version.empty() ? "" : "\n");
+            }
+            if (ImGui::IsItemClicked() && session_ == nullptr) OpenVersions();
         }
         if (!result_.problems.empty()) {
             ImGui::SameLine();
@@ -2037,12 +2104,24 @@ private:
             }
             if (ImGui::IsItemClicked()) StartLauncherUpdate();
         }
-        ImGui::SameLine();
-        {
-            std::string folders;
-            if (!settings_.gamesFolder.empty()) folders = "PS5 " + settings_.gamesFolder;
-            if (!settings_.ps4GamesFolder.empty()) folders += (folders.empty() ? "" : "   \xC2\xB7   ") + std::string("PS4 ") + settings_.ps4GamesFolder;
-            ImGui::TextColored(Dim, "%s", folders.empty() ? "No games folder set" : folders.c_str());
+        // The games folders, each a chip that opens it.
+        const auto folderChip = [&](const char* platform, const std::string& folder) {
+            ImGui::SameLine();
+            const std::string label = std::string(platform) + "  " + folder;
+            Pill(label.c_str(), Dim);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("Open %s", folder.c_str());
+            }
+            if (ImGui::IsItemClicked()) OpenFolder(FromUtf8(folder));
+        };
+        if (!settings_.gamesFolder.empty()) folderChip("PS5", settings_.gamesFolder);
+        if (!settings_.ps4GamesFolder.empty()) folderChip("PS4", settings_.ps4GamesFolder);
+        if (settings_.gamesFolder.empty() && settings_.ps4GamesFolder.empty()) {
+            ImGui::SameLine();
+            Pill("No games folder set", Amber);
+            if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            if (ImGui::IsItemClicked() && !session_ && !job_.Busy()) OpenSettings();
         }
         if (!settingsError_.empty()) ImGui::TextColored(Red, "Settings: %s", settingsError_.c_str());
         if (!profileError_.empty()) ImGui::TextColored(Red, "Profile: %s", profileError_.c_str());
