@@ -191,12 +191,9 @@ struct ParsedElf {
     std::vector<std::unique_ptr<Header>> headers;
 };
 
-ParsedElf ParseElf(const Bytes& data) {
-    static constexpr std::uint8_t magic[] = {0x7F, 'E', 'L', 'F'};
-    const auto found = std::search(data.data.begin(), data.data.end(), std::begin(magic), std::end(magic));
-    if (found == data.data.end()) Refuse("no inner ELF header");
+ParsedElf ParseElfAt(const Bytes& data, Int inner) {
     ParsedElf parsed;
-    parsed.inner = found - data.data.begin();
+    parsed.inner = inner;
     if (parsed.inner + 0x40 > data.Size()) Refuse("inner ELF header is truncated");
     std::memcpy(parsed.header.data(), data.data.data() + static_cast<std::size_t>(parsed.inner), 0x40);
     const Bytes header{parsed.header};
@@ -238,6 +235,24 @@ ParsedElf ParseElf(const Bytes& data) {
         parsed.headers.push_back(std::move(entry));
     }
     return parsed;
+}
+
+// The first "\x7fELF" that parses as the inner ELF: the metadata before it can hold
+// the same four bytes by chance. When none parses, the first one's refusal.
+ParsedElf ParseElf(const Bytes& data) {
+    static constexpr std::uint8_t magic[] = {0x7F, 'E', 'L', 'F'};
+    auto found = std::search(data.data.begin(), data.data.end(), std::begin(magic), std::end(magic));
+    if (found == data.data.end()) Refuse("no inner ELF header");
+    std::optional<UnwrapRefused> firstError;
+    while (found != data.data.end()) {
+        try {
+            return ParseElfAt(data, found - data.data.begin());
+        } catch (const UnwrapRefused& error) {
+            if (!firstError) firstError = error;
+        }
+        found = std::search(found + 1, data.data.end(), std::begin(magic), std::end(magic));
+    }
+    throw *firstError;
 }
 
 template <typename Key>

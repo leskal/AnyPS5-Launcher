@@ -80,6 +80,20 @@ TEST(UnwrapRefusesWithTheScriptsMessages) {
     CHECK_EQ(Refusal(FromHex(golden::encrypted_load_hex)), std::string(golden::encryptedMessage));
 }
 
+// As AnyPS5's test_metadata_elf_marker_does_not_mask_the_inner_elf: "\x7fELF" in
+// the metadata before the inner ELF is passed over.
+TEST(UnwrapSkipsAnElfMarkerInTheMetadata) {
+    const auto& item = golden::cases[0];
+    auto self = FromHex(item.selfHex);
+    self[0x100] = 0x7F;
+    self[0x101] = 'E';
+    self[0x102] = 'L';
+    self[0x103] = 'F';
+    const auto image = UnwrapSelfImage(self);
+    CHECK_EQ(image.size(), item.elfSize);
+    CHECK_EQ(Sha256(image), std::string(item.elfSha256));
+}
+
 TEST(UnwrapWritesTheFileAndReplacesAnOldOne) {
     fixture::TempDir temp;
     const auto input = temp.Path() / "eboot.bin";

@@ -12,7 +12,7 @@ namespace launcher {
 // A C++ port of AnyPS5's tools/unwrap_self.py: it turns a decrypted SELF or fSELF
 // container into a plain ELF the relinker accepts, and refuses the same inputs
 // with the same messages. Keep it in step with that script.
-inline constexpr const char* UnwrapSelfReference = "tools/unwrap_self.py (AnyPS5 514a52b)";
+inline constexpr const char* UnwrapSelfReference = "tools/unwrap_self.py (AnyPS5 e136d87)";
 
 class UnwrapRefused : public std::runtime_error {
 public:
