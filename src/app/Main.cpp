@@ -1061,7 +1061,23 @@ public:
             icons_->Clear();
             trophyAsked_.clear();
             artAsked_.clear();
+            // An install or a removal moves the game (Game.zar <-> Game\app0.zar), so its
+            // old location is gone after the scan: keep the same game selected anyway.
+            std::optional<std::pair<std::string, std::filesystem::path>> previous;
+            if (const auto* game = SelectedGame()) previous.emplace(game->metadata.titleId, HomeFor(*game));
             result_ = std::move(*finished);
+            if (previous && SelectedGame() == nullptr) {
+                const GameEntry* same = nullptr;
+                for (const auto& game : result_.games) {
+                    if (game.metadata.titleId != previous->first) continue;
+                    if (HomeFor(game) == previous->second) {
+                        same = &game;
+                        break;
+                    }
+                    if (same == nullptr) same = &game;
+                }
+                if (same != nullptr) selected_ = ToUtf8(same->location);
+            }
             scanned_ = true;
             RecoverSessions();
             RefreshInstalls();
