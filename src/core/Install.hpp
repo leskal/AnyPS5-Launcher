@@ -54,6 +54,11 @@ std::filesystem::path ExecutableIn(const std::filesystem::path& home, std::strin
 // alone in it; or for Games\Foo.zar the new folder Games\Foo.
 std::filesystem::path HomeFor(const GameEntry& game);
 
+// A .zar's set-up folder that an earlier removal left because it held files the
+// launcher didn't make (the game's devlog and temp0, say): a new install can use it
+// again, as nothing in it is in the way. False when the folder isn't there.
+bool LeftoverHome(const GameEntry& game);
+
 struct InstallRequest {
     const GameEntry& game;
     const AnyPS5Runtime& anyps5;

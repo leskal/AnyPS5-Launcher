@@ -1445,7 +1445,9 @@ private:
             const bool ebootElf = game.executable.kind == ExecutableKind::Elf || (game.unwrapped && game.unwrapped->kind == ExecutableKind::Elf);
             if (!ebootElf || game.modules.self > 0) return "Some files are still SELF: choose Convert SELF to ELF first";
         }
-        if (game.format == PackageFormat::Zar && game.home.empty() && PathExists(HomeFor(game))) return FileName(HomeFor(game)) + " already exists next to the archive";
+        if (game.format == PackageFormat::Zar && game.home.empty() && PathExists(HomeFor(game)) && !LeftoverHome(game)) {
+            return FileName(HomeFor(game)) + " already exists next to the archive";
+        }
         return {};
     }
 

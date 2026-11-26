@@ -316,6 +316,19 @@ std::filesystem::path HomeFor(const GameEntry& game) {
     return game.location.parent_path() / game.location.stem();
 }
 
+bool LeftoverHome(const GameEntry& game) {
+    if (game.format != PackageFormat::Zar || !game.home.empty()) return false;
+    const auto home = HomeFor(game);
+    std::error_code error;
+    if (!std::filesystem::is_directory(home, error)) return false;
+    // What an install puts there: none of it may be there already.
+    const std::set<std::string> ours{InstallManifestName, App0, App0Zar, ToUtf8(ExecutableIn(home, game.metadata.titleId).filename())};
+    for (const auto& name : TopLevelNames(home)) {
+        if (ours.count(name) != 0) return false;
+    }
+    return true;
+}
+
 std::optional<InstallManifest> ReadHomeManifest(const std::filesystem::path& home) {
     const auto document = nlohmann::json::parse(ReadText(home / InstallManifestName), nullptr, false);
     if (document.is_discarded() || !document.is_object()) return std::nullopt;
@@ -476,10 +489,14 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
     } else {
         auto package = std::make_unique<ZarPackage>(ZarArchive::Open(game.location), "");
         const bool fresh = game.home.empty();
-        if (fresh) {
+        // Set up again in the folder a removal left (with the game's devlog, temp0...).
+        const bool reused = fresh && LeftoverHome(game);
+        if (fresh && !reused) {
             if (Exists(home)) throw std::runtime_error(ToUtf8(home) + " already exists; move it away or rename the .zar");
             std::filesystem::create_directory(home, error);
             if (error) throw std::system_error(error, "cannot create " + ToUtf8(home));
+        } else if (reused) {
+            DropRunFiles(home);
         } else {
             RemoveOwnTree(app0);
         }
@@ -497,7 +514,8 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
             package.reset();
             if (fresh) {
                 try {
-                    RemoveOwnTree(home);
+                    // Only what this install made: a reused folder keeps the files it had.
+                    RemoveOwnTree(reused ? app0 : home);
                 } catch (...) {
                 }
             }

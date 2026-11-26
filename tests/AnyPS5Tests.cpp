@@ -573,6 +573,29 @@ TEST(RemoveInstallPutsEverythingBack) {
     CHECK(restored.restored == archive);
     CHECK(ReadBytes(archive) == original);
     CHECK(!std::filesystem::exists(zar.temp.Path() / "games" / "Game"));
+
+    // The game made devlog and temp0 beside the exe: removal leaves the folder for them,
+    // and installing again uses that folder instead of stopping on it.
+    zar.Install(zar.Scan(), relinker);
+    const auto zarHome = zar.temp.Path() / "games" / "Game";
+    fixture::WriteFolder(zarHome, {{"devlog/run.txt", fixture::Bytes("log")}, {"temp0/cache.bin", fixture::Bytes("tmp")}});
+    const auto kept = RemoveInstall(zar.Scan());
+    CHECK(kept.leftovers == (std::vector<std::string>{"devlog", "temp0"}));
+    CHECK(ReadBytes(archive) == original);
+    const auto again = zar.Scan();
+    CHECK(launcher::LeftoverHome(again));
+    CHECK(zar.Install(again, relinker).complete);
+    CHECK(ReadBytes(zarHome / "app0.zar") == original);
+    CHECK_EQ(ReadText(zarHome / "devlog" / "run.txt"), std::string("log"));
+    CHECK(zar.Scan().home == zarHome);
+
+    // A folder holding something an install makes is still in the way.
+    const auto removedAgain = RemoveInstall(zar.Scan());
+    CHECK(removedAgain.restored == archive);
+    fixture::WriteFolder(zarHome, {{"app0/stray.txt", fixture::Bytes("x")}});
+    CHECK(!launcher::LeftoverHome(zar.Scan()));
+    CHECK_THROWS(zar.Install(zar.Scan(), relinker));
+    CHECK(std::filesystem::is_regular_file(archive));
 }
 
 TEST(PlayMovesTheProfilesFoldersInAndBack) {
