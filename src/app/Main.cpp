@@ -325,6 +325,9 @@ bool ChipButton(const char* label, ChipIcon icon, ImVec4 tint) {
 
 enum class TopIcon { Versions, Rescan, Settings, Grid, Home };
 
+// The small icons of the details panel and the home view's cards.
+enum class DetailGlyph { Trophy, Picture, Pad, Sliders };
+
 // A round icon button for the top bar, the icon drawn in code. Returns true when pressed.
 // surface: the colour under the button when it sits in a group (no circle of its own until hovered).
 bool IconButton(const char* id, TopIcon icon, const char* tooltip, bool disabled, bool spinning = false, const ImVec4* surface = nullptr) {
@@ -3092,7 +3095,7 @@ private:
         const float gap = 14.0f * scale_;
         const float halo = 14.0f * scale_;  // room for the selected game's glow, so the row does not cut it off
         ImGui::SetCursorPos(ImVec2(style.WindowPadding.x + 8.0f * scale_ - halo, 16.0f * scale_ - halo));
-        ImGui::BeginChild("home-row", ImVec2(0, large + ImGui::GetTextLineHeightWithSpacing() * 1.5f + halo), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::BeginChild("home-row", ImVec2(0, large + halo * 2.0f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollbar);
         ImGui::SetCursorPos(ImVec2(halo, halo));
         int index = 0;
         for (const auto& game : result_.games) {
@@ -3112,12 +3115,13 @@ private:
                 if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) ImGui::OpenPopup("actions");
             }
             if (isSelected && ImGui::IsWindowAppearing()) ImGui::SetScrollHereX(0.3f);
-            if (ImGui::BeginPopupContextItem("actions")) {
+            // No right-click menu here: the "..." button beside Play has every action (and so does triangle on a pad).
+            if (ImGui::BeginPopup("actions")) {
                 DrawActionItems(game);
                 ImGui::EndPopup();
             }
             auto* rowDraw = ImGui::GetWindowDrawList();
-            const ImVec2 top(at.x, at.y + (large - tile));
+            const ImVec2 top(at.x, at.y + (large - tile) * 0.5f);  // small tiles centred on the large one, as on the console
             const float rounding = (isSelected ? 14.0f : 10.0f) * scale_;
             if (isSelected) {
                 // A soft glow marks the selected game instead of a ring, which read as a stray line around the icon.
@@ -3140,70 +3144,169 @@ private:
         if (index == 0) ImGui::TextColored(Dim, "%s", scanned_ ? "No games found. Choose the games folder in Settings." : "Looking for games...");
         ImGui::EndChild();
 
-        // The selected game: name, facts and what to do.
+        // The selected game: name, facts, the big white button, then cards along the bottom.
         if (selected != nullptr) {
-            ImGui::SetCursorPosX(style.WindowPadding.x + 16.0f * scale_);
+            const float s = scale_;
+            const float left = style.WindowPadding.x + 20.0f * s;
+            ImGui::SetCursorPos(ImVec2(left, ImGui::GetCursorPosY() + 18.0f * s));
             ImGui::BeginGroup();
-            ImGui::PushFont(nullptr, style.FontSizeBase * 2.4f);
+            ImGui::PushFont(nullptr, style.FontSizeBase * 2.2f);
+            ImGui::PushTextWrapPos(size.x * 0.6f);
             ImGui::TextUnformatted(selected->metadata.name.c_str());
+            ImGui::PopTextWrapPos();
             ImGui::PopFont();
-            bool loading = false;
-            const auto* set = TrophiesOf(*selected, loading);
             std::string facts = selected->metadata.titleId + "  \xC2\xB7  v" + selected->metadata.contentVersion + "  \xC2\xB7  " + std::string(ToString(selected->format));
             const auto region = RegionOf(selected->metadata.contentId);
             if (!region.empty()) facts += "  \xC2\xB7  " + region;
             ImGui::TextColored(Dim, "%s", facts.c_str());
-            const auto badge = BadgeFor(*selected);
-            if (badge.text != nullptr) Pill(badge.text, badge.color);
-            ImGui::Spacing();
-            ImGui::Spacing();
-            const float button = ImGui::GetFrameHeight() * 1.5f;
+            ImGui::Dummy(ImVec2(0, 10.0f * s));
+
+            // The white, rounded main button, and a round "..." beside it.
+            const float button = ImGui::GetFrameHeight() * 1.65f;
+            const float wide = ImGui::GetFontSize() * 12.0f;
             const auto* manifest = InstallFor(*selected);
+            std::string reason;
+            const char* label = nullptr;
+            int action = 0;  // 1 stop, 2 play, 3 install
             if (IsRunning(*selected)) {
-                if (PrimaryButton("Stop", ImVec2(ImGui::GetFontSize() * 9, button))) session_->Stop();
+                label = "Stop";
+                action = 1;
             } else if (manifest != nullptr) {
-                const auto reason = PlayBlocker(*selected);
-                ImGui::BeginDisabled(!reason.empty());
-                if (PrimaryButton("Play", ImVec2(ImGui::GetFontSize() * 9, button))) Play(*selected);
-                ImGui::EndDisabled();
-                if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+                label = "Play Game";
+                action = 2;
+                reason = PlayBlocker(*selected);
             } else {
-                const auto reason = InstallBlocker(*selected);
-                ImGui::BeginDisabled(!reason.empty());
-                if (PrimaryButton("Install", ImVec2(ImGui::GetFontSize() * 9, button))) StartInstall(*selected);
-                ImGui::EndDisabled();
-                if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+                label = "Install";
+                action = 3;
+                reason = InstallBlocker(*selected);
             }
-            ImGui::SameLine();
-            const std::string trophies = set == nullptr ? std::string("Trophies")
-                                         : set->encrypted ? std::to_string(set->lockedCount)
-                                                          : std::to_string(set->Count().earned) + "/" + std::to_string(set->Count().total);
-            const ImVec2 cupAt = ImGui::GetCursorScreenPos();
-            if (ImGui::Button(("     " + trophies + "##home-trophies").c_str(), ImVec2(0, button))) OpenTrophies();
-            {
-                // A cup inside the button, before the count.
-                const float cup = ImGui::GetFontSize() * 1.1f;
-                DrawTrophyCup(ImGui::GetWindowDrawList(), ImVec2(cupAt.x + style.FramePadding.x, cupAt.y + (button - cup) * 0.5f), TrophyGrade::Gold, cup);
+            if (HeroButton(label, ImVec2(wide, button), !reason.empty(), action == 2)) {
+                if (action == 1) session_->Stop();
+                else if (action == 2) Play(*selected);
+                else StartInstall(*selected);
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Controls", ImVec2(0, button))) OpenControls(*selected);
-            ImGui::SameLine();
-            if (ImGui::Button("Game settings", ImVec2(0, button))) OpenGameSettings(*selected);
-            ImGui::SameLine();
-            if (ImGui::Button("Screenshots", ImVec2(0, button))) OpenScreenshots(*selected);
-            ImGui::SameLine();
-            if (ImGui::Button("...", ImVec2(button, button))) ImGui::OpenPopup("home-actions");
+            if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+            ImGui::SameLine(0, 12.0f * s);
+            if (RoundButton("##home-more", button)) ImGui::OpenPopup("home-actions");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "All actions");
             if (ImGui::BeginPopup("home-actions")) {
                 DrawActionItems(*selected);
                 ImGui::EndPopup();
             }
-            ImGui::Spacing();
-            ImGui::PushTextWrapPos(size.x * 0.6f);
+            ImGui::Dummy(ImVec2(0, 8.0f * s));
+            ImGui::PushTextWrapPos(size.x * 0.5f);
             DrawStatus(*selected);
             ImGui::PopTextWrapPos();
             ImGui::EndGroup();
+
+            // Activity cards along the bottom, like the console's.
+            // As tall as fits below the status, so the cards are never cut off at the bottom.
+            const float roomBelow = size.y - ImGui::GetCursorPosY() - 16.0f * s - 20.0f * s;
+            const float cardHeight = std::clamp(std::min(size.y * 0.2f, roomBelow), 80.0f * s, 140.0f * s);
+            const float cardWidth = std::max(cardHeight * 1.75f, 220.0f * s);
+            const float cardGap = 14.0f * s;
+            const float bottom = size.y - cardHeight - 20.0f * s;
+            ImGui::SetCursorPos(ImVec2(left, std::max(ImGui::GetCursorPosY() + 16.0f * s, bottom)));
+            bool loading = false;
+            const auto* set = TrophiesOf(*selected, loading);
+            std::string trophyLine = "No trophy list";
+            float trophyShare = -1.0f;
+            if (loading) {
+                trophyLine = "Reading...";
+            } else if (set != nullptr && set->encrypted) {
+                trophyLine = std::to_string(set->lockedCount) + " trophies, locked";
+            } else if (set != nullptr) {
+                trophyLine = std::to_string(set->Count().earned) + " of " + std::to_string(set->Count().total) + "  \xC2\xB7  " + std::to_string(set->Percent()) + "%";
+                trophyShare = static_cast<float>(set->Percent()) / 100.0f;
+            }
+            if (HomeCard("Trophies", trophyLine.c_str(), DetailGlyph::Trophy, ImVec2(cardWidth, cardHeight), trophyShare)) OpenTrophies();
+            ImGui::SameLine(0, cardGap);
+            if (HomeCard("Screenshots", "Captured while playing", DetailGlyph::Picture, ImVec2(cardWidth, cardHeight))) OpenScreenshots(*selected);
+            ImGui::SameLine(0, cardGap);
+            if (HomeCard("Controls", "Keys and pad", DetailGlyph::Pad, ImVec2(cardWidth, cardHeight))) OpenControls(*selected);
+            ImGui::SameLine(0, cardGap);
+            if (HomeCard("Game settings", "How the game runs", DetailGlyph::Sliders, ImVec2(cardWidth, cardHeight))) OpenGameSettings(*selected);
         }
         ImGui::EndChild();
+    }
+
+    // The console's main button: white and fully rounded, dark text; a play mark when it plays.
+    bool HeroButton(const char* label, ImVec2 size, bool disabled, bool play) {
+        const float s = scale_;
+        ImGui::BeginDisabled(disabled);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(label, size);
+        const bool hovered = ImGui::IsItemHovered();
+        const bool held = ImGui::IsItemActive();
+        const bool focused = ImGui::IsItemFocused() && ImGui::GetIO().NavVisible;
+        ImGui::EndDisabled();
+        auto* draw = ImGui::GetWindowDrawList();
+        const float r = size.y * 0.5f;
+        const float alpha = disabled ? 0.35f : held ? 0.82f : hovered ? 1.0f : 0.94f;
+        if ((hovered || focused) && !disabled) {
+            for (int ring = 4; ring >= 1; --ring) {
+                const float grow = static_cast<float>(ring) * 2.0f * s;
+                draw->AddRectFilled(ImVec2(at.x - grow, at.y - grow), ImVec2(at.x + size.x + grow, at.y + size.y + grow), IM_COL32(255, 255, 255, 14), r + grow);
+            }
+        }
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(ImVec4(1, 1, 1, alpha)), r);
+        const ImU32 ink = IM_COL32(18, 20, 26, 255);
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.1f);
+        const ImVec2 text = ImGui::CalcTextSize(label);
+        const float mark = play ? ImGui::GetFontSize() * 0.6f + 10.0f * s : 0.0f;
+        const float x = at.x + (size.x - text.x - mark) * 0.5f;
+        if (play) {
+            const float h = ImGui::GetFontSize() * 0.6f;
+            const float y = at.y + size.y * 0.5f;
+            draw->AddTriangleFilled(ImVec2(x, y - h * 0.6f), ImVec2(x + h * 0.9f, y), ImVec2(x, y + h * 0.6f), ink);
+        }
+        draw->AddText(ImVec2(x + mark, at.y + (size.y - text.y) * 0.5f), ink, label);
+        ImGui::PopFont();
+        return pressed && !disabled;
+    }
+
+    // A round, see-through button with three dots.
+    bool RoundButton(const char* id, float size) {
+        const float s = scale_;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(id, ImVec2(size, size));
+        const bool hovered = ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible);
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 c(at.x + size * 0.5f, at.y + size * 0.5f);
+        draw->AddCircleFilled(c, size * 0.5f, ImGui::GetColorU32(Fade(WindowColor, hovered ? 0.85f : 0.6f)));
+        draw->AddCircle(c, size * 0.5f - 0.5f, ImGui::GetColorU32(ImVec4(1, 1, 1, hovered ? 0.6f : 0.25f)), 0, 1.2f * s);
+        for (int i = -1; i <= 1; ++i) draw->AddCircleFilled(ImVec2(c.x + static_cast<float>(i) * 6.5f * s, c.y), 2.2f * s, ImGui::GetColorU32(ImGuiCol_Text));
+        return pressed;
+    }
+
+    // A card along the bottom of the home view: an icon, a title and a line; share >= 0 adds a progress bar.
+    bool HomeCard(const char* title, const char* line, DetailGlyph glyph, ImVec2 size, float share = -1.0f) {
+        const float s = scale_;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(title, size);
+        const bool hovered = ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible);
+        auto* draw = ImGui::GetWindowDrawList();
+        const float rounding = 14.0f * s;
+        const ImVec2 end(at.x + size.x, at.y + size.y);
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(Fade(WindowColor, hovered ? 0.9f : 0.72f)), rounding);
+        draw->AddRect(at, end, ImGui::GetColorU32(ImVec4(1, 1, 1, hovered ? 0.7f : 0.08f)), rounding, 0, (hovered ? 2.0f : 1.0f) * s);
+        const float pad = 16.0f * s;
+        const float u = ImGui::GetFontSize() * 0.7f;
+        // On a short card the icon moves to the top right, out of the text's way.
+        const bool compact = size.y < 112.0f * s;
+        const ImVec2 glyphAt = compact ? ImVec2(end.x - pad - u, at.y + size.y * 0.5f) : ImVec2(at.x + pad + u, at.y + pad + u);
+        DrawDetailGlyph(draw, glyph, glyphAt, u, ImGui::GetColorU32(hovered ? Accent : ImGui::GetStyle().Colors[ImGuiCol_Text]));
+        const float textY = end.y - pad - ImGui::GetFontSize() * 2.3f - (share >= 0.0f ? 10.0f * s : 0.0f);
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.05f);
+        draw->AddText(ImVec2(at.x + pad, textY), ImGui::GetColorU32(ImGuiCol_Text), title);
+        ImGui::PopFont();
+        draw->AddText(ImVec2(at.x + pad, textY + ImGui::GetFontSize() * 1.25f), ImGui::GetColorU32(Dim), Elide(line, size.x - pad * 2.0f - (compact ? u * 2.0f + pad : 0.0f)).c_str());
+        if (share >= 0.0f) {
+            const float barY = end.y - pad - 3.0f * s;
+            draw->AddRectFilled(ImVec2(at.x + pad, barY), ImVec2(end.x - pad, barY + 4.0f * s), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.12f)), 2.0f * s);
+            if (share > 0.0f) draw->AddRectFilled(ImVec2(at.x + pad, barY), ImVec2(at.x + pad + (size.x - pad * 2.0f) * std::min(share, 1.0f), barY + 4.0f * s), ImGui::GetColorU32(Accent), 2.0f * s);
+        }
+        return pressed;
     }
 
     // ---- links, requests from a second launcher, self-update, issues -----------------
@@ -5051,27 +5154,10 @@ private:
         });
     }
 
-    enum class DetailGlyph { Trophy, Picture, Pad, Sliders };
-
-    // A button with an icon and its label on the left, for the details panel's tiles.
-    bool ActionTile(const char* label, DetailGlyph glyph, ImVec2 size) {
-        const auto& style = ImGui::GetStyle();
+    // The details' small icons, centred on c, u half their size.
+    void DrawDetailGlyph(ImDrawList* draw, DetailGlyph glyph, ImVec2 c, float u, ImU32 ink) const {
         const float s = scale_;
-        const ImVec2 at = ImGui::GetCursorScreenPos();
-        const bool pressed = ImGui::InvisibleButton(label, size);
-        const bool hovered = ImGui::IsItemHovered();
-        const bool held = ImGui::IsItemActive();
-        auto* draw = ImGui::GetWindowDrawList();
-        const ImVec4 back = held ? style.Colors[ImGuiCol_ButtonActive] : hovered ? style.Colors[ImGuiCol_ButtonHovered] : style.Colors[ImGuiCol_Button];
-        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(back), 10.0f * s);
-        if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible) {
-            draw->AddRect(ImVec2(at.x - 2, at.y - 2), ImVec2(at.x + size.x + 2, at.y + size.y + 2), ImGui::GetColorU32(ImGuiCol_NavCursor), 12.0f * s, 0, 2.0f);
-        }
-        const float g = ImGui::GetFontSize() * 0.95f;
-        const ImVec2 c(at.x + 12.0f * s + g * 0.5f, at.y + size.y * 0.5f);
-        const ImU32 ink = ImGui::GetColorU32(hovered ? Accent : Dim);
-        const float line = 1.6f * s;
-        const float u = g * 0.5f;
+        const float line = std::max(1.6f * s, u * 0.16f);
         switch (glyph) {
         case DetailGlyph::Trophy:
             // A cup on a stem.
@@ -5107,6 +5193,26 @@ private:
             }
             break;
         }
+    }
+
+    // A button with an icon and its label on the left, for the details panel's tiles.
+    bool ActionTile(const char* label, DetailGlyph glyph, ImVec2 size) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(label, size);
+        const bool hovered = ImGui::IsItemHovered();
+        const bool held = ImGui::IsItemActive();
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec4 back = held ? style.Colors[ImGuiCol_ButtonActive] : hovered ? style.Colors[ImGuiCol_ButtonHovered] : style.Colors[ImGuiCol_Button];
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(back), 10.0f * s);
+        if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible) {
+            draw->AddRect(ImVec2(at.x - 2, at.y - 2), ImVec2(at.x + size.x + 2, at.y + size.y + 2), ImGui::GetColorU32(ImGuiCol_NavCursor), 12.0f * s, 0, 2.0f);
+        }
+        const float g = ImGui::GetFontSize() * 0.95f;
+        const ImVec2 c(at.x + 12.0f * s + g * 0.5f, at.y + size.y * 0.5f);
+        const ImU32 ink = ImGui::GetColorU32(hovered ? Accent : Dim);
+        DrawDetailGlyph(draw, glyph, c, g * 0.5f, ink);
         const ImVec2 text = ImGui::CalcTextSize(label);
         draw->AddText(ImVec2(at.x + 12.0f * s + g + 10.0f * s, at.y + (size.y - text.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), label);
         return pressed;
@@ -5373,7 +5479,8 @@ private:
             if (ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0))) message_.reset();
         } else if (!drew) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(Dim, "Select a game to see it; double-click to play; right-click for every action.");
+            ImGui::TextColored(Dim, "%s", settings_.view == "home" ? "Select a game to see it; double-click to play; \"...\" beside Play for every action."
+                                                                    : "Select a game to see it; double-click to play; right-click for every action.");
         }
     }
 
