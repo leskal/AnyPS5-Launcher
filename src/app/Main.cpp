@@ -257,7 +257,7 @@ bool Segmented(const char* id, const char* const* labels, int count, int& curren
     return changed;
 }
 
-enum class ChipIcon { Report, Issue, Log };
+enum class ChipIcon { Report, Issue, Log, Plus };
 
 // A pill button with a small icon drawn in code before its label: for actions
 // that sit in a row under some text, like the last run's Make a report.
@@ -299,6 +299,10 @@ bool ChipButton(const char* label, ChipIcon icon, ImVec4 tint) {
         draw->AddCircleFilled(c, u * 0.13f, ink);
         break;
     }
+    case ChipIcon::Plus:
+        draw->AddLine(ImVec2(g.x + u * 0.5f, g.y + u * 0.12f), ImVec2(g.x + u * 0.5f, g.y + u * 0.88f), ink, line);
+        draw->AddLine(ImVec2(g.x + u * 0.12f, g.y + u * 0.5f), ImVec2(g.x + u * 0.88f, g.y + u * 0.5f), ink, line);
+        break;
     case ChipIcon::Log:
         // Lines of text of different lengths.
         for (int i = 0; i < 4; ++i) {
@@ -5471,6 +5475,213 @@ private:
         ImGui::EndPopup();
     }
 
+    // One installed AnyPS5 as a card: an icon, its name and state, Use and a menu.
+    void DrawVersionCard(const VersionEntry& entry, bool busy, std::string& remove) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const bool selected = entry.id == settings_.anyps5Version;
+        const auto& probe = ProbeFor(entry);
+        const float pad = 14.0f * s;
+        const float icon = 40.0f * s;
+        const float width = ImGui::GetContentRegionAvail().x;
+        const float nameHeight = ImGui::GetFontSize() * 1.1f;
+        const float textHeight = nameHeight + style.ItemSpacing.y + ImGui::GetTextLineHeight();
+        const float height = pad * 2.0f + std::max({icon, textHeight, ImGui::GetFrameHeight()});
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        auto* draw = ImGui::GetWindowDrawList();
+        ImGui::PushID(entry.id.c_str());
+
+        // The card, outlined in the accent colour when it's the one in use.
+        const float rounding = 12.0f * s;
+        draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(CardHover), rounding);
+        if (selected) {
+            draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(Fade(Accent, 0.08f)), rounding);
+            draw->AddRect(at, ImVec2(at.x + width, at.y + height), ImGui::GetColorU32(Fade(Accent, 0.75f)), rounding, 0, 1.5f * s);
+        }
+
+        // The icon: a box with an arrow for a release, a folder for a build of yours.
+        const ImVec2 c(at.x + pad + icon * 0.5f, at.y + height * 0.5f);
+        const ImVec4 tone = selected ? Accent : entry.Local() ? Amber : Green;
+        draw->AddCircleFilled(c, icon * 0.5f, ImGui::GetColorU32(Fade(tone, 0.16f)));
+        const ImU32 ink = ImGui::GetColorU32(tone);
+        const float u = icon * 0.24f;
+        const float line = 1.6f * s;
+        if (entry.Local()) {
+            draw->AddRect(ImVec2(c.x - u, c.y - u * 0.55f), ImVec2(c.x + u, c.y + u * 0.8f), ink, 2.0f * s, 0, line);
+            draw->AddLine(ImVec2(c.x - u, c.y - u * 0.55f), ImVec2(c.x - u * 0.85f, c.y - u * 0.9f), ink, line);
+            draw->AddLine(ImVec2(c.x - u * 0.85f, c.y - u * 0.9f), ImVec2(c.x - u * 0.15f, c.y - u * 0.9f), ink, line);
+            draw->AddLine(ImVec2(c.x - u * 0.15f, c.y - u * 0.9f), ImVec2(c.x, c.y - u * 0.55f), ink, line);
+        } else {
+            draw->AddLine(ImVec2(c.x, c.y - u), ImVec2(c.x, c.y + u * 0.35f), ink, line);
+            draw->AddLine(ImVec2(c.x - u * 0.5f, c.y - u * 0.15f), ImVec2(c.x, c.y + u * 0.35f), ink, line);
+            draw->AddLine(ImVec2(c.x + u * 0.5f, c.y - u * 0.15f), ImVec2(c.x, c.y + u * 0.35f), ink, line);
+            draw->AddLine(ImVec2(c.x - u, c.y + u * 0.85f), ImVec2(c.x + u, c.y + u * 0.85f), ink, line);
+        }
+
+        // On the right: Use (or "In use"), and a menu with the rest.
+        const float more = ImGui::GetFrameHeight();
+        const float use = ImGui::GetFontSize() * 5.0f;
+        const float actions = use + style.ItemSpacing.x + more;
+        const float buttonY = at.y + (height - ImGui::GetFrameHeight()) * 0.5f;
+
+        // The name and a line under it.
+        const float textX = at.x + pad + icon + 12.0f * s;
+        const float textWidth = at.x + width - pad - actions - style.ItemSpacing.x * 2.0f - textX;
+        ImGui::SetCursorScreenPos(ImVec2(textX, at.y + (height - textHeight) * 0.5f));
+        ImGui::BeginGroup();
+        if (entry.Local() && renamingVersion_ == entry.id) {
+            // Naming it in place: Enter or clicking away keeps the name, Esc drops it.
+            ImGui::SetNextItemWidth(std::min(textWidth, ImGui::GetFontSize() * 16.0f));
+            if (renameFocus_) {
+                ImGui::SetKeyboardFocusHere();
+                renameFocus_ = false;
+            }
+            const bool entered = ImGui::InputTextWithHint("##name", "A name for this build", &renameText_, ImGuiInputTextFlags_EnterReturnsTrue);
+            if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                renamingVersion_.clear();
+            } else if (entered || ImGui::IsItemDeactivated()) {
+                try {
+                    RenameVersion(versions_, entry.id, renameText_);
+                    SaveVersions(versionsRoot_, versions_);
+                } catch (const std::exception& failure) {
+                    versionsError_ = failure.what();
+                }
+                renamingVersion_.clear();
+            }
+        } else {
+            ImGui::PushFont(nullptr, style.FontSizeBase * 1.1f);
+            ImGui::TextUnformatted(Elide(entry.Label(), textWidth).c_str());
+            ImGui::PopFont();
+            if (entry.Local() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ToUtf8(entry.folder).c_str());
+        }
+        // A dot and the state, then where it comes from.
+        {
+            const ImVec4 state = probe.runtime ? Green : Amber;
+            const ImVec2 dot = ImGui::GetCursorScreenPos();
+            const float r = 3.5f * s;
+            draw->AddCircleFilled(ImVec2(dot.x + r, dot.y + ImGui::GetTextLineHeight() * 0.5f), r, ImGui::GetColorU32(state));
+            ImGui::Dummy(ImVec2(r * 2.0f + 2.0f * s, ImGui::GetTextLineHeight()));
+            ImGui::SameLine(0.0f, 4.0f * s);
+            ImGui::TextColored(state, "%s", probe.runtime ? "Ready" : "Not usable");
+            if (ImGui::IsItemHovered()) {
+                if (probe.runtime) {
+                    ImGui::SetTooltip("%s, %zu runtime libraries%s", probe.runtime->layout.c_str(), probe.runtime->libraries.size(),
+                                      selected && !anyps5_.version.empty() ? ("\nrelinker " + anyps5_.version).c_str() : "");
+                } else {
+                    ImGui::SetTooltip("%s", probe.problem.c_str());
+                }
+            }
+            ImGui::SameLine(0.0f, 6.0f * s);
+            const std::string from = entry.Local() ? "Your own build  \xC2\xB7  " + ToUtf8(entry.folder) : entry.repository;
+            ImGui::TextColored(Dim, "\xC2\xB7  %s", Elide(from, std::max(0.0f, at.x + width - pad - actions - style.ItemSpacing.x * 2.0f - ImGui::GetCursorScreenPos().x)).c_str());
+        }
+        ImGui::EndGroup();
+
+        ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - actions, buttonY));
+        if (selected) {
+            // "In use", centred where Use would be.
+            const ImVec2 text = ImGui::CalcTextSize("In use");
+            const float pillWidth = text.x + 16.0f * s;
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - more - style.ItemSpacing.x - pillWidth, at.y + (height - text.y - 4.0f * s) * 0.5f));
+            Pill("In use", Accent);
+        } else if (probe.runtime) {
+            ImGui::BeginDisabled(busy);
+            if (PrimaryButton("Use", ImVec2(use, 0))) SelectVersion(entry.id);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", busy ? "Wait for the game or the job to end" : "Games installed from now on are relinked with this one");
+        }
+        ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - more, buttonY));
+        if (ImGui::Button("##more", ImVec2(more, more))) ImGui::OpenPopup("version-menu");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "More");
+        {
+            // Three dots on the menu button.
+            const ImVec2 b = ImGui::GetItemRectMin();
+            const ImU32 dots = ImGui::GetColorU32(ImGuiCol_Text);
+            for (int i = -1; i <= 1; ++i) draw->AddCircleFilled(ImVec2(b.x + more * 0.5f + static_cast<float>(i) * 5.0f * s, b.y + more * 0.5f), 1.8f * s, dots);
+        }
+        if (ImGui::BeginPopup("version-menu")) {
+            if (entry.Local()) {
+                if (ImGui::MenuItem("Rename", nullptr, false, renamingVersion_.empty())) {
+                    renamingVersion_ = entry.id;
+                    renameText_ = entry.name.empty() ? entry.Label() : entry.name;
+                    renameFocus_ = true;
+                }
+            }
+            if (ImGui::MenuItem("Open folder")) OpenFolder(entry.folder);
+            if (!entry.Local() && ImGui::MenuItem("Release page")) {
+                SDL_OpenURL(("https://github.com/" + entry.repository + "/releases/tag/" + entry.tag).c_str());
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(entry.Local() ? "Forget" : "Delete", nullptr, false, !busy && !selected)) remove = entry.id;
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", selected ? "Use another version first" : entry.Local() ? "Takes it off the list; the folder stays" : "Deletes the downloaded folder");
+            }
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopID();
+        ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + height));
+        ImGui::Dummy(ImVec2(width, 8.0f * s));
+    }
+
+    // The releases of the chosen repository: one row each, newest first.
+    void DrawReleaseList(float inner, bool busy) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const float row = ImGui::GetFrameHeight() + 12.0f * s;
+        const float shown = std::min(ImGui::GetFontSize() * 16.0f, row * static_cast<float>(releases_->releases.size()));
+        ImGui::BeginChild("releases", ImVec2(inner, shown), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        const auto newest = NewestRelease(releases_->releases);
+        const float action = ImGui::CalcTextSize("Download  \xC2\xB7  999.9 MiB").x + style.FramePadding.x * 2.0f + 8.0f * s;
+        for (const auto& release : releases_->releases) {
+            ImGui::PushID(release.tag.c_str());
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const float width = ImGui::GetContentRegionAvail().x;
+            auto* draw = ImGui::GetWindowDrawList();
+            // A row lights up under the mouse.
+            ImGui::SetNextItemAllowOverlap();
+            ImGui::InvisibleButton("##row", ImVec2(width, row - 4.0f * s));
+            if (ImGui::IsItemHovered()) draw->AddRectFilled(at, ImVec2(at.x + width, at.y + row - 4.0f * s), ImGui::GetColorU32(Fade(WindowColor, 0.7f)), 8.0f * s);
+            const float y = at.y + (row - 4.0f * s - ImGui::GetFrameHeight()) * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(at.x + 10.0f * s, y));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(release.tag.c_str());
+            if (newest && newest->tag == release.tag) {
+                ImGui::SameLine();
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + style.FramePadding.y - 2.0f * s);
+                Pill("Latest", Green);
+            }
+            if (release.prerelease) {
+                ImGui::SameLine();
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + style.FramePadding.y - 2.0f * s);
+                Pill("Pre-release", Amber);
+            }
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - action - ImGui::GetFontSize() * 6.5f, y));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextColored(Dim, "%s", release.publishedAt.substr(0, 10).c_str());
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - action, y));
+            std::string problem;
+            const auto files = FilesFor(release, &problem);
+            if (IsInstalled(releases_->repository, release.tag)) {
+                ImGui::SetCursorScreenPos(ImVec2(at.x + width - action, y + style.FramePadding.y - 2.0f * s));
+                Pill("Installed", Dim);
+            } else if (!files) {
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextColored(Dim, "not for this system");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", problem.c_str());
+            } else {
+                ImGui::BeginDisabled(busy);
+                const auto label = "Download  \xC2\xB7  " + FormatBytes(files->relinker.size + files->runtime.size);
+                if (ImGui::Button(label.c_str(), ImVec2(action - 4.0f * s, 0))) StartDownload(releases_->repository, release);
+                ImGui::EndDisabled();
+            }
+            ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + row));
+            ImGui::PopID();
+        }
+        ImGui::Dummy(ImVec2(0, 0));
+        ImGui::EndChild();
+    }
+
     void DrawVersions() {
         if (openVersions_) {
             ImGui::OpenPopup("AnyPS5 versions");
@@ -5486,93 +5697,11 @@ private:
         ImGui::BeginChild("versions-body", ImVec2(0, -footer));
 
         std::string remove;
-        Section("installed", "Installed", nullptr, [&] {
-            if (versions_.versions.empty()) ImGui::TextColored(Dim, "None yet. Download a release below, or add your own build.");
-            const float actions = ImGui::GetFontSize() * 10.5f;
-            if (!versions_.versions.empty() && ImGui::BeginTable("versions", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_PadOuterX)) {
-                ImGui::TableSetupColumn("version", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 11.0f);
-                ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, actions);
-                for (const auto& entry : versions_.versions) {
-                    ImGui::PushID(entry.id.c_str());
-                    const bool selected = entry.id == settings_.anyps5Version;
-                    const auto& probe = ProbeFor(entry);
-                    ImGui::TableNextRow(ImGuiTableRowFlags_None, ImGui::GetFrameHeight() * 2.0f);
-                    if (selected) ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(Fade(Accent, 0.10f)));
-                    ImGui::TableNextColumn();
-                    if (entry.Local() && renamingVersion_ == entry.id) {
-                        // Naming it in place: Enter or clicking away keeps the name, Esc drops it.
-                        ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * 16.0f));
-                        if (ImGui::IsWindowAppearing() || renameFocus_) {
-                            ImGui::SetKeyboardFocusHere();
-                            renameFocus_ = false;
-                        }
-                        const bool entered = ImGui::InputTextWithHint("##name", "A name for this build", &renameText_, ImGuiInputTextFlags_EnterReturnsTrue);
-                        if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-                            renamingVersion_.clear();
-                        } else if (entered || ImGui::IsItemDeactivated()) {
-                            try {
-                                RenameVersion(versions_, entry.id, renameText_);
-                                SaveVersions(versionsRoot_, versions_);
-                            } catch (const std::exception& failure) {
-                                versionsError_ = failure.what();
-                            }
-                            renamingVersion_.clear();
-                        }
-                    } else {
-                        ImGui::PushFont(nullptr, style.FontSizeBase * 1.08f);
-                        ImGui::TextUnformatted(entry.Label().c_str());
-                        ImGui::PopFont();
-                        if (entry.Local() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ToUtf8(entry.folder).c_str());
-                    }
-                    if (entry.Local()) {
-                        ImGui::TextColored(Dim, "%s", "Your own build");
-                        ImGui::SameLine();
-                        ImGui::BeginDisabled(!renamingVersion_.empty());
-                        if (ImGui::SmallButton("Rename")) {
-                            renamingVersion_ = entry.id;
-                            renameText_ = entry.name.empty() ? entry.Label() : entry.name;
-                            renameFocus_ = true;
-                        }
-                        ImGui::EndDisabled();
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Open folder")) OpenFolder(entry.folder);
-                    } else {
-                        ImGui::TextColored(Dim, "%s", Elide(entry.repository, ImGui::GetContentRegionAvail().x).c_str());
-                    }
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    if (probe.runtime) {
-                        Pill("Ready", Green);
-                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s, %zu runtime libraries%s", probe.runtime->layout.c_str(), probe.runtime->libraries.size(),
-                                                                      selected && !anyps5_.version.empty() ? ("\nrelinker " + anyps5_.version).c_str() : "");
-                    } else {
-                        Pill("Not usable", Amber);
-                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", probe.problem.c_str());
-                    }
-                    ImGui::TableNextColumn();
-                    const float half = (actions - style.ItemSpacing.x) * 0.5f;
-                    if (selected) {
-                        Pill("Selected", Accent);
-                    } else if (probe.runtime) {
-                        ImGui::BeginDisabled(busy);
-                        if (PrimaryButton("Use", ImVec2(half, 0))) SelectVersion(entry.id);
-                        ImGui::EndDisabled();
-                    } else {
-                        ImGui::Dummy(ImVec2(half, ImGui::GetFrameHeight()));
-                    }
-                    ImGui::SameLine(half + style.ItemSpacing.x + ImGui::GetCursorStartPos().x);
-                    ImGui::BeginDisabled(busy || selected);
-                    if (ImGui::Button(entry.Local() ? "Forget" : "Delete", ImVec2(half, 0))) remove = entry.id;
-                    ImGui::EndDisabled();
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        ImGui::SetTooltip("%s", selected ? "Select another version first" : entry.Local() ? "Removes it from the list; the folder stays" : "Deletes the downloaded folder");
-                    }
-                    ImGui::PopID();
-                }
-                ImGui::EndTable();
-            }
-        });
+        GroupLabel("Installed");
+        if (versions_.versions.empty()) {
+            CardBlock("none", [&](float) { ImGui::TextColored(Dim, "%s", "None yet. Download a release below, or add your own build."); });
+        }
+        for (const auto& entry : versions_.versions) DrawVersionCard(entry, busy, remove);
         if (!remove.empty()) {
             try {
                 RemoveVersion(versionsRoot_, versions_, remove);
@@ -5582,8 +5711,22 @@ private:
             }
         }
 
-        Section("download", "Download a release", "From boykopovar/AnyPS5, or a fork that publishes releases the same way.", [&] {
-            ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x * 0.45f, ImGui::GetFontSize() * 18));
+        GroupLabel("Get another version");
+        CardBlock("download", [&](float inner) {
+            // Title and source on one line: the repository list and Load on the right.
+            const float load = ImGui::CalcTextSize("Load releases").x + style.FramePadding.x * 4.0f;
+            const float combo = std::min(inner * 0.42f, ImGui::GetFontSize() * 15.0f);
+            const float top = ImGui::GetCursorPosY();
+            ImGui::BeginGroup();
+            ImGui::TextUnformatted("Download a release");
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + inner - combo - load - style.ItemSpacing.x * 3.0f);
+            ImGui::TextColored(Dim, "%s", "From boykopovar/AnyPS5, or a fork that publishes releases the same way.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndGroup();
+            const float textHeight = ImGui::GetItemRectSize().y;
+            const float left = ImGui::GetItemRectMin().x - ImGui::GetWindowPos().x + ImGui::GetScrollX();
+            ImGui::SetCursorPos(ImVec2(left + inner - combo - load - style.ItemSpacing.x, top + (textHeight - ImGui::GetFrameHeight()) * 0.5f));
+            ImGui::SetNextItemWidth(combo);
             if (ImGui::BeginCombo("##repository", releasesRepository_.c_str())) {
                 if (ImGui::Selectable(OfficialRepository, releasesRepository_ == OfficialRepository)) releasesRepository_ = OfficialRepository;
                 for (const auto& repository : versions_.repositories) {
@@ -5593,8 +5736,9 @@ private:
             }
             ImGui::SameLine();
             ImGui::BeginDisabled(releasesLoader_.Running());
-            if (PrimaryButton(releasesLoader_.Running() ? "Loading..." : "Load releases")) LoadReleases(releasesRepository_, false);
+            if (PrimaryButton(releasesLoader_.Running() ? "Loading..." : "Load releases", ImVec2(load, 0))) LoadReleases(releasesRepository_, false);
             ImGui::EndDisabled();
+            ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), top + textHeight + style.ItemSpacing.y));
 
             if (releases_ && releases_->repository == releasesRepository_) {
                 ImGui::Spacing();
@@ -5602,81 +5746,71 @@ private:
                     ImGui::TextColored(Red, "%s", releases_->error.c_str());
                 } else if (releases_->releases.empty()) {
                     ImGui::TextColored(Amber, "%s has no releases. Build it and add it under \"Your own build\".", releases_->repository.c_str());
-                } else if (ImGui::BeginTable("releases", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg,
-                                             ImVec2(0, std::min(ImGui::GetFontSize() * 16.0f, ImGui::GetFrameHeight() * 1.6f * static_cast<float>(releases_->releases.size()) + 4.0f)))) {
-                    ImGui::TableSetupColumn("tag", ImGuiTableColumnFlags_WidthStretch);
-                    ImGui::TableSetupColumn("date", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 6.0f);
-                    ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 10.5f);
-                    const auto newest = NewestRelease(releases_->releases);
-                    for (const auto& release : releases_->releases) {
-                        ImGui::PushID(release.tag.c_str());
-                        ImGui::TableNextRow(ImGuiTableRowFlags_None, ImGui::GetFrameHeight() * 1.6f);
-                        ImGui::TableNextColumn();
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted(release.tag.c_str());
-                        if (newest && newest->tag == release.tag) {
-                            ImGui::SameLine();
-                            Pill("Latest", Green);
-                        }
-                        if (release.prerelease) {
-                            ImGui::SameLine();
-                            Pill("Pre-release", Amber);
-                        }
-                        ImGui::TableNextColumn();
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::TextColored(Dim, "%s", release.publishedAt.substr(0, 10).c_str());
-                        ImGui::TableNextColumn();
-                        std::string problem;
-                        const auto files = FilesFor(release, &problem);
-                        if (IsInstalled(releases_->repository, release.tag)) {
-                            Pill("Installed", Dim);
-                        } else if (!files) {
-                            ImGui::AlignTextToFramePadding();
-                            ImGui::TextColored(Dim, "not for this system");
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", problem.c_str());
-                        } else {
-                            ImGui::BeginDisabled(busy);
-                            const auto label = "Download  " + FormatBytes(files->relinker.size + files->runtime.size);
-                            if (ImGui::Button(label.c_str(), ImVec2(-FLT_MIN, 0))) StartDownload(releases_->repository, release);
-                            ImGui::EndDisabled();
-                        }
-                        ImGui::PopID();
-                    }
-                    ImGui::EndTable();
+                } else {
+                    DrawReleaseList(inner, busy);
                 }
             }
+
+            // Forks: one line, opened by a small button.
             ImGui::Spacing();
-            ImGui::TextColored(Dim, "Add a fork");
-            ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x * 0.45f, ImGui::GetFontSize() * 18));
-            ImGui::InputTextWithHint("##newrepo", "owner/repo", &newRepository_);
-            ImGui::SameLine();
-            ImGui::BeginDisabled(!IsValidRepository(newRepository_));
-            if (ImGui::Button("Add and load")) {
-                if (newRepository_ != OfficialRepository &&
-                    std::find(versions_.repositories.begin(), versions_.repositories.end(), newRepository_) == versions_.repositories.end()) {
-                    versions_.repositories.push_back(newRepository_);
-                    try {
-                        SaveVersions(versionsRoot_, versions_);
-                    } catch (const std::exception& failure) {
-                        versionsError_ = failure.what();
-                    }
+            if (!addingFork_) {
+                if (ChipButton("Add a fork", ChipIcon::Plus, Accent)) {
+                    addingFork_ = true;
+                    forkFocus_ = true;
                 }
-                releasesRepository_ = newRepository_;
-                newRepository_.clear();
-                LoadReleases(releasesRepository_, false);
+                ImGui::SameLine();
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextColored(Dim, "Its releases need relinker-<tag>%s and prx-%s-<tag>%s, as AnyPS5 publishes them.", TargetIsWindows ? ".exe" : "",
+                                   TargetIsWindows ? "windows" : "linux", TargetIsWindows ? ".zip" : ".tar.gz");
+            } else {
+                const float add = ImGui::CalcTextSize("Add and load").x + style.FramePadding.x * 4.0f;
+                const float cancel = ImGui::CalcTextSize("Cancel").x + style.FramePadding.x * 4.0f;
+                ImGui::SetNextItemWidth(std::min(inner - add - cancel - style.ItemSpacing.x * 2.0f, ImGui::GetFontSize() * 18.0f));
+                if (ImGui::IsWindowAppearing() || forkFocus_) {
+                    ImGui::SetKeyboardFocusHere();
+                    forkFocus_ = false;
+                }
+                const bool entered = ImGui::InputTextWithHint("##newrepo", "owner/repo, as on GitHub", &newRepository_, ImGuiInputTextFlags_EnterReturnsTrue);
+                ImGui::SameLine();
+                ImGui::BeginDisabled(!IsValidRepository(newRepository_));
+                const bool addIt = PrimaryButton("Add and load", ImVec2(add, 0)) || (entered && IsValidRepository(newRepository_));
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel", ImVec2(cancel, 0))) {
+                    addingFork_ = false;
+                    newRepository_.clear();
+                }
+                if (addIt) {
+                    if (newRepository_ != OfficialRepository &&
+                        std::find(versions_.repositories.begin(), versions_.repositories.end(), newRepository_) == versions_.repositories.end()) {
+                        versions_.repositories.push_back(newRepository_);
+                        try {
+                            SaveVersions(versionsRoot_, versions_);
+                        } catch (const std::exception& failure) {
+                            versionsError_ = failure.what();
+                        }
+                    }
+                    releasesRepository_ = newRepository_;
+                    newRepository_.clear();
+                    addingFork_ = false;
+                    LoadReleases(releasesRepository_, false);
+                }
             }
-            ImGui::EndDisabled();
-            ImGui::TextColored(Dim, "A fork's releases need relinker-<tag>%s and prx-%s-<tag>%s, as AnyPS5's release workflow publishes them.", TargetIsWindows ? ".exe" : "",
-                               TargetIsWindows ? "windows" : "linux", TargetIsWindows ? ".zip" : ".tar.gz");
         });
 
-        Section("local", "Your own build", "An AnyPS5 clone after a build (build\\core\\relinker), or a release with its libs\\ folder beside the relinker. A fork you built works the same way.", [&] {
-            ImGui::BeginDisabled(busy || Picker().IsOpen());
-            if (ImGui::Button("Choose a relinker...")) Picker().OpenFile(window_, &localPick_, "Relinker", TargetIsWindows ? "exe" : "");
-            ImGui::SameLine();
-            if (ImGui::Button("Choose an AnyPS5 folder...")) Picker().Open(window_, &localPick_);
-            ImGui::EndDisabled();
-        });
+        {
+            const float relinker = ImGui::CalcTextSize("Choose a relinker...").x + style.FramePadding.x * 4.0f;
+            const float folder = ImGui::CalcTextSize("Choose an AnyPS5 folder...").x + style.FramePadding.x * 4.0f;
+            SettingRow("local", "Your own build",
+                       "An AnyPS5 clone after a build (build\\core\\relinker), or a release with its libs\\ folder beside the relinker. A fork you built works the same way.",
+                       relinker + folder + style.ItemSpacing.x, [&] {
+                           ImGui::BeginDisabled(busy || Picker().IsOpen());
+                           if (ImGui::Button("Choose a relinker...", ImVec2(relinker, 0))) Picker().OpenFile(window_, &localPick_, "Relinker", TargetIsWindows ? "exe" : "");
+                           ImGui::SameLine();
+                           if (ImGui::Button("Choose an AnyPS5 folder...", ImVec2(folder, 0))) Picker().Open(window_, &localPick_);
+                           ImGui::EndDisabled();
+                       });
+        }
         ImGui::EndChild();
 
         if (job_.Busy()) ImGui::TextColored(Amber, "%s...", job_.Title().c_str());
@@ -6352,6 +6486,8 @@ private:
     bool renameFocus_ = false;
     SettingsPage settingsPage_ = SettingsPage::Library;
     bool versionsInSettings_ = false;
+    bool addingFork_ = false;  // the "Add a fork" line shows its field
+    bool forkFocus_ = false;
     std::map<std::string, AnyPS5Probe> versionProbes_;
     std::shared_ptr<std::optional<VersionEntry>> downloaded_;
     bool openVersions_ = false;
