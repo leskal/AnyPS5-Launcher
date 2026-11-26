@@ -257,7 +257,7 @@ bool Segmented(const char* id, const char* const* labels, int count, int& curren
     return changed;
 }
 
-enum class ChipIcon { Report, Issue, Log, Plus };
+enum class ChipIcon { Report, Issue, Log, Plus, Folder };
 
 // A pill button with a small icon drawn in code before its label: for actions
 // that sit in a row under some text, like the last run's Make a report.
@@ -299,6 +299,13 @@ bool ChipButton(const char* label, ChipIcon icon, ImVec4 tint) {
         draw->AddCircleFilled(c, u * 0.13f, ink);
         break;
     }
+    case ChipIcon::Folder:
+        // A folder: its tab on top, its body below.
+        draw->AddRect(ImVec2(g.x + u * 0.04f, g.y + u * 0.3f), ImVec2(g.x + u * 0.96f, g.y + u * 0.9f), ink, 1.5f, 0, line);
+        draw->AddLine(ImVec2(g.x + u * 0.04f, g.y + u * 0.3f), ImVec2(g.x + u * 0.12f, g.y + u * 0.12f), ink, line);
+        draw->AddLine(ImVec2(g.x + u * 0.12f, g.y + u * 0.12f), ImVec2(g.x + u * 0.42f, g.y + u * 0.12f), ink, line);
+        draw->AddLine(ImVec2(g.x + u * 0.42f, g.y + u * 0.12f), ImVec2(g.x + u * 0.5f, g.y + u * 0.3f), ink, line);
+        break;
     case ChipIcon::Plus:
         draw->AddLine(ImVec2(g.x + u * 0.5f, g.y + u * 0.12f), ImVec2(g.x + u * 0.5f, g.y + u * 0.88f), ink, line);
         draw->AddLine(ImVec2(g.x + u * 0.12f, g.y + u * 0.5f), ImVec2(g.x + u * 0.88f, g.y + u * 0.5f), ink, line);
@@ -4916,82 +4923,215 @@ private:
             draw->AddRectFilled(at, ImVec2(at.x + art, at.y + art), ImGui::GetColorU32(Placeholder), 12.0f * scale_);
         }
         ImGui::Dummy(ImVec2(art, art));
-        ImGui::Spacing();
+        ImGui::Dummy(ImVec2(0, 4.0f * scale_));
+
+        // The name, then small chips: platform, serial, version, kind of copy.
         ImGui::PushFont(nullptr, style.FontSizeBase * 1.35f);
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextUnformatted(game.metadata.name.c_str());
         ImGui::PopTextWrapPos();
         ImGui::PopFont();
-        ImGui::TextColored(Dim, "%s  \xC2\xB7  v%s  \xC2\xB7  %s", game.metadata.titleId.c_str(), game.metadata.contentVersion.c_str(), ToString(game.format).data());
+        {
+            const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+            bool first = true;
+            const auto chip = [&](const std::string& text, ImVec4 color, const char* tip) {
+                const float w = ImGui::CalcTextSize(text.c_str()).x + 16.0f * ImGui::GetStyle().FontScaleDpi;
+                if (!first) {
+                    ImGui::SameLine(0.0f, 6.0f * scale_);
+                    if (ImGui::GetCursorScreenPos().x + w > right) ImGui::NewLine();
+                }
+                first = false;
+                Pill(text.c_str(), color);
+                if (tip != nullptr && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
+            };
+            if (const auto platform = PlatformOf(game.metadata.titleId); !platform.empty()) chip(platform, Accent, nullptr);
+            chip(game.metadata.titleId, Dim, "Title ID");
+            if (!game.metadata.contentVersion.empty()) chip("v" + game.metadata.contentVersion, Dim, "The game's version");
+            chip(std::string(ToString(game.format)), Dim, game.format == PackageFormat::Zar ? "A .zar archive: the launcher reads it without unpacking" : "A game folder");
+            const auto badge = BadgeFor(game);
+            if (badge.text != nullptr) chip(badge.text, badge.color, nullptr);
+        }
         if (GroupByTitleId(result_.games).at(game.metadata.titleId).size() > 1) {
             Pill("Another copy of this game is in the list", Amber);
         }
-        ImGui::Spacing();
+        ImGui::Dummy(ImVec2(0, 6.0f * scale_));
 
-        // Primary actions.
+        // The main action, big, with a menu button for everything else beside it.
         const auto* manifest = InstallFor(game);
         const float full = ImGui::GetContentRegionAvail().x;
-        const float buttonHeight = ImGui::GetFrameHeight() * 1.35f;
+        const float buttonHeight = ImGui::GetFrameHeight() * 1.5f;
+        const float menuWidth = buttonHeight;
+        const float mainWidth = full - menuWidth - style.ItemSpacing.x;
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f * scale_);
+        std::string hint;
+        ImVec4 hintColor = Dim;
+        const ImVec2 mainAt = ImGui::GetCursorScreenPos();
+        bool mainGlyph = false;
         if (IsRunning(game)) {
-            if (PrimaryButton("Stop", ImVec2(full, buttonHeight))) session_->Stop();
+            if (PrimaryButton("Stop", ImVec2(mainWidth, buttonHeight))) session_->Stop();
         } else if (manifest != nullptr) {
             const auto reason = PlayBlocker(game);
             ImGui::BeginDisabled(!reason.empty());
-            if (PrimaryButton("Play", ImVec2(full, buttonHeight))) Play(game);
+            if (PrimaryButton("Play", ImVec2(mainWidth, buttonHeight))) Play(game);
             ImGui::EndDisabled();
             if (!reason.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", reason.c_str());
+            mainGlyph = true;
         } else {
             const bool needsConversion = game.format == PackageFormat::Folder && (game.executable.kind == ExecutableKind::Self || game.modules.self > 0);
             if (needsConversion) {
                 ImGui::BeginDisabled(job_.Busy());
-                if (PrimaryButton("Convert SELF to ELF", ImVec2(full, buttonHeight))) StartConvertSelf(game);
+                if (PrimaryButton("Convert SELF to ELF", ImVec2(mainWidth, buttonHeight))) StartConvertSelf(game);
                 ImGui::EndDisabled();
-                ImGui::PushTextWrapPos(0.0f);
-                ImGui::TextColored(Dim, "Needed before Install; the originals are zipped first.");
-                ImGui::PopTextWrapPos();
+                hint = "Needed before Install; the originals are zipped first.";
             } else {
                 const auto reason = InstallBlocker(game);
                 ImGui::BeginDisabled(!reason.empty());
-                if (PrimaryButton("Install", ImVec2(full, buttonHeight))) StartInstall(game);
+                if (PrimaryButton("Install", ImVec2(mainWidth, buttonHeight))) StartInstall(game);
                 ImGui::EndDisabled();
-                if (!reason.empty()) {
-                    ImGui::PushTextWrapPos(0.0f);
-                    ImGui::TextColored(Amber, "%s", reason.c_str());
-                    ImGui::PopTextWrapPos();
-                }
+                hint = reason;
+                hintColor = Amber;
             }
         }
-        const float half = (full - style.ItemSpacing.x) * 0.5f;
-        if (ImGui::Button("Trophies", ImVec2(half, 0))) OpenTrophies();
+        if (mainGlyph) {
+            // A play triangle before the word.
+            auto* list = ImGui::GetWindowDrawList();
+            const float h = ImGui::GetFontSize() * 0.62f;
+            const float textWidth = ImGui::CalcTextSize("Play").x;
+            const float x = mainAt.x + (mainWidth - textWidth) * 0.5f - h - 8.0f * scale_;
+            const float y = mainAt.y + buttonHeight * 0.5f;
+            list->AddTriangleFilled(ImVec2(x, y - h * 0.6f), ImVec2(x + h * 0.9f, y), ImVec2(x, y + h * 0.6f), IM_COL32(255, 255, 255, 255));
+        }
         ImGui::SameLine();
-        if (ImGui::Button("Screenshots", ImVec2(half, 0))) OpenScreenshots(game);
-        if (ImGui::Button("Controls", ImVec2(half, 0))) OpenControls(game);
-        ImGui::SameLine();
-        if (ImGui::Button("Game settings", ImVec2(half, 0))) OpenGameSettings(game);
-        if (ImGui::Button("All actions...", ImVec2(full, 0))) ImGui::OpenPopup("details-actions");
+        if (ImGui::Button("##details-more", ImVec2(menuWidth, buttonHeight))) ImGui::OpenPopup("details-actions");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "All actions");
+        {
+            const ImVec2 b = ImGui::GetItemRectMin();
+            auto* list = ImGui::GetWindowDrawList();
+            for (int i = -1; i <= 1; ++i) {
+                list->AddCircleFilled(ImVec2(b.x + menuWidth * 0.5f + static_cast<float>(i) * 6.0f * scale_, b.y + buttonHeight * 0.5f), 2.0f * scale_, ImGui::GetColorU32(ImGuiCol_Text));
+            }
+        }
+        ImGui::PopStyleVar();
         if (ImGui::BeginPopup("details-actions")) {
             DrawActionItems(game);
             ImGui::EndPopup();
         }
-
-        ImGui::Spacing();
-        ImGui::SeparatorText("Status");
-        DrawStatus(game);
-        ImGui::SeparatorText("Trophies");
-        DrawTrophySummary(game);
-        ImGui::SeparatorText("Store");
-        DrawStore(game);
-        if (!game.changes.empty()) {
-            ImGui::SeparatorText("What's new");
-            DrawChanges(game);
+        if (!hint.empty()) {
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(hintColor, "%s", hint.c_str());
+            ImGui::PopTextWrapPos();
         }
-        ImGui::SeparatorText("Executable");
-        DrawExecutable(game);
-        ImGui::SeparatorText("Location");
+
+        // Four tiles, each with its icon.
+        const float half = (full - style.ItemSpacing.x) * 0.5f;
+        const float tile = ImGui::GetFrameHeight() * 1.25f;
+        if (ActionTile("Trophies", DetailGlyph::Trophy, ImVec2(half, tile))) OpenTrophies();
+        ImGui::SameLine();
+        if (ActionTile("Screenshots", DetailGlyph::Picture, ImVec2(half, tile))) OpenScreenshots(game);
+        if (ActionTile("Controls", DetailGlyph::Pad, ImVec2(half, tile))) OpenControls(game);
+        ImGui::SameLine();
+        if (ActionTile("Game settings", DetailGlyph::Sliders, ImVec2(half, tile))) OpenGameSettings(game);
+        ImGui::Dummy(ImVec2(0, 6.0f * scale_));
+
+        // The facts, each group in its own card.
+        InfoCard("status", "Status", [&] { DrawStatus(game); });
+        InfoCard("trophies", "Trophies", [&] { DrawTrophySummary(game); });
+        InfoCard("store", "Store", [&] { DrawStore(game); });
+        if (!game.changes.empty()) InfoCard("changes", "What's new", [&] { DrawChanges(game); });
+        InfoCard("files", "Files", [&] {
+            DrawExecutable(game);
+            ImGui::Dummy(ImVec2(0, 2.0f * scale_));
+            const auto where = game.home.empty() ? game.location : game.home;
+            ImGui::TextColored(Dim, "%s", ToUtf8(where).c_str());
+            if (game.format == PackageFormat::Zar && game.layout == ZarLayout::Nested) ImGui::TextColored(Amber, "The game is inside a folder of the archive");
+            ImGui::Dummy(ImVec2(0, 2.0f * scale_));
+            if (ChipButton("Open folder", ChipIcon::Folder, ImGui::GetStyle().Colors[ImGuiCol_Text])) {
+                OpenFolder(std::filesystem::is_directory(where) ? where : where.parent_path());
+            }
+        });
+    }
+
+    enum class DetailGlyph { Trophy, Picture, Pad, Sliders };
+
+    // A button with an icon and its label on the left, for the details panel's tiles.
+    bool ActionTile(const char* label, DetailGlyph glyph, ImVec2 size) {
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(label, size);
+        const bool hovered = ImGui::IsItemHovered();
+        const bool held = ImGui::IsItemActive();
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec4 back = held ? style.Colors[ImGuiCol_ButtonActive] : hovered ? style.Colors[ImGuiCol_ButtonHovered] : style.Colors[ImGuiCol_Button];
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(back), 10.0f * s);
+        if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible) {
+            draw->AddRect(ImVec2(at.x - 2, at.y - 2), ImVec2(at.x + size.x + 2, at.y + size.y + 2), ImGui::GetColorU32(ImGuiCol_NavCursor), 12.0f * s, 0, 2.0f);
+        }
+        const float g = ImGui::GetFontSize() * 0.95f;
+        const ImVec2 c(at.x + 12.0f * s + g * 0.5f, at.y + size.y * 0.5f);
+        const ImU32 ink = ImGui::GetColorU32(hovered ? Accent : Dim);
+        const float line = 1.6f * s;
+        const float u = g * 0.5f;
+        switch (glyph) {
+        case DetailGlyph::Trophy:
+            // A cup on a stem.
+            draw->PathArcTo(ImVec2(c.x, c.y - u * 0.55f), u * 0.62f, 0.0f, 3.14159f, 12);
+            draw->PathLineTo(ImVec2(c.x - u * 0.62f, c.y - u * 0.85f));
+            draw->PathLineTo(ImVec2(c.x + u * 0.62f, c.y - u * 0.85f));
+            draw->PathStroke(ink, ImDrawFlags_Closed, line);
+            draw->AddLine(ImVec2(c.x, c.y + u * 0.07f), ImVec2(c.x, c.y + u * 0.6f), ink, line);
+            draw->AddLine(ImVec2(c.x - u * 0.4f, c.y + u * 0.75f), ImVec2(c.x + u * 0.4f, c.y + u * 0.75f), ink, line);
+            break;
+        case DetailGlyph::Picture:
+            // A frame with a hill and a sun.
+            draw->AddRect(ImVec2(c.x - u * 0.9f, c.y - u * 0.7f), ImVec2(c.x + u * 0.9f, c.y + u * 0.7f), ink, 2.0f * s, 0, line);
+            draw->AddLine(ImVec2(c.x - u * 0.7f, c.y + u * 0.45f), ImVec2(c.x - u * 0.15f, c.y - u * 0.1f), ink, line);
+            draw->AddLine(ImVec2(c.x - u * 0.15f, c.y - u * 0.1f), ImVec2(c.x + u * 0.7f, c.y + u * 0.45f), ink, line);
+            draw->AddCircleFilled(ImVec2(c.x + u * 0.45f, c.y - u * 0.32f), u * 0.14f, ink);
+            break;
+        case DetailGlyph::Pad:
+            // A controller's outline with a cross and two buttons.
+            draw->AddRect(ImVec2(c.x - u * 0.95f, c.y - u * 0.5f), ImVec2(c.x + u * 0.95f, c.y + u * 0.55f), ink, u * 0.45f, 0, line);
+            draw->AddLine(ImVec2(c.x - u * 0.62f, c.y), ImVec2(c.x - u * 0.22f, c.y), ink, line);
+            draw->AddLine(ImVec2(c.x - u * 0.42f, c.y - u * 0.2f), ImVec2(c.x - u * 0.42f, c.y + u * 0.2f), ink, line);
+            draw->AddCircleFilled(ImVec2(c.x + u * 0.35f, c.y + u * 0.08f), u * 0.1f, ink);
+            draw->AddCircleFilled(ImVec2(c.x + u * 0.58f, c.y - u * 0.12f), u * 0.1f, ink);
+            break;
+        case DetailGlyph::Sliders:
+            // Three lines with a knob each.
+            for (int i = 0; i < 3; ++i) {
+                const float y = c.y + (static_cast<float>(i) - 1.0f) * u * 0.6f;
+                draw->AddLine(ImVec2(c.x - u * 0.85f, y), ImVec2(c.x + u * 0.85f, y), ink, line);
+                const float knob = c.x + (i == 0 ? 0.35f : i == 1 ? -0.4f : 0.1f) * u;
+                draw->AddCircleFilled(ImVec2(knob, y), u * 0.2f, ink);
+            }
+            break;
+        }
+        const ImVec2 text = ImGui::CalcTextSize(label);
+        draw->AddText(ImVec2(at.x + 12.0f * s + g + 10.0f * s, at.y + (size.y - text.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), label);
+        return pressed;
+    }
+
+    // A rounded card in the details panel: a small dim title over its contents.
+    template <typename Body>
+    void InfoCard(const char* id, const char* title, Body body) {
+        const float s = scale_;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, Fade(WindowColor, 0.55f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f * s, 12.0f * s));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f * s);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+        ImGui::BeginChild(id, ImVec2(-FLT_MIN, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextColored(Dim, "%s", ToUtf8(game.home.empty() ? game.location : game.home).c_str());
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.92f);
+        ImGui::TextColored(Dim, "%s", title);
+        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, 2.0f * s));
+        body();
         ImGui::PopTextWrapPos();
-        if (game.format == PackageFormat::Zar && game.layout == ZarLayout::Nested) ImGui::TextColored(Amber, "The game is inside a folder of the archive");
+        ImGui::EndChild();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 4.0f * s));
     }
 
     static void DrawExecutable(const GameEntry& game) {
