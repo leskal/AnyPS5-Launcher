@@ -2841,7 +2841,25 @@ private:
             } else {
                 ImGui::TextColored(Amber, "%s", "No games there yet. You can still go on and add them later.");
             }
-            canGoOn = !draft_.gamesFolder.empty();
+            // PS4 trophy lists are encrypted: the user's own key opens them. Optional,
+            // and it can be set later in Settings > Games.
+            ImGui::Dummy(ImVec2(0, 16 * s));
+            label("PS4 trophy key (optional)");
+            const bool keyValid = draft_.ps4TrophyKey.empty() || ParseTrophyKey(draft_.ps4TrophyKey).has_value();
+            {
+                const char* note = draft_.ps4TrophyKey.empty() ? "Opens the encrypted trophy lists of PS4 games: your console's key, 32 hex digits. The launcher doesn't include one. Leave it empty to skip; Settings > Games has it too."
+                                   : keyValid                 ? "Set. PS4 trophy lists will show their names and grades."
+                                                              : "Not a key: it needs 32 hex digits (0-9, A-F). Fix it or empty it to go on.";
+                const float field = std::min(ImGui::GetFontSize() * 17.0f, width * 0.45f);
+                SettingRow("setup-ps4key", "Trophy key", note, field, [&] {
+                    const float eye = ImGui::GetFrameHeight();
+                    ImGui::SetNextItemWidth(field - eye - style.ItemSpacing.x);
+                    ImGui::InputTextWithHint("##setup-ps4key", "32 hex digits", &draft_.ps4TrophyKey, showTrophyKey_ ? ImGuiInputTextFlags_None : ImGuiInputTextFlags_Password);
+                    ImGui::SameLine();
+                    if (EyeButton("##setup-eye", showTrophyKey_)) showTrophyKey_ = !showTrophyKey_;
+                });
+            }
+            canGoOn = !draft_.gamesFolder.empty() && keyValid;
         } else if (setupStep_ == 2) {
             title("AnyPS5", "The relinker that converts games, and the libraries they run on. Get the official release, or point to a build of your own. More versions can be added later.");
             const bool busy = job_.Busy() || releasesLoader_.Running();
@@ -2964,24 +2982,28 @@ private:
             const std::string version = anyps5_.probe.runtime ? CurrentVersionLabel() : std::string("not yet, set it up later under AnyPS5 versions");
             const std::string look = std::string(draft_.theme == "dark" ? "Dark" : draft_.theme == "light" ? "Light" : "Follows Windows") + ", " +
                                      (draft_.view == "home" ? "home row" : "grid");
-            const std::pair<const char*, std::string> rows[] = {{"Games", games + found}, {"AnyPS5", version}, {"Look", look}};
+            const std::string key = draft_.ps4TrophyKey.empty() ? std::string("not set (optional; Settings > Games)") : std::string("set");
+            const std::pair<const char*, std::string> rows[] = {{"Games", games + found}, {"AnyPS5", version}, {"Look", look}, {"PS4 trophies", key}};
+            constexpr int rowCount = 4;
             auto* draw = ImGui::GetWindowDrawList();
-            draw->AddRectFilled(at, ImVec2(at.x + width, at.y + row * 3 + 12 * s), ImGui::GetColorU32(Card), 12 * s);
-            for (int i = 0; i < 3; ++i) {
+            draw->AddRectFilled(at, ImVec2(at.x + width, at.y + row * rowCount + 12 * s), ImGui::GetColorU32(Card), 12 * s);
+            for (int i = 0; i < rowCount; ++i) {
                 const float y = at.y + 6 * s + static_cast<float>(i) * row;
+                const bool skipped = i == 3 && draft_.ps4TrophyKey.empty();  // optional: a dim dot, not a warning
                 const bool ok = i != 1 || anyps5_.probe.runtime;
                 const ImVec2 c(at.x + 22 * s, y + row * 0.5f);
-                draw->AddCircleFilled(c, 8 * s, ImGui::GetColorU32(ok ? Fade(Green, 0.9f) : Fade(Amber, 0.9f)));
-                if (ok) DrawCheck(draw, c, 11 * s, IM_COL32_WHITE, 1.8f * s);
+                draw->AddCircleFilled(c, 8 * s, ImGui::GetColorU32(skipped ? Fade(Dim, 0.5f) : ok ? Fade(Green, 0.9f) : Fade(Amber, 0.9f)));
+                if (skipped) draw->AddLine(ImVec2(c.x - 4 * s, c.y), ImVec2(c.x + 4 * s, c.y), IM_COL32_WHITE, 1.8f * s);
+                else if (ok) DrawCheck(draw, c, 11 * s, IM_COL32_WHITE, 1.8f * s);
                 else draw->AddText(ImVec2(c.x - ImGui::CalcTextSize("!").x * 0.5f, c.y - ImGui::GetTextLineHeight() * 0.5f), IM_COL32_WHITE, "!");
                 const float textY = y + (row - ImGui::GetTextLineHeight()) * 0.5f;
                 draw->AddText(ImVec2(at.x + 40 * s, textY), ImGui::GetColorU32(Dim), rows[i].first);
-                const float valueX = at.x + 120 * s;
+                const float valueX = at.x + 150 * s;
                 draw->PushClipRect(ImVec2(valueX, y), ImVec2(at.x + width - 12 * s, y + row), true);
                 draw->AddText(ImVec2(valueX, textY), ImGui::GetColorU32(ImGuiCol_Text), rows[i].second.c_str());
                 draw->PopClipRect();
             }
-            ImGui::Dummy(ImVec2(width, row * 3 + 12 * s));
+            ImGui::Dummy(ImVec2(width, row * rowCount + 12 * s));
         }
         setupCanGoOn_ = canGoOn;
     }
