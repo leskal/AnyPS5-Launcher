@@ -3115,8 +3115,34 @@ private:
         const float large = small * 1.55f;
         const float gap = 14.0f * scale_;
         const float halo = 14.0f * scale_;  // room for the selected game's glow, so the row does not cut it off
+        // The mouse wheel anywhere on the view moves the selection along the row (down or
+        // right is the next game), and the row follows it: no scroll bar needed.
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)) {
+            const auto& io = ImGui::GetIO();
+            homeWheel_ += -io.MouseWheel - io.MouseWheelH;
+            const int steps = static_cast<int>(homeWheel_);
+            if (steps != 0) {
+                homeWheel_ -= static_cast<float>(steps);
+                std::vector<std::string> keys;
+                for (const auto& game : result_.games) {
+                    if (ContainsFolded(game.metadata.name, search_) || ContainsFolded(game.metadata.titleId, search_)) keys.push_back(ToUtf8(game.location));
+                }
+                if (!keys.empty()) {
+                    const auto at = std::find(keys.begin(), keys.end(), selected_);
+                    const int current = at == keys.end() ? 0 : static_cast<int>(at - keys.begin());
+                    const int next = std::clamp(current + steps, 0, static_cast<int>(keys.size()) - 1);
+                    if (keys[static_cast<std::size_t>(next)] != selected_) {
+                        selected_ = keys[static_cast<std::size_t>(next)];
+                        selected = SelectedGame();
+                    }
+                }
+            }
+        } else {
+            homeWheel_ = 0.0f;
+        }
         ImGui::SetCursorPos(ImVec2(style.WindowPadding.x + 8.0f * scale_ - halo, 16.0f * scale_ - halo));
-        ImGui::BeginChild("home-row", ImVec2(0, large + halo * 2.0f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild("home-row", ImVec2(0, large + halo * 2.0f), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         ImGui::SetCursorPos(ImVec2(halo, halo));
         int index = 0;
         for (const auto& game : result_.games) {
@@ -3127,6 +3153,7 @@ private:
             if (index++ > 0) ImGui::SameLine(0, gap);
             ImGui::PushID(key.c_str());
             const ImVec2 at = ImGui::GetCursorScreenPos();
+            const float localX = ImGui::GetCursorPosX();
             ImGui::InvisibleButton("tile", ImVec2(tile, large));
             if (ImGui::IsItemClicked()) selected_ = key;
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ActivateGame(game);
@@ -3135,7 +3162,16 @@ private:
                 if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown, false) || ImGui::IsKeyPressed(ImGuiKey_Enter, false)) ActivateGame(game);
                 if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) ImGui::OpenPopup("actions");
             }
-            if (isSelected && ImGui::IsWindowAppearing()) ImGui::SetScrollHereX(0.3f);
+            if (isSelected) {
+                // As on the console, the selected game is always the first one on the left: the
+                // row slides there (at once when the view opens), the games before it off the edge.
+                // (Two pixels more, so not even the edge of the game before it shows.)
+                const float target = localX - halo + 2.0f * scale_;
+                const float now = ImGui::GetScrollX();
+                const float step = ImGui::IsWindowAppearing() ? 1.0f : std::min(1.0f, ImGui::GetIO().DeltaTime * 14.0f);
+                if (std::abs(target - now) > 0.5f) ImGui::SetScrollX(now + (target - now) * step);
+                else if (target != now) ImGui::SetScrollX(target);
+            }
             // No right-click menu here: the "..." button beside Play has every action (and so does triangle on a pad).
             if (ImGui::BeginPopup("actions")) {
                 DrawActionItems(game);
@@ -3163,6 +3199,9 @@ private:
             ImGui::PopID();
         }
         if (index == 0) ImGui::TextColored(Dim, "%s", scanned_ ? "No games found. Choose the games folder in Settings." : "Looking for games...");
+        // Room after the last game, so even it can slide to the left edge.
+        ImGui::SameLine(0, 0);
+        ImGui::Dummy(ImVec2(ImGui::GetWindowWidth(), large));
         ImGui::EndChild();
 
         // The selected game: name, facts, the big white button, then cards along the bottom.
@@ -5496,7 +5535,7 @@ private:
             if (ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0))) message_.reset();
         } else if (!drew) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextColored(Dim, "%s", settings_.view == "home" ? "Select a game to see it; double-click to play; \"...\" beside Play for every action."
+            ImGui::TextColored(Dim, "%s", settings_.view == "home" ? "Scroll or click to pick a game; double-click to play; \"...\" beside Play for every action."
                                                                     : "Select a game to see it; double-click to play; right-click for every action.");
         }
     }
@@ -6829,7 +6868,8 @@ private:
     bool renameFocus_ = false;
     SettingsPage settingsPage_ = SettingsPage::Library;
     bool versionsInSettings_ = false;
-    bool addingFork_ = false;  // the "Add a fork" line shows its field
+    bool addingFork_ = false;
+    float homeWheel_ = 0.0f;  // wheel notches not yet turned into a move along the home row  // the "Add a fork" line shows its field
     bool forkFocus_ = false;
     std::map<std::string, AnyPS5Probe> versionProbes_;
     std::shared_ptr<std::optional<VersionEntry>> downloaded_;
