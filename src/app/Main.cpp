@@ -5200,7 +5200,13 @@ private:
         InfoCard("status", "Status", [&] { DrawStatus(game); });
         InfoCard("trophies", "Trophies", [&] { DrawTrophySummary(game); });
         InfoCard("store", "Store", [&] { DrawStore(game); });
-        if (!game.changes.empty()) InfoCard("changes", "What's new", [&] { DrawChanges(game); });
+        // The game's own notes, only when the Store card has none: ORBISPatches gives the
+        // same notes for PS4 updates. (PROSPEROPatches gives none, so PS5 games keep them.)
+        bool storeNotes = false;
+        if (const auto found = online_.find(game.metadata.titleId); found != online_.end() && settings_.onlineInfo) {
+            for (const auto& patch : found->second.patches) storeNotes = storeNotes || !patch.notes.empty();
+        }
+        if (!game.changes.empty() && !storeNotes) InfoCard("changes", "What's new", [&] { DrawChanges(game); });
         InfoCard("files", "Files", [&] {
             DrawExecutable(game);
             ImGui::Dummy(ImVec2(0, 2.0f * scale_));
