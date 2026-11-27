@@ -51,6 +51,7 @@ A desktop frontend for [AnyPS5](https://github.com/boykopovar/AnyPS5): a game li
 - **Links**: `anyps5://play/<title ID>` starts a game and `anyps5://game/<title ID>` shows it, from a shortcut, a browser or Steam (**Copy link** in a game's actions). A launcher that is already open takes the request.
 - **Updates**: the launcher checks its GitHub releases at start (Settings → Launcher) and downloads a new one in the background. "Update ready" in the top bar shows what's new; **Restart now** reopens it in a second, in the same place and on the same game, and otherwise it goes in place when you close the launcher. Releases are built by `.github/workflows/release.yml` for each `v*` tag, with the commit titles since the last tag as their notes.
 - **Open an issue**: after a run that went wrong, opens a new issue on AnyPS5's GitHub with the facts filled in, for you to check and submit.
+- **Languages**: English and Greek are built in. The launcher follows the Windows display language, or the one chosen in **Settings > Appearance > Launcher language**. To add a language, put `lang\<code>.json` next to the exe (for example `lang\es.json`) with `"_name"` for the language's own name and `"English text": "translation"` pairs; `src/core/I18nGreek.inc` lists every text. The same file changes texts of a built-in language. Reports and GitHub issues stay in English.
 
 This is a separate project. It needs no changes to AnyPS5 and talks to it only through its documented command line, runtime layout, environment variables and run report.
 

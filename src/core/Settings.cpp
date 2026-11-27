@@ -70,6 +70,7 @@ LoadedSettings LoadSettings(const std::filesystem::path& file) {
     ReadString(*document, "userdataFolder", result.settings.userdataFolder, result.error);
     ReadString(*document, "profile", result.settings.profile, result.error);
     ReadString(*document, "theme", result.settings.theme, result.error);
+    ReadString(*document, "language", result.settings.language, result.error);
     ReadString(*document, "syncFolder", result.settings.syncFolder, result.error);
     ReadString(*document, "view", result.settings.view, result.error);
     if (result.settings.view != "home") result.settings.view = "grid";
@@ -133,6 +134,8 @@ void SaveSettings(const std::filesystem::path& file, const Settings& settings) {
     document["userdataFolder"] = settings.userdataFolder;
     document["profile"] = settings.profile;
     document["theme"] = settings.theme;
+    if (settings.language.empty()) document.erase("language");
+    else document["language"] = settings.language;
     document["onlineInfo"] = settings.onlineInfo;
     document["trophyPopups"] = settings.trophyPopups;
     document["trophySound"] = settings.trophySound;

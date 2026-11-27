@@ -20,6 +20,7 @@ struct Settings {
     std::string userdataFolder;
     std::string profile;
     std::string theme = "system";  // "system" follows Windows, or "dark" / "light"
+    std::string language;          // the launcher's language: a code ("en", "el"), or empty to follow Windows
     bool onlineInfo = true;        // look up each game's update list on PROSPEROPatches / ORBISPatches
     bool trophyPopups = true;      // a card over the game when it earns a trophy
     bool trophySound = true;       // and a short chime with it

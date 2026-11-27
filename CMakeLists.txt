@@ -38,6 +38,7 @@ add_library(launcher_core STATIC
     src/core/Trophies.cpp
     src/core/PatchInfo.cpp
     src/core/Playtime.cpp
+    src/core/I18n.cpp
     src/core/Profiles.cpp
     src/core/SaveBackup.cpp
     src/core/SaveSync.cpp
@@ -86,6 +87,7 @@ if(LAUNCHER_BUILD_TESTS)
         tests/PatchInfoTests.cpp
         tests/TrophyInputTests.cpp
         tests/FeatureTests.cpp
+        tests/I18nTests.cpp
         tests/ScannerTests.cpp
         tests/SettingsTests.cpp
         tests/UnwrapTests.cpp
