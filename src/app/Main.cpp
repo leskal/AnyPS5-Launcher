@@ -572,8 +572,7 @@ ImVec4 GradeColor(TrophyGrade grade) {
 }
 
 // A trophy cup in the grade's colour, size by size, at the cursor. Hovering it names the grade.
-void DrawTrophyCup(ImDrawList* draw, ImVec2 at, TrophyGrade grade, float size) {
-    const ImU32 color = ImGui::GetColorU32(GradeColor(grade));
+void DrawTrophyCup(ImDrawList* draw, ImVec2 at, ImU32 color, float size) {
     const auto point = [&](float x, float y) { return ImVec2(at.x + x * size, at.y + y * size); };
     // Handles, then the bowl over them, the stem and a two-step base.
     draw->AddCircle(point(0.25f, 0.27f), size * 0.13f, color, 0, size * 0.075f);
@@ -584,6 +583,10 @@ void DrawTrophyCup(ImDrawList* draw, ImVec2 at, TrophyGrade grade, float size) {
     draw->AddRectFilled(point(0.24f, 0.80f), point(0.76f, 0.93f), color, size * 0.03f);
     // A soft shine on the bowl.
     draw->AddRectFilled(point(0.33f, 0.12f), point(0.40f, 0.36f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.35f)), size * 0.035f);
+}
+
+void DrawTrophyCup(ImDrawList* draw, ImVec2 at, TrophyGrade grade, float size) {
+    DrawTrophyCup(draw, at, ImGui::GetColorU32(GradeColor(grade)), size);
 }
 
 void TrophyIcon(TrophyGrade grade, float size) {
@@ -5178,13 +5181,9 @@ private:
         const float line = std::max(1.6f * s, u * 0.16f);
         switch (glyph) {
         case DetailGlyph::Trophy:
-            // A cup on a stem.
-            draw->PathArcTo(ImVec2(c.x, c.y - u * 0.55f), u * 0.62f, 0.0f, 3.14159f, 12);
-            draw->PathLineTo(ImVec2(c.x - u * 0.62f, c.y - u * 0.85f));
-            draw->PathLineTo(ImVec2(c.x + u * 0.62f, c.y - u * 0.85f));
-            draw->PathStroke(ink, ImDrawFlags_Closed, line);
-            draw->AddLine(ImVec2(c.x, c.y + u * 0.07f), ImVec2(c.x, c.y + u * 0.6f), ink, line);
-            draw->AddLine(ImVec2(c.x - u * 0.4f, c.y + u * 0.75f), ImVec2(c.x + u * 0.4f, c.y + u * 0.75f), ink, line);
+            // The trophy lists' cup, a little bigger than the line icons, in their colour (the accent on hover).
+            DrawTrophyCup(draw, ImVec2(c.x - u * 1.15f, c.y - u * 1.15f), ink, u * 2.3f);
+            (void)line;
             break;
         case DetailGlyph::Picture:
             // A frame with a hill and a sun.
