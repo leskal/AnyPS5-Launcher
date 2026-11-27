@@ -6,6 +6,7 @@
 #include "Framework.hpp"
 
 #include "core/Diagnosis.hpp"
+#include "core/FileOps.hpp"
 #include "core/GameSettings.hpp"
 #include "core/Job.hpp"
 #include "core/SaveBackup.hpp"
@@ -399,4 +400,14 @@ TEST(SavesSyncThroughAFolder) {
     // PC 1 gets it back.
     CHECK(launcher::PullSaves(pc1, "PPSA00001", sync, control).action == Action::Pulled);
     CHECK_EQ(ReadText(pc1.Saves("PPSA00001") / "_sd" / "SAVE0" / "data"), std::string("pc2 later"));
+}
+
+// A message with our UTF-8 text and the system's ANSI text after it: the UTF-8 part
+// stays as it is (it was read as ANSI as a whole before, and Greek showed as garbage).
+TEST(ReadableTextKeepsTheUtf8PartOfAMixedMessage) {
+    const std::string utf8 = "cannot move: \xCE\x94\xCE\xB5\xCE\xBD";  // "Δεν"
+    CHECK_EQ(launcher::ReadableText(utf8), utf8);
+    const auto mixed = launcher::ReadableText(utf8 + ": \xC4\xE5\xED");  // "Δεν" in Windows-1253
+    CHECK(mixed.rfind(utf8 + ": ", 0) == 0);
+    CHECK(launcher::ReadableText(mixed) == mixed);  // valid UTF-8 now
 }
