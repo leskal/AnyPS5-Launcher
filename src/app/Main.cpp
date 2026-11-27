@@ -555,7 +555,7 @@ struct TrophyLoad {
     std::optional<TrophySet> set;
 };
 
-// A game's sce_sys/pic0.png, read in the background; empty when it has none.
+// A game's background (sce_sys/pic0.png, else pic1.png), read in the background; empty when it has none.
 struct ArtLoad {
     std::string key;
     std::vector<std::uint8_t> png;
@@ -1226,6 +1226,7 @@ public:
         DrawNewProfile();
         DrawEditProfile();
         DrawLauncherUpdate();
+        DrawCloseConfirm();
         // Options on a controller opens Settings when nothing else is open.
         if (ImGui::IsKeyPressed(ImGuiKey_GamepadStart, false) && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && !session_) OpenSettings();
         DrawGameSettings();
@@ -3372,7 +3373,15 @@ private:
     // ---- links, requests from a second launcher, self-update, issues -----------------
 
 public:
-    bool QuitRequested() const { return quitRequested_; }
+    bool QuitRequested() const { return quitRequested_ || (closeAfterJob_ && !job_.Busy()); }
+
+    // The window's X: closes at once, unless a task (an install, a conversion...) is
+    // running; then the user is asked first.
+    bool CloseRequested() {
+        if (!job_.Busy()) return true;
+        askClose_ = true;
+        return false;
+    }
 
     void SetStartRequest(std::optional<LaunchRequest> request) { pendingRequest_ = std::move(request); }
 
@@ -3535,6 +3544,53 @@ private:
         }
         SDL_DestroyProcess(process);  // it runs on by itself
         quitRequested_ = true;
+    }
+
+    // "A task is running": keep it, or stop it and close once it has stopped.
+    void DrawCloseConfirm() {
+        if (askClose_) {
+            askClose_ = false;
+            if (job_.Busy() && !closeAfterJob_) ImGui::OpenPopup("Close the launcher?");
+        }
+        const auto& style = ImGui::GetStyle();
+        const float s = scale_;
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 30.0f, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f * s, 20.0f * s));
+        if (ImGui::BeginPopupModal("Close the launcher?", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+            if (!job_.Busy()) {
+                // It ended while the question was open: nothing to ask any more.
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PushFont(nullptr, style.FontSizeBase * 1.25f);
+            ImGui::TextUnformatted("A task is still running");
+            ImGui::PopFont();
+            ImGui::Dummy(ImVec2(0, 4.0f * s));
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(Amber, "%s", job_.Title().c_str());
+            const auto& control = job_.Control();
+            if (control.Total() > 0) {
+                ImGui::ProgressBar(static_cast<float>(static_cast<double>(control.Done()) / static_cast<double>(control.Total())), ImVec2(-FLT_MIN, 6.0f * s), "");
+            }
+            ImGui::Dummy(ImVec2(0, 4.0f * s));
+            ImGui::TextColored(Dim, "%s", job_.Cancellable()
+                                              ? "Closing stops it first, as its Cancel button does. Close anyway?"
+                                              : "This task can't be stopped half way: the launcher closes as soon as it ends. Close then?");
+            ImGui::PopTextWrapPos();
+            ImGui::Dummy(ImVec2(0, 10.0f * s));
+            const float buttonHeight = ImGui::GetFrameHeight() * 1.3f;
+            const float buttonWidth = ImGui::GetFontSize() * 9.0f;
+            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - style.WindowPadding.x - buttonWidth * 2.0f - style.ItemSpacing.x);
+            if (ImGui::Button("Keep running", ImVec2(buttonWidth, buttonHeight)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+            ImGui::SameLine();
+            if (PrimaryButton(job_.Cancellable() ? "Stop and close" : "Close when done", ImVec2(buttonWidth, buttonHeight))) {
+                if (job_.Cancellable()) job_.Control().Cancel();
+                closeAfterJob_ = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar();
     }
 
     void DrawLauncherUpdate() {
@@ -4353,7 +4409,14 @@ private:
                 ArtLoad load{key, {}};
                 try {
                     auto package = OpenGamePackage(copy);
-                    if (auto png = package->ReadAll("sce_sys/pic0.png", 32u << 20)) load.png = std::move(*png);
+                    // PS5 games keep their background in pic0.png; many PS4 games have only
+                    // pic1.png (and some dumps write the names in capitals).
+                    for (const char* name : {"sce_sys/pic0.png", "sce_sys/pic1.png", "sce_sys/PIC0.PNG", "sce_sys/PIC1.PNG"}) {
+                        if (auto png = package->ReadAll(name, 32u << 20); png && !png->empty()) {
+                            load.png = std::move(*png);
+                            break;
+                        }
+                    }
                 } catch (const std::exception&) {
                 }
                 return load;
@@ -6927,6 +6990,8 @@ private:
     bool updateApplied_ = false;                    // the new exe is in place
     bool openLauncherUpdate_ = false;
     bool quitRequested_ = false;
+    bool askClose_ = false;       // the window's X was pressed while a task runs
+    bool closeAfterJob_ = false;  // close as soon as the running task has ended
     bool launcherChecked_ = false;
     bool openSetup_ = false;
     int setupStep_ = 0;
@@ -7071,9 +7136,9 @@ int main(int argc, char** argv) {
             while (SDL_PollEvent(&event)) {
                 if (app.TakeEvent(event)) continue;  // a key for the controls window
                 ImGui_ImplSDL3_ProcessEvent(&event);
-                if (event.type == SDL_EVENT_QUIT) done = true;
+                if (event.type == SDL_EVENT_QUIT && app.CloseRequested()) done = true;
                 if (event.type == SDL_EVENT_SYSTEM_THEME_CHANGED) app.ThemeChanged();
-                if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)) done = true;
+                if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window) && app.CloseRequested()) done = true;
             }
             app.Tick();
             if (app.QuitRequested()) done = true;
