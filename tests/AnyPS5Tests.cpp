@@ -581,6 +581,33 @@ TEST(RunFilesDoNotBlockRemovingAnInstall) {
     CHECK(!std::filesystem::exists(home / "anyps5-recipe.json"));
 }
 
+TEST(ARunsTemp0DoesNotBlockRemovingAnInstall) {
+    // The game's files came with a temp0 (from running them before they were set up), and
+    // a run of the installed game made another beside app0: that one gives way.
+    InstallFixture fixture;
+    const auto home = fixture.WriteConvertedGame("PPSA00111");
+    fixture::WriteFolder(home, {{"temp0/old.bin", fixture::Bytes("before")}});
+    FakeRelinker relinker;
+    fixture.Install(fixture.Scan(), relinker);
+    CHECK(std::filesystem::exists(home / "app0" / "temp0" / "old.bin"));
+    fixture::WriteFolder(home, {{"temp0/new.bin", fixture::Bytes("run")}});
+    const auto removed = RemoveInstall(fixture.Scan());
+    CHECK(removed.leftovers.empty());
+    CHECK(std::filesystem::exists(home / "temp0" / "old.bin"));
+    CHECK(!std::filesystem::exists(home / "temp0" / "new.bin"));
+    CHECK(!std::filesystem::exists(home / "app0"));
+}
+
+TEST(OtherFilesInTheWayStopRemovingAnInstall) {
+    InstallFixture fixture;
+    const auto home = fixture.WriteConvertedGame("PPSA00112");
+    FakeRelinker relinker;
+    fixture.Install(fixture.Scan(), relinker);
+    fixture::WriteFolder(home, {{"sce_sys/extra.bin", fixture::Bytes("mine")}});
+    CHECK_THROWS(RemoveInstall(fixture.Scan()));
+    CHECK(std::filesystem::exists(home / "app0" / "eboot.bin"));  // nothing moved
+}
+
 TEST(RemoveInstallPutsEverythingBack) {
     InstallFixture fixture;
     const auto home = fixture.WriteConvertedGame("PPSA00107");

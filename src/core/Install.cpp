@@ -289,6 +289,9 @@ std::vector<std::string> ModuleDirArguments(const std::vector<std::string>& argu
     return folders;
 }
 
+// The game's temporary storage (/temp0), which AnyPS5 keeps beside app0.
+constexpr const char* TempFolderName = "temp0";
+
 // Deletes the run files left in a folder.
 void DropRunFiles(const std::filesystem::path& folder) {
     std::error_code error;
@@ -655,8 +658,21 @@ RemovedInstall RemoveInstall(const GameEntry& game) {
             DropRunFiles(app0);  // left there by an older set-up that moved them in with the game
             DropRunFiles(home);
             const auto names = TopLevelNames(app0);
+            // temp0 is the game's scratch storage, wiped each time the game mounts it: one
+            // made by a run here gives way to the copy that came with the game's files (from
+            // a run before it was set up). Anything else in the way is the player's to sort out.
+            std::vector<std::string> scratch;
             for (const auto& name : names) {
-                if (Exists(home / FromUtf8(name)) && name != App0) throw std::runtime_error(ToUtf8(home / FromUtf8(name)) + " is in the way of the game's own " + name);
+                if (name == App0 || !Exists(home / FromUtf8(name))) continue;
+                if (name == TempFolderName) {
+                    scratch.push_back(name);
+                    continue;
+                }
+                throw std::runtime_error(ToUtf8(home / FromUtf8(name)) + " is in the way of the game's own " + name + "; move one of them away");
+            }
+            for (const auto& name : scratch) {
+                RemoveTree(home / FromUtf8(name));
+                std::erase(result.leftovers, name);
             }
             // The game's own files are moved out first; app0 itself last, in case the game has an app0 entry.
             for (const auto& name : names) {
