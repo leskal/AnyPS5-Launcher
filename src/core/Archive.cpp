@@ -219,8 +219,7 @@ void PackFolderToZar(const std::filesystem::path& folder, const std::filesystem:
 }
 
 void ExtractZarToFolder(const std::filesystem::path& archivePath, std::string_view innerPrefix, const std::filesystem::path& output, JobControl& control) {
-    const auto partial = WithSuffix(output, ".partial");
-    RequireAbsentOutputs(output, partial);
+    RequireAbsentOutputs(output, WithSuffix(output, ".partial"));  // .partial: left by older versions
     const auto archive = ZarArchive::Open(archivePath);
     std::string root(innerPrefix);
     while (!root.empty() && root.back() == '/') root.pop_back();
@@ -231,12 +230,27 @@ void ExtractZarToFolder(const std::filesystem::path& archivePath, std::string_vi
     control.SetTotal(total);
     RequireFreeSpace(output.parent_path(), total);
 
+    // Written straight into the final folder, like ZArchive does: renaming a just-written
+    // folder fails while the antivirus is still scanning its files, which takes long for
+    // a big game. A marker file inside says it isn't finished, so the scan skips it if
+    // the conversion is cut off; it is deleted last.
+    const auto marker = output / UnfinishedExtractMarker;
+    bool created = false;
     try {
-        std::filesystem::create_directory(partial);
+        std::error_code error;
+        if (!std::filesystem::create_directory(output, error)) {
+            throw std::system_error(error ? error : std::make_error_code(std::errc::file_exists), "cannot create " + ToUtf8(output));
+        }
+        created = true;
+        {
+            std::ofstream note(marker, std::ios::binary | std::ios::trunc);
+            note << "AnyPS5 Launcher is extracting " << ToUtf8(archivePath.filename()) << " here. If this file stays, the conversion was cut off: delete the folder.\n";
+            if (!note) throw std::runtime_error("cannot create " + ToUtf8(marker));
+        }
         std::vector<std::uint8_t> buffer;
         for (const auto& item : items) {
             ThrowIfCancelled(control);
-            const auto target = partial / item.relative;
+            const auto target = output / item.relative;
             if (item.isDirectory) {
                 std::filesystem::create_directory(target);
                 continue;
@@ -256,10 +270,14 @@ void ExtractZarToFolder(const std::filesystem::path& archivePath, std::string_vi
             file.close();
             if (!file) throw std::runtime_error("cannot write " + ToUtf8(target));
         }
-        RenameNew(partial, output);
+        RemoveTree(marker);  // waits for the antivirus if it is reading it
     } catch (...) {
-        std::error_code ignored;
-        std::filesystem::remove_all(partial, ignored);
+        if (created) {
+            try {
+                RemoveTree(output);
+            } catch (...) {
+            }
+        }
         throw;
     }
 }

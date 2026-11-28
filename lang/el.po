@@ -2242,6 +2242,10 @@ msgid "Remove the install first"
 msgstr "Αφαιρέστε πρώτα την εγκατάσταση"
 
 #: src/app/Main.cpp
+msgid ".partial is left from a conversion that was cut off; delete it first"
+msgstr ".partial έμεινε από μια μετατροπή που διακόπηκε· διαγράψτε το πρώτα"
+
+#: src/app/Main.cpp
 msgid "Convert .zar to folder"
 msgstr "Μετατροπή .zar σε φάκελο"
 

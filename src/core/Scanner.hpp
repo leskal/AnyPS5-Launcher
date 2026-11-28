@@ -39,6 +39,9 @@ struct ModuleSummary {
 //   app0.zar       the archive, moved here unchanged (.zar game)
 inline constexpr const char* GameHomeMarker = "anyps5-launcher-install.json";
 
+// In a folder while .zar to folder is still writing it: the scan skips such a folder.
+inline constexpr const char* UnfinishedExtractMarker = "anyps5-launcher-extracting";
+
 struct GameEntry {
     std::filesystem::path location;  // the game folder, its app0\ or the .zar
     std::filesystem::path home;      // the set-up folder; empty when not set up

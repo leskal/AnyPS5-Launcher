@@ -216,6 +216,10 @@ private:
 
     bool TryFolder(const std::filesystem::path& folder) {
         std::error_code error;
+        if (std::filesystem::is_regular_file(folder / UnfinishedExtractMarker, error)) {
+            Problem(folder, "an unfinished .zar to folder conversion (it was interrupted); delete this folder and convert again");
+            return true;
+        }
         if (std::filesystem::is_regular_file(folder / GameHomeMarker, error)) {
             if (std::filesystem::is_regular_file(folder / "app0.zar", error)) TryZar(folder / "app0.zar", folder);
             else if (!TryGameFolder(folder / "app0", folder)) Problem(folder, "set up for AnyPS5, but app0\\ holds no game");

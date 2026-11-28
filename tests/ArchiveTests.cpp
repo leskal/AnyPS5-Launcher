@@ -182,6 +182,26 @@ TEST(CancelLeavesNothingBehind) {
     CHECK(!std::filesystem::exists(temp.Path() / "H.partial"));
 }
 
+TEST(ExtractingWritesStraightIntoTheFolder) {
+    fixture::TempDir temp;
+    fixture::WriteZar(temp.Path() / "games" / "E.zar", fixture::Game("PPSA00028", "E"));
+    JobControl control;
+    ExtractZarToFolder(temp.Path() / "games" / "E.zar", "", temp.Path() / "games" / "E", control);
+    CHECK(!std::filesystem::exists(temp.Path() / "games" / "E" / launcher::UnfinishedExtractMarker));
+    CHECK(!std::filesystem::exists(temp.Path() / "games" / "E.partial"));
+
+    // One cut off (the marker still there) isn't listed as a game.
+    fixture::WriteFolder(temp.Path() / "games" / "F", fixture::Game("PPSA00029", "F"));
+    fixture::WriteFolder(temp.Path() / "games" / "F", {{launcher::UnfinishedExtractMarker, fixture::Bytes("")}});
+    const auto result = launcher::Scan({.roots = {temp.Path() / "games"}});
+    std::size_t games = 0;
+    for (const auto& game : result.games) games += game.format == launcher::PackageFormat::Folder ? 1 : 0;
+    CHECK_EQ(games, std::size_t{1});
+    bool reported = false;
+    for (const auto& problem : result.problems) reported = reported || problem.message.find("unfinished") != std::string::npos;
+    CHECK(reported);
+}
+
 TEST(SafeArchiveNames) {
     CHECK(IsSafeArchiveName("eboot.bin"));
     CHECK(IsSafeArchiveName("sce_sys"));

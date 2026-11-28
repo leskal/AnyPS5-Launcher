@@ -2233,6 +2233,10 @@ msgid "Remove the install first"
 msgstr ""
 
 #: src/app/Main.cpp
+msgid ".partial is left from a conversion that was cut off; delete it first"
+msgstr ""
+
+#: src/app/Main.cpp
 msgid "Convert .zar to folder"
 msgstr ""
 

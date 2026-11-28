@@ -5655,6 +5655,7 @@ private:
             if (reason.empty() && game.format != PackageFormat::Zar) reason = T("This game is already a folder");
             if (reason.empty() && !game.home.empty()) reason = T("Remove the install first");
             if (reason.empty() && PathExists(output)) reason = FileName(output) + T(" already exists next to the archive");
+            if (reason.empty() && PathExists(std::filesystem::path(output) += ".partial")) reason = FileName(output) + T(".partial is left from a conversion that was cut off; delete it first");
             if (MenuAction(T("Convert .zar to folder"), reason, T("Extracts to ") + ToUtf8(output) + T(". The .zar is kept."))) StartExtract(game, output);
         }
         {
@@ -5663,6 +5664,7 @@ private:
             if (reason.empty() && game.format != PackageFormat::Folder) reason = T("This game is already a .zar");
             if (reason.empty() && !game.home.empty()) reason = T("Remove the install first");
             if (reason.empty() && PathExists(output)) reason = FileName(output) + T(" already exists next to the folder");
+            if (reason.empty() && PathExists(std::filesystem::path(output) += ".partial")) reason = FileName(output) + T(".partial is left from a conversion that was cut off; delete it first");
             if (MenuAction(T("Convert folder to .zar"), reason, T("Packs into ") + ToUtf8(output) + T(". The folder is kept."))) StartPack(game, output);
         }
     }
