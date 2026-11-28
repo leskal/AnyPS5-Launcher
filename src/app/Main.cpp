@@ -3267,11 +3267,17 @@ private:
                 // As on the console, the selected game is always the first one on the left: the
                 // row slides there (at once when the view opens), the games before it off the edge.
                 // (Two pixels more, so not even the edge of the game before it shows.)
-                const float target = localX - halo + 2.0f * scale_;
+                // ImGui rounds the scroll to whole pixels, so each step moves at least one pixel:
+                // a smaller one (on a fast screen, near the end) was rounded away and the row
+                // stopped a few pixels short, showing the edge of the game before.
+                const float target = std::round(localX - halo + 2.0f * scale_);
                 const float now = ImGui::GetScrollX();
                 const float step = ImGui::IsWindowAppearing() ? 1.0f : std::min(1.0f, ImGui::GetIO().DeltaTime * 14.0f);
-                if (std::abs(target - now) > 0.5f) ImGui::SetScrollX(now + (target - now) * step);
-                else if (target != now) ImGui::SetScrollX(target);
+                if (target != now) {
+                    float move = (target - now) * step;
+                    if (std::abs(move) < 1.0f) move = std::clamp(target - now, -1.0f, 1.0f);
+                    ImGui::SetScrollX(now + move);
+                }
             }
             // No right-click menu here: the "..." button beside Play has every action (and so does triangle on a pad).
             if (ImGui::BeginPopup("actions")) {
