@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
+#include <exception>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -406,7 +407,46 @@ std::string ReinstallReason(const GameEntry& game, const InstallManifest& manife
     return {};
 }
 
+namespace {
+
+InstallManifest SetUpAndRelink(const InstallRequest& request, const ProcessRunner& run, JobControl& control);
+
+}
+
 InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& run, JobControl& control) {
+    const auto& game = request.game;
+    if (!game.home.empty()) return SetUpAndRelink(request, run, control);  // set up already: stays set up
+    try {
+        return SetUpAndRelink(request, run, control);
+    } catch (...) {
+        // A first install that failed puts the game back as it was, so it can be
+        // installed again or used as before: the .zar or the files go back.
+        const auto failure = std::current_exception();
+        const auto home = HomeFor(game);
+        std::error_code error;
+        if (std::filesystem::is_regular_file(home / InstallManifestName, error)) {
+            auto setUp = game;
+            setUp.home = home;
+            try {
+                RemoveInstall(setUp);
+            } catch (const std::exception& undo) {
+                std::string message = "install failed";
+                try {
+                    std::rethrow_exception(failure);
+                } catch (const std::exception& original) {
+                    message = original.what();
+                } catch (...) {
+                }
+                throw std::runtime_error(message + "; the game couldn't be put back as it was (" + undo.what() + "), so it stays set up: use Remove install");
+            }
+        }
+        std::rethrow_exception(failure);
+    }
+}
+
+namespace {
+
+InstallManifest SetUpAndRelink(const InstallRequest& request, const ProcessRunner& run, JobControl& control) {
     const auto& game = request.game;
     const auto& serial = game.metadata.titleId;
     control.SetTotal(ProgressTotal);
@@ -510,18 +550,23 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
                 manifest.originalName = ToUtf8(game.location.filename());
                 MoveTree(game.location, home / App0Zar);
             }
+            WriteManifest(home / InstallManifestName, manifest);
         } catch (...) {
             package.reset();
             if (fresh) {
                 try {
-                    // Only what this install made: a reused folder keeps the files it had.
-                    RemoveOwnTree(reused ? app0 : home);
+                    // The .zar back first; then only what this install made: a reused
+                    // folder keeps the files it had.
+                    if (!Exists(game.location) && Exists(home / App0Zar)) MoveTree(home / App0Zar, game.location);
+                    if (Exists(game.location)) {
+                        std::filesystem::remove(home / InstallManifestName, error);
+                        RemoveOwnTree(reused ? app0 : home);
+                    }
                 } catch (...) {
                 }
             }
             throw;
         }
-        WriteManifest(home / InstallManifestName, manifest);
     }
     control.Advance(200);
 
@@ -567,6 +612,8 @@ InstallManifest InstallGame(const InstallRequest& request, const ProcessRunner& 
     WriteManifest(home / InstallManifestName, manifest);
     control.Advance(ProgressTotal - control.Done());
     return manifest;
+}
+
 }
 
 RemovedInstall RemoveInstall(const GameEntry& game) {

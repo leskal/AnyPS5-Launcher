@@ -503,7 +503,7 @@ TEST(ZarInstallFailureLeavesTheArchiveWhereItWas) {
     CHECK(!std::filesystem::exists(fixture.temp.Path() / "games" / "Locked"));
 }
 
-TEST(FailedRelinkLeavesTheGameSetUpButNotInstalled) {
+TEST(AFailedFirstInstallPutsTheFolderBack) {
     InstallFixture fixture;
     const auto home = fixture.WriteConvertedGame("PPSA00101");
     FakeRelinker relinker;
@@ -515,13 +515,48 @@ TEST(FailedRelinkLeavesTheGameSetUpButNotInstalled) {
         message = failure.what();
     }
     CHECK(message.find("missing symbol sceFooBar") != std::string::npos);
-    CHECK(!ReadInstallManifest(home).has_value());
-    CHECK(ReadHomeManifest(home).has_value());
+    // As before the install: the files out of app0, nothing of the launcher's left.
+    CHECK(std::filesystem::is_regular_file(home / "eboot.bin"));
+    CHECK(!std::filesystem::exists(home / "app0"));
+    CHECK(!std::filesystem::exists(home / InstallManifestName));
     CHECK(!std::filesystem::exists(ExecutableIn(home, "PPSA00101")));
     const auto game = fixture.Scan();
-    CHECK(game.home == home);
+    CHECK(game.home.empty());
     relinker.exitCode = 0;
     CHECK(fixture.Install(game, relinker).complete);
+}
+
+TEST(AFailedFirstZarInstallPutsTheArchiveBack) {
+    InstallFixture fixture;
+    const auto archive = fixture.temp.Path() / "games" / "Game.zar";
+    fixture::WriteZar(archive, SelfGame("PPSA00108"));
+    const auto original = ReadBytes(archive);
+    FakeRelinker relinker;
+    relinker.exitCode = 2;
+    CHECK_THROWS(fixture.Install(fixture.Scan(), relinker));
+    CHECK(ReadBytes(archive) == original);
+    CHECK(!std::filesystem::exists(fixture.temp.Path() / "games" / "Game"));
+    relinker.exitCode = 0;
+    CHECK(fixture.Install(fixture.Scan(), relinker).complete);
+}
+
+TEST(AFailedReinstallStaysSetUpAndCanBeRemoved) {
+    InstallFixture fixture;
+    const auto archive = fixture.temp.Path() / "games" / "Game.zar";
+    fixture::WriteZar(archive, SelfGame("PPSA00109"));
+    const auto original = ReadBytes(archive);
+    const auto home = fixture.temp.Path() / "games" / "Game";
+    FakeRelinker relinker;
+    fixture.Install(fixture.Scan(), relinker);
+    relinker.exitCode = 2;
+    CHECK_THROWS(fixture.Install(fixture.Scan(), relinker));
+    CHECK(!ReadInstallManifest(home).has_value());
+    CHECK(ReadHomeManifest(home).has_value());
+    const auto game = fixture.Scan();
+    CHECK(game.home == home);
+    RemoveInstall(game);
+    CHECK(ReadBytes(archive) == original);
+    CHECK(!std::filesystem::exists(home));
 }
 
 TEST(RunFilesDoNotBlockRemovingAnInstall) {
