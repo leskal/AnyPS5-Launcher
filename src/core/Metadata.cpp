@@ -7,6 +7,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/I18n.hpp"
+
 namespace launcher {
 
 namespace {
@@ -242,12 +244,12 @@ std::vector<unsigned long> VersionParts(std::string_view text) {
 std::string RegionOf(std::string_view contentId) {
     if (contentId.size() < 2) return {};
     const auto prefix = contentId.substr(0, 2);
-    if (prefix == "EP") return "Europe";
-    if (prefix == "UP") return "USA";
-    if (prefix == "JP") return "Japan";
-    if (prefix == "HP") return "Asia";
-    if (prefix == "KP") return "Korea";
-    if (prefix == "IP") return "Internal";
+    if (prefix == "EP") return N("Europe");
+    if (prefix == "UP") return N("USA");
+    if (prefix == "JP") return N("Japan");
+    if (prefix == "HP") return N("Asia");
+    if (prefix == "KP") return N("Korea");
+    if (prefix == "IP") return N("Internal");
     return {};
 }
 

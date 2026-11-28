@@ -12,6 +12,8 @@
 #include "core/I18n.hpp"
 #include "core/Settings.hpp"
 
+#include "TextScan.hpp"
+
 using launcher::Fmt;
 using launcher::T;
 
@@ -47,8 +49,11 @@ TEST(LangFilesAddLanguagesAndChangeTexts) {
     fixture::TempDir temp;
     const auto lang = temp.Path() / "lang";
     std::filesystem::create_directories(lang);
-    std::ofstream(lang / "es.json") << R"({"_name": "Español", "Library": "Biblioteca", "Save": ""})";
-    std::ofstream(lang / "el.json") << R"({"Library": "Δική μου"})";
+    {
+        std::ofstream(lang / "es.po") << "msgctxt \"language name\"\nmsgid \"English\"\nmsgstr \"Español\"\n\n"
+                                         "msgid \"Library\"\nmsgstr \"Biblioteca\"\n\nmsgid \"Save\"\nmsgstr \"\"\n";
+        std::ofstream(lang / "el.po") << "msgid \"Library\"\nmsgstr \"Δική μου\"\n";
+    }
     bool spanish = false;
     for (const auto& language : launcher::AvailableLanguages()) spanish = spanish || language.code == "es";
     CHECK(!spanish);  // not before the folder is known
@@ -65,9 +70,52 @@ TEST(LangFilesAddLanguagesAndChangeTexts) {
     launcher::SelectLanguage("en", {}, lang);
 }
 
-// Every translation keeps the printf specifiers and {N} places of its English text,
-// in the same order, so no text can read the wrong value or crash.
-TEST(GreekKeepsEveryPlaceholder) {
+TEST(PoFilesAreReadLikeGettextDoes) {
+    const auto po = launcher::ParsePo(
+        "\xEF\xBB\xBF# a comment\r\n"
+        "msgid \"\"\r\nmsgstr \"\"\r\n\"Language: xx\\n\"\r\n\r\n"
+        "#. for translators\r\n#: src/app/Main.cpp\r\nmsgid \"\"\r\n\"Two\\n\"\r\n\"lines \\\"quoted\\\"\"\r\nmsgstr \"\"\r\n\"Dos\\n\"\r\n\"líneas\"\r\n\r\n"
+        "#, fuzzy\r\nmsgid \"Guessed\"\r\nmsgstr \"Adivinado\"\r\n\r\n"
+        "#, c-format\r\nmsgid \"%d games\"\r\nmsgstr \"%d juegos\"\r\n"
+        "msgctxt \"something else\"\r\nmsgid \"Save\"\r\nmsgstr \"Otro\"\r\n"
+        "msgid \"One file\"\r\nmsgid_plural \"Files\"\r\nmsgstr[0] \"Un archivo\"\r\nmsgstr[1] \"Archivos\"\r\n"
+        "msgctxt \"language name\"\r\nmsgid \"English\"\r\nmsgstr \"Prueba\"\r\n"
+        "#~ msgid \"Old\"\r\n#~ msgstr \"Viejo\"\r\n");
+    CHECK_EQ(po.name, std::string("Prueba"));
+    CHECK_EQ(po.texts.size(), std::size_t{3});
+    CHECK_EQ(po.texts[0].first, std::string("Two\nlines \"quoted\""));
+    CHECK_EQ(po.texts[0].second, std::string("Dos\nlíneas"));
+    CHECK_EQ(po.texts[1].second, std::string("%d juegos"));  // the fuzzy one is left out
+    CHECK_EQ(po.texts[2].second, std::string("Un archivo"));
+}
+
+TEST(TextsAreFoundInTheCode) {
+    const auto found = texts::FindTexts(
+        "// T(\"in a comment\")\n"
+        "ImGui::Text(\"%s\", T(\"Hello \\\"you\\\"\\n\"));\n"
+        "const char* x = \"T(not a call)\"; /* N(\"also a comment\") */\n"
+        "Show(N(\"Joined \"\n      \"text\"), T(name), T(\"a\" + b), FMT(\"no\"));\n"
+        "auto raw = R\"x(T(\"raw\"))x\"; char c = '\"'; T(\"after\");\n");
+    CHECK_EQ(found.size(), std::size_t{3});
+    CHECK_EQ(found[0], std::string("Hello \"you\"\n"));
+    CHECK_EQ(found[1], std::string("Joined text"));
+    CHECK_EQ(found[2], std::string("after"));
+}
+
+// lang/launcher.pot is what translators work from, so it must list the texts of the code.
+TEST(TheTextListIsCurrent) {
+    const std::filesystem::path root = LAUNCHER_SOURCE_DIR;
+    std::ifstream stream(root / "lang" / "launcher.pot", std::ios::binary);
+    std::string saved((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+    std::erase(saved, '\r');  // a Windows checkout may have CRLF
+    const auto made = texts::MakePot(texts::CollectTexts(root));
+    if (saved != made) std::fprintf(stderr, "lang/launcher.pot is out of date: build the update-texts target\n");
+    CHECK(saved == made);
+}
+
+// Every built-in translation keeps the printf specifiers and {N} places of its English
+// text, in the same order, so no text can read the wrong value or crash.
+TEST(TranslationsKeepEveryPlaceholder) {
     const std::regex printf(R"(%[-+ #0-9.]*(?:ll|l|z|h)?[sdiufxXcp%])");
     const std::regex places(R"(\{\d\})");
     const auto list = [](const std::string& text, const std::regex& pattern) {
@@ -75,15 +123,15 @@ TEST(GreekKeepsEveryPlaceholder) {
         for (auto it = std::sregex_iterator(text.begin(), text.end(), pattern); it != std::sregex_iterator(); ++it) found += it->str() + "|";
         return found;
     };
-    const auto pairs = launcher::BuiltInTranslations("el");
-    CHECK(pairs.size() > 700);
-    std::set<std::string> seen;
-    for (const auto& [english, greek] : pairs) {
-        CHECK(seen.insert(english).second);  // no text twice
-        CHECK(!greek.empty());
-        if (list(english, printf) != list(greek, printf) || list(english, places) != list(greek, places)) {
-            std::fprintf(stderr, "placeholders differ: %s\n", english.c_str());
-            CHECK(false);
+    CHECK(launcher::BuiltInTranslations("el").size() > 700);
+    for (const auto& language : launcher::AvailableLanguages()) {
+        std::set<std::string> seen;
+        for (const auto& [english, text] : launcher::BuiltInTranslations(language.code)) {
+            CHECK(seen.insert(english).second);  // no text twice
+            if (list(english, printf) != list(text, printf) || list(english, places) != list(text, places)) {
+                std::fprintf(stderr, "%s: placeholders differ: %s\n", language.code.c_str(), english.c_str());
+                CHECK(false);
+            }
         }
     }
 }

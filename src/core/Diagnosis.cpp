@@ -7,6 +7,7 @@
 #include <fstream>
 #include <system_error>
 
+#include "core/I18n.hpp"
 #include "core/Utf8.hpp"
 
 namespace launcher {
@@ -67,45 +68,45 @@ std::string Hex(unsigned long code) {
 RunDiagnosis DiagnoseRun(const std::optional<RunReport>& report, std::string_view logTail, std::optional<int> exitCode, bool stopRequested) {
     using Level = RunDiagnosis::Level;
     const auto lower = Lower(logTail);
-    if (stopRequested) return {Level::Stopped, "You stopped the game", {}, {}};
+    if (stopRequested) return {Level::Stopped, N("You stopped the game"), {}, {}};
 
     if (report) {
         if (report->stopKind == "missing-function") {
-            return {Level::Problem, "Needs a system function AnyPS5 doesn't have yet", report->missingFunction.empty() ? report->stopMessage : report->missingFunction,
-                    "Nothing to fix on your side: the game needs a newer AnyPS5. Make a report to share it."};
+            return {Level::Problem, N("Needs a system function AnyPS5 doesn't have yet"), report->missingFunction.empty() ? report->stopMessage : report->missingFunction,
+                    N("Nothing to fix on your side: the game needs a newer AnyPS5. Make a report to share it.")};
         }
         if (report->stopKind == "unsupported-shader" || report->stopKind == "unsupported-format") {
-            return {Level::Problem, "Uses graphics AnyPS5 can't draw yet", report->stopMessage, "The game needs a newer AnyPS5. Make a report to share it."};
+            return {Level::Problem, N("Uses graphics AnyPS5 can't draw yet"), report->stopMessage, N("The game needs a newer AnyPS5. Make a report to share it.")};
         }
         if (report->stopKind == "other" || report->stopKind == "assert" || report->exit == "abort") {
-            return {Level::Problem, "Stopped on an engine error", report->stopMessage.empty() ? report->summary : report->stopMessage, {}};
+            return {Level::Problem, N("Stopped on an engine error"), report->stopMessage.empty() ? report->summary : report->stopMessage, {}};
         }
     }
 
-    if (report && report->exit == "clean") return {Level::Fine, "Closed normally", report->summary, {}};
+    if (report && report->exit == "clean") return {Level::Fine, N("Closed normally"), report->summary, {}};
 
     if (auto line = FindLast(logTail, lower, {"dependency module not found", "failed to load module", "module not found"})) {
-        return {Level::Problem, "A module is missing", *line, "Reinstall the game. If it stays, AnyPS5 doesn't provide this module yet."};
+        return {Level::Problem, N("A module is missing"), *line, N("Reinstall the game. If it stays, AnyPS5 doesn't provide this module yet.")};
     }
     if (auto line = FindLast(logTail, lower, {"vk_error_out_of_device_memory", "out of device memory"})) {
-        return {Level::Problem, "The GPU ran out of memory", *line, "Close other programs that use the GPU, or lower the game's own graphics settings."};
+        return {Level::Problem, N("The GPU ran out of memory"), *line, N("Close other programs that use the GPU, or lower the game's own graphics settings.")};
     }
     if (auto line = FindLast(logTail, lower, {"vk_error_device_lost", "device lost"})) {
-        return {Level::Problem, "The GPU stopped", *line, "Update the graphics driver. If it keeps happening at the same place, make a report."};
+        return {Level::Problem, N("The GPU stopped"), *line, N("Update the graphics driver. If it keeps happening at the same place, make a report.")};
     }
     if (auto line = FindLast(logTail, lower, {"ran out of memory", "out of memory", "commit limit"})) {
-        return {Level::Problem, "The system ran out of memory", *line, "Close other programs, or let Windows grow the page file (System > About > Advanced system settings)."};
+        return {Level::Problem, N("The system ran out of memory"), *line, N("Close other programs, or let Windows grow the page file (System > About > Advanced system settings).")};
     }
     if (const auto at = lower.rfind("unhandled exception 0x"); at != std::string::npos) {
         const auto line = LineAt(logTail, at);
         const unsigned long code = std::strtoul(std::string(lower.substr(at + 20, 10)).c_str(), nullptr, 16);
         const char* name = ExceptionName(code);
         std::string hint;
-        if (lower.find("nvgpucomp64.dll") != std::string::npos) hint = "The crash is in NVIDIA's shader compiler: update the graphics driver.";
+        if (lower.find("nvgpucomp64.dll") != std::string::npos) hint = N("The crash is in NVIDIA's shader compiler: update the graphics driver.");
         return {Level::Problem, std::string("Crashed: ") + (name != nullptr ? name : "exception") + " (" + Hex(code) + ")", line, hint};
     }
     if (auto line = FindLast(logTail, lower, {"[libc] unhandled exception", "terminate called", "fatal:"})) {
-        return {Level::Problem, "Stopped on an error", *line, {}};
+        return {Level::Problem, N("Stopped on an error"), *line, {}};
     }
 
     if (exitCode && *exitCode != 0) {
@@ -113,8 +114,8 @@ RunDiagnosis DiagnoseRun(const std::optional<RunReport>& report, std::string_vie
         if (const char* name = ExceptionName(code)) return {Level::Problem, std::string("Crashed: ") + name + " (" + Hex(code) + ")", {}, {}};
         return {Level::Problem, "Ended with exit code " + std::to_string(*exitCode), {}, {}};
     }
-    if (report) return {Level::Fine, "Ended", report->summary, {}};
-    return {Level::Fine, "Closed", {}, {}};
+    if (report) return {Level::Fine, N("Ended"), report->summary, {}};
+    return {Level::Fine, N("Closed"), {}, {}};
 }
 
 std::string ReadLogTail(const std::filesystem::path& log, std::size_t bytes) {

@@ -1,0 +1,3355 @@
+# The texts of AnyPS5 Launcher, in English. Made from the T("...") and N("...")
+# texts in src by the update-texts build target; don't edit it by hand.
+# Translations are lang/<code>.po files made from it.
+msgid ""
+msgstr ""
+"Project-Id-Version: AnyPS5 Launcher\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. The name of this language, written in it: Ελληνικά, Español, Deutsch.
+msgctxt "language name"
+msgid "English"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophy earned"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A trophy"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "couldn't move "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " to the Recycle Bin (error "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not set (English, United States)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Same as Windows"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't look up AnyPS5 releases"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No usable AnyPS5 release"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "none of "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "'s releases has a relinker and runtime for this system"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't add that AnyPS5"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "checking..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves of "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " are still in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Moved saves back to their profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "after an unfinished run of "
+msgstr ""
+
+#. {0}, {1}... are filled in by the launcher; keep them, in any order.
+#: src/app/Main.cpp
+msgid "Same as Windows ({0})"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (pinned)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Another task is running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Stop the game first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Still checking the AnyPS5 folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This .zar keeps the game inside a folder: convert it to a folder first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "eboot.bin is missing"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "eboot.bin is still encrypted: use a decrypted dump of the game"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Some files are still SELF: choose Convert SELF to ELF first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " already exists next to the archive"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Already running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Another game is running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Being installed"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Install it first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Install "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Converted with AnyPS5"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; copied "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " into AnyPS5's libs folder (once)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Remove install: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Restored "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". Left in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " because the launcher didn't make them: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Sync saves: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Newer saves came in from the sync folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; the ones here are kept in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves are up to date"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " is still running from the last time (it may hang after a crash); end it in Task Manager, then press Play again"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "the saves of the last run are still beside the exe and can't be moved back: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Playing "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't start "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " are still beside its exe"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". The launcher tries again when you press Play, and at its next start."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " with exit code "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " without a run report; see "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves sent to the sync folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The sync folder already has these saves"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back up saves"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " game"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " from "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " profiles"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "SELF to ELF: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " module"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " modules"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Converted "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " and "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Moved "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; moved "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " older .self backups into the zip"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "nothing to convert"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "nothing converted: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". Originals with MD5 in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". Not converted: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Restore originals: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " file"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " files"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ", each matching its MD5; deleted "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ".zar to folder: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Extracted to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Folder to .zar: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Packed into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Joy-Con pair"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Gamepad"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No controller found."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "USB: use a cable that carries data, not only charge. Bluetooth: pair it in Windows first (DualSense and DualShock 4: hold Create/Share and PS until the light flashes)."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  Bluetooth"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  USB"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  charging"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  battery "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Stop test"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Test"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "While the test is open the pad only shows here; Stop test gives it back to the launcher."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Shows the buttons, sticks and triggers as you press them"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Vibrate"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Steam is running: Steam Input can turn a pad into a mouse or an Xbox pad. Turn it off for PlayStation pads (Steam > Settings > Controller), or close Steam before playing."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "DS4Windows is running: it can hide the DualShock or DualSense behind a virtual Xbox pad. Close it, or turn off its 'Hide DS4 controller' option."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "DualSenseX is running: it can hide the DualSense behind a virtual pad. Close it before playing."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "HidHide's client is open: if the pad is hidden there, add the game's exe to its allowed programs."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Search games by name or serial"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Clear"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The profile can't change while a game runs"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profile: saves, trophies, controls and language"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profiles"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Edit "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "New profile..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Library"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Show the games as a grid"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Show the games as a row, the selected one large"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 versions (not while a game runs)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 versions"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Scanning..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Rescan (set a games folder in Settings first)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Rescan the games folders"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Settings (not while a game runs)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Settings"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " installed"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Checking AnyPS5..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 not set up"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 "
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s%sClick for AnyPS5 versions"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "relinker "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " problem"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " problems"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Click to see them"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " game to reinstall"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " games to reinstall"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Converted with another AnyPS5 than the one they use now. Click to reinstall them one after another."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " more to reinstall"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Update ready: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloaded. Click to see what's new and restart, or keep going: it's put in place when you close the launcher."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Launcher "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloading the new launcher in the background."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid ""
+"The download failed: %s\n"
+"Click to see the update and try again."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A newer launcher is out. Click to see what's new."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Open %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No games folder set"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Settings: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Profile: %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Working..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reinstall"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Installed"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Encrypted"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No eboot"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Looking for games..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Set your games folder in Settings."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No games found."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Game folders (with eboot.bin and sce_sys) and .zar archives in the games folder show up here."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid ""
+"%s\n"
+"Double-click to play, right-click for all actions"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No games yet."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Nothing matches the search."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Region"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Publisher"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Online lookups are off (Settings)."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Can't look up updates: %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Looking up updates..."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s doesn't list this title."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Update available: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Up to date (newest is %s)"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Newer than the newest listed update (%s)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "All updates ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Version"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Size"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Firmware"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Made"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Added"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Notes"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your version"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "... the rest is on ORBISPatches"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No updates are listed for this title."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "View on "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Whole changelogs, update downloads and add-ons, in your browser"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Refresh"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This version,"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Newest notes,"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Earlier notes"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Look and feel"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Theme and library view"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Where your dumps are"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Relinker and libraries"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves, trophies, controls"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 Launcher"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "First-time setup"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Everything here can be changed later in Settings."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Welcome"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your PS5 game dumps, converted with AnyPS5 and ready to play, with saves, trophies and controls per profile. Four quick steps; first, how it should look."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Language"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Theme"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Follow Windows"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Dark"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Light"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Grid"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Home row"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Covers in a grid, details on the side"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Big artwork, one game at a time"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The folder with your game dumps: game folders and .zar archives, in it or in its subfolders. Nothing is copied, and .zar files stay as they are."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Games folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "For example D:\\Games\\PS5"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Browse..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Paste a path or choose one"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Choose a folder to go on."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Found %d game"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Found %d games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "That folder can't be read."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No games there yet. You can still go on and add them later."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "PS4 trophy key (optional)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Opens the encrypted trophy lists of PS4 games: your console's key, 32 hex digits. The launcher doesn't include one. Leave it empty to skip; Settings > Games has it too."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Set. PS4 trophy lists will show their names and grades."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not a key: it needs 32 hex digits (0-9, A-F). Fix it or empty it to go on."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophy key"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "32 hex digits"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The relinker that converts games, and the libraries they run on. Get the official release, or point to a build of your own. More versions can be added later."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Ready: AnyPS5 %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Looking up the latest release..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not set up yet. You can skip this and do it later."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Official release"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloads the newest AnyPS5 from github.com/boykopovar/AnyPS5 and checks it."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "My own build"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "An AnyPS5 folder you built or unpacked, with the relinker and its libs folder."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Choose a folder..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Recommended"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Intel CPU"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Games will be converted with the Intel flag (--to-intel), which Intel CPUs need. You can turn it off in Settings under Converting games."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A profile keeps its own saves, trophies, controls, screenshots and console language. Add more later from the profile button in the top bar."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Name"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Use a name that can be a folder name (no \\ / : * ? \" < > |)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Ready to go"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "not set"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " game)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " games)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "not yet, set it up later under AnyPS5 versions"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Follows Windows"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "home row"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "not set (optional; Settings > Games)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Look"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "PS4 trophies"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloading AnyPS5; Continue unlocks when it's done."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Step %d of %d"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Start playing"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Continue"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No games found. Choose the games folder in Settings."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  v"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Stop"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Play Game"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Install"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "All actions"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No trophy list"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reading..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " trophies, locked"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " of "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophies"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Screenshots"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Captured while playing"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controls"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keys and pad"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Game settings"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "How the game runs"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Launcher updated"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "You're on AnyPS5 Launcher "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Link"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " isn't in the games folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't play "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Link copied"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (paste it in a shortcut, Steam, a browser...)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't update the launcher"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Updated"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Start the launcher again to use the new version."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A task is still running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Closing stops it first, as its Cancel button does. Close anyway?"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This task can't be stopped half way: the launcher closes as soon as it ends. Close then?"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keep running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Stop and close"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Close when done"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "You have "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". Released "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 Launcher "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No notes for this release."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Ready. Restart after the game closes, or it goes in place when you close the launcher."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Ready. Restarting takes a second; you come back to the same game."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloading..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download failed: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Getting it ready..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "All changes on GitHub"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This release's page, in your browser"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Try again"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Later"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keep going; the update goes in place when you close the launcher."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Restart now"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back up saves: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves and trophies of profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " are in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Restore saves: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; the saves you had are kept in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Shader cache cleared"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " builds it again at its next start."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't clear the shader cache"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Report saved"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (read it before you share it)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't write the report"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Game settings: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Applied at each start of "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " in profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". Unchanged settings use AnyPS5's defaults."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Display"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Screen"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "F11 switches while playing."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Window"
+msgstr ""
+
+#: src/app/Main.cpp src/core/InputMapping.cpp
+msgid "Full screen"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Where the window opens."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "First display"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Display "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Resolution class the game sees"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Some games pick their render size from it. The window size never changes it."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The display's"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Vertical sync"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Off can tear; the two middle ones keep whole frames without waiting."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "On"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Latest frame, no wait"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Mailbox, no wait"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Off"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Frame rate limit"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Frames per second, like 30 or 59.94. Empty: no limit."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "no limit"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "From 0.5 to 1000000, at most three decimals"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Upscaling"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "FSR 1 sharpens a picture smaller than the window; otherwise it does nothing."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Bilinear"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "FSR 1"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "sharpness %.1f (0 sharpest)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 version"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Install and play this game with a version other than the selected one, for example one it's known to run on."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The selected one ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "After Save the game shows Reinstall: install it again to use this version."
+msgstr ""
+
+#: src/app/Main.cpp src/core/InputMapping.cpp
+msgid "Performance overlay"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Frames per second, frame times, memory; F10 cycles it while playing."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "At start"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Page 1"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Page 2"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Corner"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Top left"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Top right"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Bottom left"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Bottom right"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Sound, vibration and language"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Volume"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "F5 and F6 change it while playing."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Mute when the game isn't in front"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controller vibration"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "0 turns it off."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Game language"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Instead of the profile's console language."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profile's ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profile's"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Shader cache"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Compiled shaders, so later starts don't stutter. Safe to clear; it's rebuilt."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keep a shader cache"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Clear shader cache"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "measuring..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves and trophies"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back up now"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open backups folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Looking for backups..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No backups yet."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Restore"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Put the saves and trophies of %s back?"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "What the profile has now is backed up first."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Cancel"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Share"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "One file with this game's settings and its own controls, to keep or give to someone."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Export..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 Launcher game settings"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Import..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reset all"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Save"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "the frame rate limit isn't a number AnyPS5 takes"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Game settings saved"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " uses them from its next start."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Exported"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't export: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " isn't an AnyPS5 Launcher game settings file"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Imported"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "From "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The controls are saved; press Save to keep the settings."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't import: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Screenshots: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "F12 while playing saves one. "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " picture"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " pictures"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Delete"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Can't delete"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "All"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Loading..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No screenshots yet. Press F12 while the game plays."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Starting%s  %.0f s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The first start of a game takes longest: shaders are compiled."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Hide"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophy "
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s: %s earned"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reading the trophy list..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No trophy list in the game files (sce_sys/trophy2 or sce_sys/trophy)."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d of %d earned  ·  %d%%"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d trophies"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The PS4 trophy key in Settings doesn't open this list. Check that it's your console's key (32 hex digits)."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This PS4 game's trophy list is encrypted. Add your console's PS4 trophy key in Settings > Games to see the names and grades."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open Settings"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophies: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " earned, "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "%. Kept per profile ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "); the list updates when the game closes."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This game has no trophy list in its files (sce_sys/trophy2 or sce_sys/trophy)."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Earned"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not earned"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Show hidden trophies"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Hidden trophy"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keep playing to find out what it is."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "%llu/%llu"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "this game"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "all games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " takes a keyboard key only."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The mouse wheel can only press pad buttons."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reset"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s: click, then press the key you want"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Press a key...  Esc cancels"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Press a key, click or turn the wheel...  Esc cancels"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Click to remove"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "An action keeps at least one key; click the row to change it"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ""
+"\n"
+"Also used by:"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Add another key or mouse button"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back to the keys of all games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back to AnyPS5's built-in keys"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controls: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controls for all games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Click a row, then press the key you want for it; Esc cancels. Changes here are for "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " only; the keys of every game are in Settings. A connected controller keeps its own buttons. AnyPS5 reads these at the game's next start, or at once with F1."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Click a row, then press the key you want for it; Esc cancels. These keys are for every game of profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; a game can still change some in its own Controls. A connected controller keeps its own buttons."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Sticks and mouse"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Change"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Other lines in the file are kept as they are (%d), such as controller button swaps."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d key(s) do two things at once (shown in amber); hover one to see which."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This game uses the keys of all games again"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Every game uses AnyPS5's built-in keys again (games with their own controls keep them)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controls saved"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " uses them from its next start (or press F1 in the game)."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Every game of profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Title ID"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The game's version"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A .zar archive: the launcher reads it without unpacking"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A game folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Another copy of this game is in the list"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Play"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Convert SELF to ELF"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Needed before Install; the originals are zipped first."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Status"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Store"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "What's new"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Files"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The game is inside a folder of the archive"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "eboot.bin: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "eboot.elf: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "modules: %d ELF"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "modules: %d ELF, %d SELF"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Installing..."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Installed %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Reinstall: %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not installed"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Played less than a minute"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Played "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  last "
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d session with profile %s, counted from when the game's window shows"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d sessions with profile %s, counted from when the game's window shows"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Last run: %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Make a report"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open an issue"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Opens a new issue on github.com/boykopovar/AnyPS5 with the facts filled in; you check it and submit it"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open log"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The game's newest log, in the app that opens .log files"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Runs the converted game with profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophies..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controls..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Game settings..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Copy link"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Play: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Show: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Screenshots..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not while a game runs"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No saves or trophies of this game in profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " yet"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Zips the saves and trophies of profile "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open last log"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No logs yet"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Run the game once first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "One text file for a GitHub issue: system, versions, settings, the last run's reason and the end of its log, with your user name and home folder removed"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not while the game runs"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No shader cache"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Deletes "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; AnyPS5 builds it again (the next start is slower)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Relinks the game again in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The game already sits in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; nothing is moved."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Moves the game's files into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (a rename, nothing is copied), then relinks."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Moves the .zar unchanged to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " and extracts only eboot, sce_sys and the modules into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ", then relinks."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reinstall with AnyPS5"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Install with AnyPS5"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " The exe goes into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "; the relinker writes <module>.guest.prx beside each module. Nothing is linked."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open saves folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open logs folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Open game folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not set up for AnyPS5"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "moves the .zar back to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "<its old name>"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " and deletes the extracted files"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "moves the game's files out of app0 back into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Remove install"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Deletes the exe and the relinker's outputs, "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". Saves stay in the profile."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The files are inside the archive; Install unwraps them while extracting"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "eboot.bin and the modules are already ELF"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (eboot.bin and "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " modules)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " module)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (eboot.bin)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "First stores the originals in "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ""
+", with their MD5, and checks the zip.\n"
+"Then replaces eboot.bin, the SELF modules (sce_module, sce_modules, prx, the title's module folders) and extra executables with their ELF.\n"
+"Same conversion as AnyPS5's unwrap_self.py. Install needs this done first."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Only for game folders"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Restore original SELF files"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Puts every file from "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " back, each checked against its MD5, then deletes the zip."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This game is already a folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Remove the install first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Convert .zar to folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Extracts to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". The .zar is kept."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This game is already a .zar"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " already exists next to the folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Convert folder to .zar"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Packs into "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ". The folder is kept."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Playing %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "profile %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Scroll or click to pick a game; double-click to play; \"...\" beside Play for every action."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Select a game to see it; double-click to play; right-click for every action."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "New profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Each profile has its own saves, trophies, input mapping and screenshots."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Games still show the player name \"Player\": AnyPS5 doesn't let it be changed yet."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "profile name"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Create"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "That profile already exists"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "a game is running"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " still has the profile's saves beside its exe; restart the launcher to put them back"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Edit profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves, trophies, controls and screenshots stay with the profile."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Games still see the player as \"Player\"."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Console language"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The language games start in."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Delete profile..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "It's the only profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not now: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "the profile can't be renamed now: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Delete profile?"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Delete the profile \"%s\"?"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Its saves, trophies, controls and screenshots go to the Recycle Bin."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Its saves, trophies, controls and screenshots are deleted for good."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keep it"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "not now: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "it's the only profile"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "couldn't switch to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profile deleted"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "\" is gone; now using "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "your own build"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Installed games converted with another version show \"Reinstall\"."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download AnyPS5 "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloaded to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " and selected"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The launcher needs AnyPS5's relinker and runtime to install and play games."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Download the latest release of %s?"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "The relinker and the runtime libraries of the same release, into %s."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download the latest"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Choose a version..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not now"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A name for this build"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Ready"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not usable"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s, %zu runtime libraries%s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid ""
+"\n"
+"relinker "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your own build  ·  "
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "·  %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "In use"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Use"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Wait for the game or the job to end"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Games installed from now on are relinked with this one"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "More"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Rename"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Release page"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Forget"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Use another version first"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Takes it off the list; the folder stays"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Deletes the downloaded folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download  ·  999.9 MiB"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Latest"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Pre-release"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "not for this system"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download  ·  "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The selected version relinks games at Install. Games keep the version they were converted with until you reinstall them."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "None yet. Download a release below, or add your own build."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Get another version"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Load releases"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Download a release"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "From boykopovar/AnyPS5, or a fork that publishes releases the same way."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s has no releases. Build it and add it under \"Your own build\"."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Add a fork"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Its releases need relinker-<tag>%s and prx-%s-<tag>%s, as AnyPS5 publishes them."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Add and load"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "owner/repo, as on GitHub"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Choose a relinker..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Choose an AnyPS5 folder..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your own build"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "An AnyPS5 clone after a build (build\\core\\relinker), or a release with its libs\\ folder beside the relinker. A fork you built works the same way."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reinstall all"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Reinstall all ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Every installed game uses the relinker it was converted with"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Installs again, one after another, every game converted with another AnyPS5 than the one it uses now"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Close"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Where your games are, and where the launcher keeps its own files."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "How games are converted, and what the launcher looks up about them."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Appearance"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "How the launcher looks. A theme shows at once; Save keeps it."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keys for every game of this profile, and the pads the launcher sees."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Saves"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keep saves and trophies the same on your other PCs."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "While playing"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "What the launcher does while a game runs."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "About"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This launcher's version and its updates."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Hide the key"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Show the key"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Profile %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Check for updates"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Launcher on GitHub"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 on GitHub"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Update to v00.00.00"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "PS5 games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Scanned for game folders and .zar archives."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "the folder that holds your PS5 games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "PS4 games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Optional: a second folder, for your PS4 games. Both show in the library together."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "the folder that holds your PS4 games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Logs and shader caches; safe to delete, it is rebuilt."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Userdata"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Profiles, saves and trophies: back this up. Keep it on the same drive as your games, so saves move instantly for each run."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Converting"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Converts games at Install. Now: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Manage..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "an Intel CPU"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "a CPU that isn't Intel"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This PC has "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "On by default for Intel CPUs."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Off by default; Intel CPUs need it."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " Changed from the default."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " Applies to games you install from now on."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Intel flag (--to-intel)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "PS4 trophy lists are encrypted. Your console's trophy key (32 hex digits) opens them; the launcher doesn't include one."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Set. PS4 trophy lists show their names and grades."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not a key: it needs 32 hex digits (0-9, A-F)."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "PS4 trophy key"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Online"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Look up game updates"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Asks PROSPEROPatches.com (PS5) or ORBISPatches.com (PS4) for the selected game's region, publisher and newest update, with update notes for PS4 games. Only the title ID is sent; answers are kept for a day."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Library view"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Launcher language"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "The language of the launcher's own texts. Games start in the profile's console language (Edit profile). Applies when you save."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keyboard and mouse"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Keys for all games"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Every game of this profile starts from these. A game can change some of them for itself under Controls in its details."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Edit..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Controllers"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (✕ plays, △ opens a game's actions)."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Save sync"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Through a folder your PCs all see (OneDrive, Dropbox, a USB stick, a network share). Before a game starts newer saves come in; after it ends this PC's go out. Whatever gets replaced is kept in the save backups first."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Sync folder"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Empty: off."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "e.g. C:\\Users\\you\\OneDrive\\AnyPS5 saves"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "On: saves of each profile go to <folder>\\<profile>\\<title ID>"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Backup"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back up saves to a zip"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "One zip with the saves and trophies of every game, in a folder per profile and game (<profile>\\<title ID>\\_sd, _sd_mem, _trophy), the same layout as a game's own backups. Keep it anywhere: another drive, a USB stick, the cloud."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This profile ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "All profiles ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Back up to a zip..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "AnyPS5 saves "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "all profiles"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Zip archive"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "After the game closes: its saves are with it while it runs."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Backing up..."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Minimize the launcher"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Once the game's window shows. It comes back when the game ends."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Trophy cards"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "A card at the top of the game's window when a trophy is earned. It never takes the keyboard or the mouse from the game."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Play a sound with it"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Version %s  ·  GPL-2.0"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Update to "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "See "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Checking..."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s is out."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Up to date."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Not checked yet."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Check for updates at start"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Looks at github.com/leskal/AnyPS5-Launcher/releases and downloads a new version in the background."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Links"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Links like anyps5://play/PPSA01234 start a game from anywhere: a shortcut, a browser, another app. Copy link is in a game's actions."
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Changes take effect when you save."
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Saved in %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "the "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " folder is inside a games folder ("
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "); choose another place"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Could not save: "
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "SDL_Init failed: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "SDL_CreateWindow failed: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "SDL_CreateRenderer failed: %s"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "You stopped the game"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Needs a system function AnyPS5 doesn't have yet"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Nothing to fix on your side: the game needs a newer AnyPS5. Make a report to share it."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Uses graphics AnyPS5 can't draw yet"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "The game needs a newer AnyPS5. Make a report to share it."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Stopped on an engine error"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Closed normally"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "A module is missing"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Reinstall the game. If it stays, AnyPS5 doesn't provide this module yet."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "The GPU ran out of memory"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Close other programs that use the GPU, or lower the game's own graphics settings."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "The GPU stopped"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Update the graphics driver. If it keeps happening at the same place, make a report."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "The system ran out of memory"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Close other programs, or let Windows grow the page file (System > About > Advanced system settings)."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "The crash is in NVIDIA's shader compiler: update the graphics driver."
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Stopped on an error"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Ended"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "Closed"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Buttons"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Cross"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Circle"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Square"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Triangle"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "L1"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "R1"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "L2"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "R2"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "L3"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "R3"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Options"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "D-pad"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Up"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Down"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Left"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Right"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Left stick"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Right stick"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Touchpad and motion"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Touchpad left"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Touchpad right"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Shake"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Slow stick (held)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "AnyPS5"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse moves the stick"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Screenshot"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Controller status"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Volume down"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Volume up"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mute"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Reload these controls"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Left stick dead zone (%)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "How much of a controller stick's travel reads as centered. Raise it for a drifting stick."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Right stick dead zone (%)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "The same for the right stick."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse sensitivity"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "How fast the mouse turns the stick while \"Mouse moves the stick\" is on."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse vertical speed"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Multiplies up and down mouse movement, for games that pitch slower or faster than they turn."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse response curve"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Above 1 gives finer control at low speed; below 1 reaches large tilts sooner."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse minimum tilt"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "The smallest tilt any mouse movement gives. Set it just above the game's own dead zone."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse maximum speed"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "The fastest tracked speed, as a multiple of full tilt."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse smoothing (ms)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "0 follows every mouse report directly."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse stop delay (ms)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "How soon the stick centers after the mouse stops."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse drives"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Which stick the mouse moves."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Slow stick tilt"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "How far keyboard stick keys tilt while \"Slow stick\" is held."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Keyboard stick ramp (ms)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "How long a key takes to tilt a stick fully. 0 tilts at once."
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Trigger ramp (ms)"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "How long a key takes to press L2 or R2 fully, for racing games."
+msgstr ""
+
+#: src/core/Metadata.cpp
+msgid "Europe"
+msgstr ""
+
+#: src/core/Metadata.cpp
+msgid "USA"
+msgstr ""
+
+#: src/core/Metadata.cpp
+msgid "Japan"
+msgstr ""
+
+#: src/core/Metadata.cpp
+msgid "Asia"
+msgstr ""
+
+#: src/core/Metadata.cpp
+msgid "Korea"
+msgstr ""
+
+#: src/core/Metadata.cpp
+msgid "Internal"
+msgstr ""
+
+#: src/core/Trophies.cpp
+msgid "Platinum"
+msgstr ""
+
+#: src/core/Trophies.cpp
+msgid "Gold"
+msgstr ""
+
+#: src/core/Trophies.cpp
+msgid "Silver"
+msgstr ""
+
+#: src/core/Trophies.cpp
+msgid "Bronze"
+msgstr ""

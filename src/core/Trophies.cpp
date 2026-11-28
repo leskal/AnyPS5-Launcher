@@ -13,6 +13,7 @@
 #include "core/Aes.hpp"
 #include "core/Metadata.hpp"
 #include "core/Package.hpp"
+#include "core/I18n.hpp"
 #include "core/Utf8.hpp"
 
 namespace launcher {
@@ -137,10 +138,10 @@ void ReadPairs(const std::filesystem::path& file, Visit visit) {
 
 const char* TrophyGradeName(TrophyGrade grade) {
     switch (grade) {
-    case TrophyGrade::Platinum: return "Platinum";
-    case TrophyGrade::Gold: return "Gold";
-    case TrophyGrade::Silver: return "Silver";
-    case TrophyGrade::Bronze: return "Bronze";
+    case TrophyGrade::Platinum: return N("Platinum");
+    case TrophyGrade::Gold: return N("Gold");
+    case TrophyGrade::Silver: return N("Silver");
+    case TrophyGrade::Bronze: return N("Bronze");
     }
     return "";
 }

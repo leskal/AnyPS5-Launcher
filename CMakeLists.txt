@@ -53,6 +53,22 @@ add_library(launcher_core STATIC
     src/core/ZipStore.cpp
 )
 target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# The translations: every lang/*.po is built in (see src/core/I18n.hpp).
+file(GLOB LAUNCHER_TRANSLATIONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lang/*.po)
+list(SORT LAUNCHER_TRANSLATIONS)
+string(REPLACE ";" "|" LAUNCHER_TRANSLATION_LIST "${LAUNCHER_TRANSLATIONS}")
+set(LAUNCHER_GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated)
+add_custom_command(
+    OUTPUT ${LAUNCHER_GENERATED}/LauncherTranslations.inc
+    COMMAND ${CMAKE_COMMAND} "-DFILES=${LAUNCHER_TRANSLATION_LIST}" -DOUTPUT=${LAUNCHER_GENERATED}/LauncherTranslations.inc
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedTranslations.cmake
+    DEPENDS ${LAUNCHER_TRANSLATIONS} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedTranslations.cmake
+    COMMENT "Building in the translations"
+    VERBATIM
+)
+target_sources(launcher_core PRIVATE ${LAUNCHER_GENERATED}/LauncherTranslations.inc)
+target_include_directories(launcher_core PRIVATE ${LAUNCHER_GENERATED})
 target_link_libraries(launcher_core PUBLIC launcher_zarchive launcher_json)
 target_include_directories(launcher_core PRIVATE ${LAUNCHER_3RDPARTY}/ZArchive/src)
 if(WIN32)
@@ -76,6 +92,19 @@ if(LAUNCHER_BUILD_APP)
     endif()
 endif()
 
+# `cmake --build --preset release --target update-texts` rewrites lang/launcher.pot
+# from the T("...") and N("...") texts in src.
+add_executable(update_texts EXCLUDE_FROM_ALL tools/texts/UpdateTexts.cpp tools/texts/TextScan.cpp)
+if(MINGW)
+    target_link_options(update_texts PRIVATE -static)
+endif()
+add_custom_target(update-texts
+    COMMAND update_texts ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS update_texts
+    COMMENT "Updating lang/launcher.pot"
+    VERBATIM
+)
+
 if(LAUNCHER_BUILD_TESTS)
     enable_testing()
     add_executable(launcher_tests
@@ -98,6 +127,9 @@ if(LAUNCHER_BUILD_TESTS)
     if(MINGW)
         target_link_options(launcher_tests PRIVATE -static)
     endif()
+    target_sources(launcher_tests PRIVATE tools/texts/TextScan.cpp)
+    target_include_directories(launcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools/texts)
+    target_compile_definitions(launcher_tests PRIVATE LAUNCHER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME launcher_tests COMMAND launcher_tests)
 
     add_executable(unwrap_self_cli EXCLUDE_FROM_ALL tests/tools/UnwrapSelfCli.cpp)

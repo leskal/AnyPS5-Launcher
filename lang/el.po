@@ -1,0 +1,3364 @@
+# Greek texts of AnyPS5 Launcher.
+msgid ""
+msgstr ""
+"Project-Id-Version: AnyPS5 Launcher\n"
+"Language: el\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. The name of this language, written in it: Ελληνικά, Español, Deutsch.
+msgctxt "language name"
+msgid "English"
+msgstr "Ελληνικά"
+
+#: src/app/Main.cpp
+msgid "Trophy earned"
+msgstr "Κερδίσατε τρόπαιο"
+
+#: src/app/Main.cpp
+msgid "A trophy"
+msgstr "Ένα τρόπαιο"
+
+#: src/app/Main.cpp
+msgid "couldn't move "
+msgstr "δεν ήταν δυνατή η μεταφορά του "
+
+#: src/app/Main.cpp
+msgid " to the Recycle Bin (error "
+msgstr " στον Κάδο Ανακύκλωσης (σφάλμα "
+
+#: src/app/Main.cpp
+msgid "Not set (English, United States)"
+msgstr "Δεν έχει οριστεί (Αγγλικά, Ηνωμένες Πολιτείες)"
+
+#: src/app/Main.cpp
+msgid "Same as Windows"
+msgstr "Όπως τα Windows"
+
+#: src/app/Main.cpp
+msgid "Can't look up AnyPS5 releases"
+msgstr "Δεν ήταν δυνατή η αναζήτηση εκδόσεων του AnyPS5"
+
+#: src/app/Main.cpp
+msgid "No usable AnyPS5 release"
+msgstr "Δεν υπάρχει κατάλληλη έκδοση του AnyPS5"
+
+#: src/app/Main.cpp
+msgid "none of "
+msgstr "καμία από τις εκδόσεις του "
+
+#: src/app/Main.cpp
+msgid "'s releases has a relinker and runtime for this system"
+msgstr " δεν έχει relinker και runtime για αυτό το σύστημα"
+
+#: src/app/Main.cpp
+msgid "Can't add that AnyPS5"
+msgstr "Δεν ήταν δυνατή η προσθήκη αυτού του AnyPS5"
+
+#: src/app/Main.cpp
+msgid "checking..."
+msgstr "έλεγχος..."
+
+#: src/app/Main.cpp
+msgid "Profile"
+msgstr "Προφίλ"
+
+#: src/app/Main.cpp
+msgid "Saves of "
+msgstr "Οι αποθηκεύσεις του "
+
+#: src/app/Main.cpp
+msgid " are still in "
+msgstr " βρίσκονται ακόμα στο "
+
+#: src/app/Main.cpp
+msgid "Moved saves back to their profile"
+msgstr "Οι αποθηκεύσεις επέστρεψαν στο προφίλ τους"
+
+#: src/app/Main.cpp
+msgid "after an unfinished run of "
+msgstr "μετά από ημιτελή εκτέλεση του "
+
+#. {0}, {1}... are filled in by the launcher; keep them, in any order.
+#: src/app/Main.cpp
+msgid "Same as Windows ({0})"
+msgstr "Όπως τα Windows ({0})"
+
+#: src/app/Main.cpp
+msgid " (pinned)"
+msgstr " (καρφιτσωμένη)"
+
+#: src/app/Main.cpp
+msgid "Another task is running"
+msgstr "Εκτελείται άλλη εργασία"
+
+#: src/app/Main.cpp
+msgid "Stop the game first"
+msgstr "Σταματήστε πρώτα το παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "Still checking the AnyPS5 folder"
+msgstr "Ο φάκελος του AnyPS5 ελέγχεται ακόμα"
+
+#: src/app/Main.cpp
+msgid "AnyPS5: "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "This .zar keeps the game inside a folder: convert it to a folder first"
+msgstr "Αυτό το .zar έχει το παιχνίδι μέσα σε φάκελο: μετατρέψτε το πρώτα σε φάκελο"
+
+#: src/app/Main.cpp
+msgid "eboot.bin is missing"
+msgstr "Λείπει το eboot.bin"
+
+#: src/app/Main.cpp
+msgid "eboot.bin is still encrypted: use a decrypted dump of the game"
+msgstr "Το eboot.bin είναι ακόμα κρυπτογραφημένο: χρησιμοποιήστε αποκρυπτογραφημένο dump του παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "Some files are still SELF: choose Convert SELF to ELF first"
+msgstr "Κάποια αρχεία είναι ακόμα SELF: επιλέξτε πρώτα Μετατροπή SELF σε ELF"
+
+#: src/app/Main.cpp
+msgid " already exists next to the archive"
+msgstr " υπάρχει ήδη δίπλα στο αρχείο"
+
+#: src/app/Main.cpp
+msgid "Already running"
+msgstr "Εκτελείται ήδη"
+
+#: src/app/Main.cpp
+msgid "Another game is running"
+msgstr "Εκτελείται άλλο παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "Being installed"
+msgstr "Εγκαθίσταται"
+
+#: src/app/Main.cpp
+msgid "Install it first"
+msgstr "Εγκαταστήστε το πρώτα"
+
+#: src/app/Main.cpp
+msgid "Install "
+msgstr "Εγκατάσταση: "
+
+#: src/app/Main.cpp
+msgid "Converted with AnyPS5"
+msgstr "Μετατράπηκε με το AnyPS5"
+
+#: src/app/Main.cpp
+msgid "; copied "
+msgstr "· αντιγράφηκαν τα "
+
+#: src/app/Main.cpp
+msgid " into AnyPS5's libs folder (once)"
+msgstr " στον φάκελο libs του AnyPS5 (μία φορά)"
+
+#: src/app/Main.cpp
+msgid "Remove install: "
+msgstr "Αφαίρεση εγκατάστασης: "
+
+#: src/app/Main.cpp
+msgid "Restored "
+msgstr "Επαναφέρθηκε: "
+
+#: src/app/Main.cpp
+msgid ". Left in "
+msgstr ". Έμειναν στο "
+
+#: src/app/Main.cpp
+msgid " because the launcher didn't make them: "
+msgstr " επειδή δεν τα δημιούργησε ο launcher: "
+
+#: src/app/Main.cpp
+msgid "Sync saves: "
+msgstr "Συγχρονισμός αποθηκεύσεων: "
+
+#: src/app/Main.cpp
+msgid "Newer saves came in from the sync folder"
+msgstr "Ήρθαν νεότερες αποθηκεύσεις από τον φάκελο συγχρονισμού"
+
+#: src/app/Main.cpp
+msgid "; the ones here are kept in "
+msgstr "· όσες υπήρχαν εδώ φυλάχτηκαν στο "
+
+#: src/app/Main.cpp
+msgid "Saves are up to date"
+msgstr "Οι αποθηκεύσεις είναι ενημερωμένες"
+
+#: src/app/Main.cpp
+msgid " is still running from the last time (it may hang after a crash); end it in Task Manager, then press Play again"
+msgstr " εκτελείται ακόμα από την προηγούμενη φορά (μπορεί να κόλλησε μετά από κατάρρευση)· τερματίστε το από τη Διαχείριση Εργασιών και πατήστε ξανά Παίξτε"
+
+#: src/app/Main.cpp
+msgid "the saves of the last run are still beside the exe and can't be moved back: "
+msgstr "οι αποθηκεύσεις της τελευταίας εκτέλεσης είναι ακόμα δίπλα στο exe και δεν μπορούν να επιστρέψουν: "
+
+#: src/app/Main.cpp
+msgid "Playing "
+msgstr "Παίζεται: "
+
+#: src/app/Main.cpp
+msgid "Profile "
+msgstr "Προφίλ "
+
+#: src/app/Main.cpp
+msgid "Can't start "
+msgstr "Δεν ξεκινά: "
+
+#: src/app/Main.cpp
+msgid " are still beside its exe"
+msgstr " είναι ακόμα δίπλα στο exe του"
+
+#: src/app/Main.cpp
+msgid ". The launcher tries again when you press Play, and at its next start."
+msgstr ". Ο launcher θα ξαναδοκιμάσει όταν πατήσετε Παίξτε, και στην επόμενη εκκίνησή του."
+
+#: src/app/Main.cpp
+msgid " with exit code "
+msgstr " με κωδικό εξόδου "
+
+#: src/app/Main.cpp
+msgid " without a run report; see "
+msgstr " χωρίς αναφορά εκτέλεσης· δείτε "
+
+#: src/app/Main.cpp
+msgid "Saves sent to the sync folder"
+msgstr "Οι αποθηκεύσεις στάλθηκαν στον φάκελο συγχρονισμού"
+
+#: src/app/Main.cpp
+msgid "The sync folder already has these saves"
+msgstr "Ο φάκελος συγχρονισμού έχει ήδη αυτές τις αποθηκεύσεις"
+
+#: src/app/Main.cpp
+msgid "Back up saves"
+msgstr "Αντίγραφο αποθηκεύσεων"
+
+#: src/app/Main.cpp
+msgid " game"
+msgstr " παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid " games"
+msgstr " παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid " from "
+msgstr " από "
+
+#: src/app/Main.cpp
+msgid " profiles"
+msgstr " προφίλ"
+
+#: src/app/Main.cpp
+msgid " in "
+msgstr " στο "
+
+#: src/app/Main.cpp
+msgid "SELF to ELF: "
+msgstr "SELF σε ELF: "
+
+#: src/app/Main.cpp
+msgid " module"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " modules"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Converted "
+msgstr "Μετατράπηκαν "
+
+#: src/app/Main.cpp
+msgid " and "
+msgstr " και "
+
+#: src/app/Main.cpp
+msgid "Moved "
+msgstr "Μεταφέρθηκαν "
+
+#: src/app/Main.cpp
+msgid "; moved "
+msgstr "· μεταφέρθηκαν "
+
+#: src/app/Main.cpp
+msgid " older .self backups into the zip"
+msgstr " παλαιότερα αντίγραφα .self στο zip"
+
+#: src/app/Main.cpp
+msgid "nothing to convert"
+msgstr "τίποτα για μετατροπή"
+
+#: src/app/Main.cpp
+msgid "nothing converted: "
+msgstr "δεν μετατράπηκε τίποτα: "
+
+#: src/app/Main.cpp
+msgid ". Originals with MD5 in "
+msgstr ". Τα αρχικά με MD5 στο "
+
+#: src/app/Main.cpp
+msgid ". Not converted: "
+msgstr ". Δεν μετατράπηκαν: "
+
+#: src/app/Main.cpp
+msgid "Restore originals: "
+msgstr "Επαναφορά αρχικών: "
+
+#: src/app/Main.cpp
+msgid " file"
+msgstr " αρχείο"
+
+#: src/app/Main.cpp
+msgid " files"
+msgstr " αρχεία"
+
+#: src/app/Main.cpp
+msgid ", each matching its MD5; deleted "
+msgstr ", όλα με σωστό MD5· διαγράφηκε το "
+
+#: src/app/Main.cpp
+msgid ".zar to folder: "
+msgstr ".zar σε φάκελο: "
+
+#: src/app/Main.cpp
+msgid "Extracted to "
+msgstr "Εξήχθη στο "
+
+#: src/app/Main.cpp
+msgid "Folder to .zar: "
+msgstr "Φάκελος σε .zar: "
+
+#: src/app/Main.cpp
+msgid "Packed into "
+msgstr "Πακεταρίστηκε στο "
+
+#: src/app/Main.cpp
+msgid "Joy-Con pair"
+msgstr "Ζεύγος Joy-Con"
+
+#: src/app/Main.cpp
+msgid "Gamepad"
+msgstr "Χειριστήριο"
+
+#: src/app/Main.cpp
+msgid "No controller found."
+msgstr "Δεν βρέθηκε χειριστήριο."
+
+#: src/app/Main.cpp
+msgid "USB: use a cable that carries data, not only charge. Bluetooth: pair it in Windows first (DualSense and DualShock 4: hold Create/Share and PS until the light flashes)."
+msgstr "USB: χρησιμοποιήστε καλώδιο που μεταφέρει δεδομένα, όχι μόνο φόρτιση. Bluetooth: κάντε πρώτα σύζευξη στα Windows (DualSense και DualShock 4: κρατήστε Create/Share και PS μέχρι να αναβοσβήσει η φωτεινή ένδειξη)."
+
+#: src/app/Main.cpp
+msgid "  ·  Bluetooth"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  USB"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "  ·  charging"
+msgstr "  ·  φορτίζει"
+
+#: src/app/Main.cpp
+msgid "  ·  battery "
+msgstr "  ·  μπαταρία "
+
+#: src/app/Main.cpp
+msgid "Stop test"
+msgstr "Τέλος δοκιμής"
+
+#: src/app/Main.cpp
+msgid "Test"
+msgstr "Δοκιμή"
+
+#: src/app/Main.cpp
+msgid "While the test is open the pad only shows here; Stop test gives it back to the launcher."
+msgstr "Όσο η δοκιμή είναι ανοιχτή, το χειριστήριο φαίνεται μόνο εδώ· το Τέλος δοκιμής το επιστρέφει στον launcher."
+
+#: src/app/Main.cpp
+msgid "Shows the buttons, sticks and triggers as you press them"
+msgstr "Δείχνει τα κουμπιά, τους μοχλούς και τις σκανδάλες καθώς τα πατάτε"
+
+#: src/app/Main.cpp
+msgid "Vibrate"
+msgstr "Δόνηση"
+
+#: src/app/Main.cpp
+msgid "Steam is running: Steam Input can turn a pad into a mouse or an Xbox pad. Turn it off for PlayStation pads (Steam > Settings > Controller), or close Steam before playing."
+msgstr "Το Steam εκτελείται: το Steam Input μπορεί να κάνει το χειριστήριο ποντίκι ή χειριστήριο Xbox. Απενεργοποιήστε το για χειριστήρια PlayStation (Steam > Ρυθμίσεις > Χειριστήριο) ή κλείστε το Steam πριν παίξετε."
+
+#: src/app/Main.cpp
+msgid "DS4Windows is running: it can hide the DualShock or DualSense behind a virtual Xbox pad. Close it, or turn off its 'Hide DS4 controller' option."
+msgstr "Το DS4Windows εκτελείται: μπορεί να κρύψει το DualShock ή το DualSense πίσω από ένα εικονικό χειριστήριο Xbox. Κλείστε το ή απενεργοποιήστε την επιλογή 'Hide DS4 controller'."
+
+#: src/app/Main.cpp
+msgid "DualSenseX is running: it can hide the DualSense behind a virtual pad. Close it before playing."
+msgstr "Το DualSenseX εκτελείται: μπορεί να κρύψει το DualSense πίσω από ένα εικονικό χειριστήριο. Κλείστε το πριν παίξετε."
+
+#: src/app/Main.cpp
+msgid "HidHide's client is open: if the pad is hidden there, add the game's exe to its allowed programs."
+msgstr "Το HidHide είναι ανοιχτό: αν το χειριστήριο είναι κρυμμένο εκεί, προσθέστε το exe του παιχνιδιού στα επιτρεπόμενα προγράμματα."
+
+#: src/app/Main.cpp
+msgid "Search games by name or serial"
+msgstr "Αναζήτηση παιχνιδιών με όνομα ή κωδικό"
+
+#: src/app/Main.cpp
+msgid "Clear"
+msgstr "Καθαρισμός"
+
+#: src/app/Main.cpp
+msgid "The profile can't change while a game runs"
+msgstr "Το προφίλ δεν αλλάζει όσο εκτελείται παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "Profile: saves, trophies, controls and language"
+msgstr "Προφίλ: αποθηκεύσεις, τρόπαια, χειρισμοί και γλώσσα"
+
+#: src/app/Main.cpp
+msgid "Profiles"
+msgstr "Προφίλ"
+
+#: src/app/Main.cpp
+msgid "Edit "
+msgstr "Επεξεργασία: "
+
+#: src/app/Main.cpp
+msgid "New profile..."
+msgstr "Νέο προφίλ..."
+
+#: src/app/Main.cpp
+msgid "Library"
+msgstr "Βιβλιοθήκη"
+
+#: src/app/Main.cpp
+msgid "Show the games as a grid"
+msgstr "Εμφάνιση των παιχνιδιών σε πλέγμα"
+
+#: src/app/Main.cpp
+msgid "Show the games as a row, the selected one large"
+msgstr "Εμφάνιση των παιχνιδιών σε σειρά, με το επιλεγμένο μεγάλο"
+
+#: src/app/Main.cpp
+msgid "AnyPS5 versions (not while a game runs)"
+msgstr "Εκδόσεις AnyPS5 (όχι όσο εκτελείται παιχνίδι)"
+
+#: src/app/Main.cpp
+msgid "AnyPS5 versions"
+msgstr "Εκδόσεις AnyPS5"
+
+#: src/app/Main.cpp
+msgid "Scanning..."
+msgstr "Σάρωση..."
+
+#: src/app/Main.cpp
+msgid "Rescan (set a games folder in Settings first)"
+msgstr "Νέα σάρωση (ορίστε πρώτα φάκελο παιχνιδιών στις Ρυθμίσεις)"
+
+#: src/app/Main.cpp
+msgid "Rescan the games folders"
+msgstr "Νέα σάρωση των φακέλων παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "Settings (not while a game runs)"
+msgstr "Ρυθμίσεις (όχι όσο εκτελείται παιχνίδι)"
+
+#: src/app/Main.cpp
+msgid "Settings"
+msgstr "Ρυθμίσεις"
+
+#: src/app/Main.cpp
+msgid " installed"
+msgstr " εγκατεστημένα"
+
+#: src/app/Main.cpp
+msgid "Checking AnyPS5..."
+msgstr "Έλεγχος AnyPS5..."
+
+#: src/app/Main.cpp
+msgid "AnyPS5 not set up"
+msgstr "Το AnyPS5 δεν έχει ρυθμιστεί"
+
+#: src/app/Main.cpp
+msgid "AnyPS5 "
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s%sClick for AnyPS5 versions"
+msgstr "%s%sΚάντε κλικ για τις εκδόσεις AnyPS5"
+
+#: src/app/Main.cpp
+msgid "relinker "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " problem"
+msgstr " πρόβλημα"
+
+#: src/app/Main.cpp
+msgid " problems"
+msgstr " προβλήματα"
+
+#: src/app/Main.cpp
+msgid "Click to see them"
+msgstr "Κάντε κλικ για να τα δείτε"
+
+#: src/app/Main.cpp
+msgid " game to reinstall"
+msgstr " παιχνίδι για επανεγκατάσταση"
+
+#: src/app/Main.cpp
+msgid " games to reinstall"
+msgstr " παιχνίδια για επανεγκατάσταση"
+
+#: src/app/Main.cpp
+msgid "Converted with another AnyPS5 than the one they use now. Click to reinstall them one after another."
+msgstr "Μετατράπηκαν με άλλο AnyPS5 από αυτό που χρησιμοποιούν τώρα. Κάντε κλικ για να επανεγκατασταθούν το ένα μετά το άλλο."
+
+#: src/app/Main.cpp
+msgid " more to reinstall"
+msgstr " ακόμα για επανεγκατάσταση"
+
+#: src/app/Main.cpp
+msgid "Update ready: "
+msgstr "Έτοιμη ενημέρωση: "
+
+#: src/app/Main.cpp
+msgid "Downloaded. Click to see what's new and restart, or keep going: it's put in place when you close the launcher."
+msgstr "Κατέβηκε. Κάντε κλικ για να δείτε τι νέο υπάρχει και να γίνει επανεκκίνηση, ή συνεχίστε: θα εφαρμοστεί όταν κλείσετε τον launcher."
+
+#: src/app/Main.cpp
+msgid "Launcher "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Downloading the new launcher in the background."
+msgstr "Η νέα έκδοση του launcher κατεβαίνει στο παρασκήνιο."
+
+#, c-format
+#: src/app/Main.cpp
+msgid ""
+"The download failed: %s\n"
+"Click to see the update and try again."
+msgstr ""
+"Η λήψη απέτυχε: %s\n"
+"Κάντε κλικ για να δείτε την ενημέρωση και να ξαναδοκιμάσετε."
+
+#: src/app/Main.cpp
+msgid "A newer launcher is out. Click to see what's new."
+msgstr "Κυκλοφόρησε νεότερος launcher. Κάντε κλικ για να δείτε τι νέο υπάρχει."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Open %s"
+msgstr "Άνοιγμα %s"
+
+#: src/app/Main.cpp
+msgid "No games folder set"
+msgstr "Δεν έχει οριστεί φάκελος παιχνιδιών"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Settings: %s"
+msgstr "Ρυθμίσεις: %s"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Profile: %s"
+msgstr "Προφίλ: %s"
+
+#: src/app/Main.cpp
+msgid "Running"
+msgstr "Εκτελείται"
+
+#: src/app/Main.cpp
+msgid "Working..."
+msgstr "Σε εξέλιξη..."
+
+#: src/app/Main.cpp
+msgid "Reinstall"
+msgstr "Επανεγκατάσταση"
+
+#: src/app/Main.cpp
+msgid "Installed"
+msgstr "Εγκατεστημένο"
+
+#: src/app/Main.cpp
+msgid "Encrypted"
+msgstr "Κρυπτογραφημένο"
+
+#: src/app/Main.cpp
+msgid "No eboot"
+msgstr "Χωρίς eboot"
+
+#: src/app/Main.cpp
+msgid "Looking for games..."
+msgstr "Αναζήτηση παιχνιδιών..."
+
+#: src/app/Main.cpp
+msgid "Set your games folder in Settings."
+msgstr "Ορίστε τον φάκελο παιχνιδιών στις Ρυθμίσεις."
+
+#: src/app/Main.cpp
+msgid "No games found."
+msgstr "Δεν βρέθηκαν παιχνίδια."
+
+#: src/app/Main.cpp
+msgid "Game folders (with eboot.bin and sce_sys) and .zar archives in the games folder show up here."
+msgstr "Εδώ εμφανίζονται οι φάκελοι παιχνιδιών (με eboot.bin και sce_sys) και τα αρχεία .zar του φακέλου παιχνιδιών."
+
+#, c-format
+#: src/app/Main.cpp
+msgid ""
+"%s\n"
+"Double-click to play, right-click for all actions"
+msgstr ""
+"%s\n"
+"Διπλό κλικ για παιχνίδι, δεξί κλικ για όλες τις ενέργειες"
+
+#: src/app/Main.cpp
+msgid "No games yet."
+msgstr "Δεν υπάρχουν ακόμα παιχνίδια."
+
+#: src/app/Main.cpp
+msgid "Nothing matches the search."
+msgstr "Τίποτα δεν ταιριάζει με την αναζήτηση."
+
+#: src/app/Main.cpp
+msgid "Region"
+msgstr "Περιοχή"
+
+#: src/app/Main.cpp
+msgid "Publisher"
+msgstr "Εκδότης"
+
+#: src/app/Main.cpp
+msgid "Online lookups are off (Settings)."
+msgstr "Οι διαδικτυακές αναζητήσεις είναι απενεργοποιημένες (Ρυθμίσεις)."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Can't look up updates: %s"
+msgstr "Δεν ήταν δυνατή η αναζήτηση ενημερώσεων: %s"
+
+#: src/app/Main.cpp
+msgid "Looking up updates..."
+msgstr "Αναζήτηση ενημερώσεων..."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s doesn't list this title."
+msgstr "Το %s δεν έχει αυτόν τον τίτλο."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Update available: %s"
+msgstr "Διαθέσιμη ενημέρωση: %s"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Up to date (newest is %s)"
+msgstr "Ενημερωμένο (η νεότερη είναι η %s)"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Newer than the newest listed update (%s)"
+msgstr "Νεότερο από την πιο πρόσφατη καταχωρημένη ενημέρωση (%s)"
+
+#: src/app/Main.cpp
+msgid "All updates ("
+msgstr "Όλες οι ενημερώσεις ("
+
+#: src/app/Main.cpp
+msgid "Version"
+msgstr "Έκδοση"
+
+#: src/app/Main.cpp
+msgid "Size"
+msgstr "Μέγεθος"
+
+#: src/app/Main.cpp
+msgid "Firmware"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Made"
+msgstr "Δημιουργία"
+
+#: src/app/Main.cpp
+msgid "Added"
+msgstr "Προσθήκη"
+
+#: src/app/Main.cpp
+msgid "Notes"
+msgstr "Σημειώσεις"
+
+#: src/app/Main.cpp
+msgid "Your version"
+msgstr "Η έκδοσή σας"
+
+#: src/app/Main.cpp
+msgid "... the rest is on ORBISPatches"
+msgstr "... τα υπόλοιπα στο ORBISPatches"
+
+#: src/app/Main.cpp
+msgid "No updates are listed for this title."
+msgstr "Δεν υπάρχουν καταχωρημένες ενημερώσεις για αυτόν τον τίτλο."
+
+#: src/app/Main.cpp
+msgid "View on "
+msgstr "Προβολή στο "
+
+#: src/app/Main.cpp
+msgid "Whole changelogs, update downloads and add-ons, in your browser"
+msgstr "Πλήρεις σημειώσεις αλλαγών, λήψεις ενημερώσεων και πρόσθετα, στον browser σας"
+
+#: src/app/Main.cpp
+msgid "Refresh"
+msgstr "Ανανέωση"
+
+#: src/app/Main.cpp
+msgid "This version,"
+msgstr "Αυτή η έκδοση,"
+
+#: src/app/Main.cpp
+msgid "Newest notes,"
+msgstr "Νεότερες σημειώσεις,"
+
+#: src/app/Main.cpp
+msgid "Earlier notes"
+msgstr "Παλαιότερες σημειώσεις"
+
+#: src/app/Main.cpp
+msgid "Look and feel"
+msgstr "Εμφάνιση"
+
+#: src/app/Main.cpp
+msgid "Theme and library view"
+msgstr "Θέμα και προβολή βιβλιοθήκης"
+
+#: src/app/Main.cpp
+msgid "Your games"
+msgstr "Τα παιχνίδια σας"
+
+#: src/app/Main.cpp
+msgid "Where your dumps are"
+msgstr "Πού είναι τα dumps σας"
+
+#: src/app/Main.cpp
+msgid "Relinker and libraries"
+msgstr "Relinker και βιβλιοθήκες"
+
+#: src/app/Main.cpp
+msgid "Your profile"
+msgstr "Το προφίλ σας"
+
+#: src/app/Main.cpp
+msgid "Saves, trophies, controls"
+msgstr "Αποθηκεύσεις, τρόπαια, χειρισμοί"
+
+#: src/app/Main.cpp
+msgid "AnyPS5 Launcher"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "First-time setup"
+msgstr "Πρώτη ρύθμιση"
+
+#: src/app/Main.cpp
+msgid "Everything here can be changed later in Settings."
+msgstr "Όλα αυτά αλλάζουν αργότερα από τις Ρυθμίσεις."
+
+#: src/app/Main.cpp
+msgid "Welcome"
+msgstr "Καλώς ήρθατε"
+
+#: src/app/Main.cpp
+msgid "Your PS5 game dumps, converted with AnyPS5 and ready to play, with saves, trophies and controls per profile. Four quick steps; first, how it should look."
+msgstr "Τα dumps των παιχνιδιών PS5 σας, μετατρεμμένα με το AnyPS5 και έτοιμα για παιχνίδι, με αποθηκεύσεις, τρόπαια και χειρισμούς ανά προφίλ. Τέσσερα γρήγορα βήματα· πρώτα, η εμφάνιση."
+
+#: src/app/Main.cpp
+msgid "Language"
+msgstr "Γλώσσα"
+
+#: src/app/Main.cpp
+msgid "Theme"
+msgstr "Θέμα"
+
+#: src/app/Main.cpp
+msgid "Follow Windows"
+msgstr "Όπως τα Windows"
+
+#: src/app/Main.cpp
+msgid "Dark"
+msgstr "Σκούρο"
+
+#: src/app/Main.cpp
+msgid "Light"
+msgstr "Ανοιχτό"
+
+#: src/app/Main.cpp
+msgid "Grid"
+msgstr "Πλέγμα"
+
+#: src/app/Main.cpp
+msgid "Home row"
+msgstr "Σειρά αρχικής"
+
+#: src/app/Main.cpp
+msgid "Covers in a grid, details on the side"
+msgstr "Εξώφυλλα σε πλέγμα, στοιχεία δίπλα"
+
+#: src/app/Main.cpp
+msgid "Big artwork, one game at a time"
+msgstr "Μεγάλη εικόνα, ένα τη φορά"
+
+#: src/app/Main.cpp
+msgid "The folder with your game dumps: game folders and .zar archives, in it or in its subfolders. Nothing is copied, and .zar files stay as they are."
+msgstr "Ο φάκελος με τα dumps των παιχνιδιών σας: φάκελοι παιχνιδιών και αρχεία .zar, μέσα του ή στους υποφακέλους του. Τίποτα δεν αντιγράφεται και τα .zar μένουν όπως είναι."
+
+#: src/app/Main.cpp
+msgid "Games folder"
+msgstr "Φάκελος παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "For example D:\\Games\\PS5"
+msgstr "Για παράδειγμα D:\\Games\\PS5"
+
+#: src/app/Main.cpp
+msgid "Browse..."
+msgstr "Αναζήτηση..."
+
+#: src/app/Main.cpp
+msgid "Paste a path or choose one"
+msgstr "Επικολλήστε μια διαδρομή ή επιλέξτε μία"
+
+#: src/app/Main.cpp
+msgid "Choose a folder to go on."
+msgstr "Επιλέξτε φάκελο για να συνεχίσετε."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Found %d game"
+msgstr "Βρέθηκε %d παιχνίδι"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Found %d games"
+msgstr "Βρέθηκαν %d παιχνίδια"
+
+#: src/app/Main.cpp
+msgid "That folder can't be read."
+msgstr "Αυτός ο φάκελος δεν διαβάζεται."
+
+#: src/app/Main.cpp
+msgid "No games there yet. You can still go on and add them later."
+msgstr "Δεν υπάρχουν ακόμα παιχνίδια εκεί. Μπορείτε να συνεχίσετε και να τα προσθέσετε αργότερα."
+
+#: src/app/Main.cpp
+msgid "PS4 trophy key (optional)"
+msgstr "Κλειδί τροπαίων PS4 (προαιρετικό)"
+
+#: src/app/Main.cpp
+msgid "Opens the encrypted trophy lists of PS4 games: your console's key, 32 hex digits. The launcher doesn't include one. Leave it empty to skip; Settings > Games has it too."
+msgstr "Ανοίγει τις κρυπτογραφημένες λίστες τροπαίων των παιχνιδιών PS4: το κλειδί της κονσόλας σας, 32 δεκαεξαδικά ψηφία. Ο launcher δεν περιέχει κανένα. Αφήστε το κενό για παράλειψη· υπάρχει και στις Ρυθμίσεις > Παιχνίδια."
+
+#: src/app/Main.cpp
+msgid "Set. PS4 trophy lists will show their names and grades."
+msgstr "Ορίστηκε. Οι λίστες τροπαίων PS4 θα δείχνουν ονόματα και βαθμίδες."
+
+#: src/app/Main.cpp
+msgid "Not a key: it needs 32 hex digits (0-9, A-F). Fix it or empty it to go on."
+msgstr "Δεν είναι κλειδί: χρειάζεται 32 δεκαεξαδικά ψηφία (0-9, A-F). Διορθώστε το ή αδειάστε το για να συνεχίσετε."
+
+#: src/app/Main.cpp
+msgid "Trophy key"
+msgstr "Κλειδί τροπαίων"
+
+#: src/app/Main.cpp
+msgid "32 hex digits"
+msgstr "32 δεκαεξαδικά ψηφία"
+
+#: src/app/Main.cpp
+msgid "The relinker that converts games, and the libraries they run on. Get the official release, or point to a build of your own. More versions can be added later."
+msgstr "Ο relinker που μετατρέπει τα παιχνίδια και οι βιβλιοθήκες στις οποίες τρέχουν. Κατεβάστε την επίσημη έκδοση ή δείξτε ένα δικό σας build. Περισσότερες εκδόσεις προστίθενται αργότερα."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Ready: AnyPS5 %s"
+msgstr "Έτοιμο: AnyPS5 %s"
+
+#: src/app/Main.cpp
+msgid "Looking up the latest release..."
+msgstr "Αναζήτηση της τελευταίας έκδοσης..."
+
+#: src/app/Main.cpp
+msgid "Not set up yet. You can skip this and do it later."
+msgstr "Δεν έχει ρυθμιστεί ακόμα. Μπορείτε να το παραλείψετε και να το κάνετε αργότερα."
+
+#: src/app/Main.cpp
+msgid "Official release"
+msgstr "Επίσημη έκδοση"
+
+#: src/app/Main.cpp
+msgid "Downloads the newest AnyPS5 from github.com/boykopovar/AnyPS5 and checks it."
+msgstr "Κατεβάζει το νεότερο AnyPS5 από το github.com/boykopovar/AnyPS5 και το ελέγχει."
+
+#: src/app/Main.cpp
+msgid "Download"
+msgstr "Λήψη"
+
+#: src/app/Main.cpp
+msgid "My own build"
+msgstr "Δικό μου build"
+
+#: src/app/Main.cpp
+msgid "An AnyPS5 folder you built or unpacked, with the relinker and its libs folder."
+msgstr "Ένας φάκελος AnyPS5 που φτιάξατε ή αποσυμπιέσατε, με τον relinker και τον φάκελο libs του."
+
+#: src/app/Main.cpp
+msgid "Choose a folder..."
+msgstr "Επιλογή φακέλου..."
+
+#: src/app/Main.cpp
+msgid "Recommended"
+msgstr "Προτείνεται"
+
+#: src/app/Main.cpp
+msgid "Intel CPU"
+msgstr "Επεξεργαστής Intel"
+
+#: src/app/Main.cpp
+msgid "Games will be converted with the Intel flag (--to-intel), which Intel CPUs need. You can turn it off in Settings under Converting games."
+msgstr "Τα παιχνίδια θα μετατρέπονται με τη σημαία Intel (--to-intel), που χρειάζονται οι επεξεργαστές Intel. Μπορείτε να την απενεργοποιήσετε στις Ρυθμίσεις."
+
+#: src/app/Main.cpp
+msgid "A profile keeps its own saves, trophies, controls, screenshots and console language. Add more later from the profile button in the top bar."
+msgstr "Κάθε προφίλ έχει δικές του αποθηκεύσεις, τρόπαια, χειρισμούς, στιγμιότυπα και γλώσσα κονσόλας. Προσθέστε κι άλλα αργότερα από το κουμπί προφίλ στην πάνω μπάρα."
+
+#: src/app/Main.cpp
+msgid "Name"
+msgstr "Όνομα"
+
+#: src/app/Main.cpp
+msgid "Use a name that can be a folder name (no \\ / : * ? \" < > |)"
+msgstr "Χρησιμοποιήστε όνομα που μπορεί να είναι όνομα φακέλου (χωρίς \\ / : * ? \" < > |)"
+
+#: src/app/Main.cpp
+msgid "Ready to go"
+msgstr "Όλα έτοιμα"
+
+#: src/app/Main.cpp
+msgid "not set"
+msgstr "δεν έχει οριστεί"
+
+#: src/app/Main.cpp
+msgid " game)"
+msgstr " παιχνίδι)"
+
+#: src/app/Main.cpp
+msgid " games)"
+msgstr " παιχνίδια)"
+
+#: src/app/Main.cpp
+msgid "not yet, set it up later under AnyPS5 versions"
+msgstr "όχι ακόμα, ρυθμίστε το αργότερα στις Εκδόσεις AnyPS5"
+
+#: src/app/Main.cpp
+msgid "Follows Windows"
+msgstr "Όπως τα Windows"
+
+#: src/app/Main.cpp
+msgid "home row"
+msgstr "σειρά αρχικής"
+
+#: src/app/Main.cpp
+msgid "not set (optional; Settings > Games)"
+msgstr "δεν έχει οριστεί (προαιρετικό· Ρυθμίσεις > Παιχνίδια)"
+
+#: src/app/Main.cpp
+msgid "Games"
+msgstr "Παιχνίδια"
+
+#: src/app/Main.cpp
+msgid "Look"
+msgstr "Εμφάνιση"
+
+#: src/app/Main.cpp
+msgid "PS4 trophies"
+msgstr "Τρόπαια PS4"
+
+#: src/app/Main.cpp
+msgid "Downloading AnyPS5; Continue unlocks when it's done."
+msgstr "Το AnyPS5 κατεβαίνει· το Συνέχεια ενεργοποιείται όταν τελειώσει."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Step %d of %d"
+msgstr "Βήμα %d από %d"
+
+#: src/app/Main.cpp
+msgid "Back"
+msgstr "Πίσω"
+
+#: src/app/Main.cpp
+msgid "Start playing"
+msgstr "Ξεκινήστε"
+
+#: src/app/Main.cpp
+msgid "Continue"
+msgstr "Συνέχεια"
+
+#: src/app/Main.cpp
+msgid "No games found. Choose the games folder in Settings."
+msgstr "Δεν βρέθηκαν παιχνίδια. Επιλέξτε τον φάκελο παιχνιδιών στις Ρυθμίσεις."
+
+#: src/app/Main.cpp
+msgid "  ·  v"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Stop"
+msgstr "Διακοπή"
+
+#: src/app/Main.cpp
+msgid "Play Game"
+msgstr "Παίξτε"
+
+#: src/app/Main.cpp
+msgid "Install"
+msgstr "Εγκατάσταση"
+
+#: src/app/Main.cpp
+msgid "All actions"
+msgstr "Όλες οι ενέργειες"
+
+#: src/app/Main.cpp
+msgid "No trophy list"
+msgstr "Χωρίς λίστα τροπαίων"
+
+#: src/app/Main.cpp
+msgid "Reading..."
+msgstr "Ανάγνωση..."
+
+#: src/app/Main.cpp
+msgid " trophies, locked"
+msgstr " τρόπαια, κλειδωμένα"
+
+#: src/app/Main.cpp
+msgid " of "
+msgstr " από "
+
+#: src/app/Main.cpp
+msgid "Trophies"
+msgstr "Τρόπαια"
+
+#: src/app/Main.cpp
+msgid "Screenshots"
+msgstr "Στιγμιότυπα"
+
+#: src/app/Main.cpp
+msgid "Captured while playing"
+msgstr "Από την ώρα του παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "Controls"
+msgstr "Χειρισμοί"
+
+#: src/app/Main.cpp
+msgid "Keys and pad"
+msgstr "Πλήκτρα, χειριστήριο"
+
+#: src/app/Main.cpp
+msgid "Game settings"
+msgstr "Ρυθμίσεις παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "How the game runs"
+msgstr "Πώς τρέχει το παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "Launcher updated"
+msgstr "Ο launcher ενημερώθηκε"
+
+#: src/app/Main.cpp
+msgid "You're on AnyPS5 Launcher "
+msgstr "Έχετε το AnyPS5 Launcher "
+
+#: src/app/Main.cpp
+msgid "Link"
+msgstr "Σύνδεσμος"
+
+#: src/app/Main.cpp
+msgid " isn't in the games folder"
+msgstr " δεν είναι στον φάκελο παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "Can't play "
+msgstr "Δεν παίζεται: "
+
+#: src/app/Main.cpp
+msgid "Link copied"
+msgstr "Ο σύνδεσμος αντιγράφηκε"
+
+#: src/app/Main.cpp
+msgid " (paste it in a shortcut, Steam, a browser...)"
+msgstr " (επικολλήστε τον σε συντόμευση, στο Steam, σε browser...)"
+
+#: src/app/Main.cpp
+msgid "Can't update the launcher"
+msgstr "Δεν ήταν δυνατή η ενημέρωση του launcher"
+
+#: src/app/Main.cpp
+msgid "Updated"
+msgstr "Ενημερώθηκε"
+
+#: src/app/Main.cpp
+msgid "Start the launcher again to use the new version."
+msgstr "Ανοίξτε ξανά τον launcher για να χρησιμοποιήσετε τη νέα έκδοση."
+
+#: src/app/Main.cpp
+msgid "A task is still running"
+msgstr "Μια εργασία εκτελείται ακόμα"
+
+#: src/app/Main.cpp
+msgid "Closing stops it first, as its Cancel button does. Close anyway?"
+msgstr "Το κλείσιμο τη σταματά πρώτα, όπως το κουμπί Ακύρωση. Να κλείσει παρ' όλα αυτά;"
+
+#: src/app/Main.cpp
+msgid "This task can't be stopped half way: the launcher closes as soon as it ends. Close then?"
+msgstr "Αυτή η εργασία δεν σταματά στη μέση: ο launcher θα κλείσει μόλις τελειώσει. Να κλείσει τότε;"
+
+#: src/app/Main.cpp
+msgid "Keep running"
+msgstr "Συνέχιση"
+
+#: src/app/Main.cpp
+msgid "Stop and close"
+msgstr "Διακοπή και κλείσιμο"
+
+#: src/app/Main.cpp
+msgid "Close when done"
+msgstr "Κλείσιμο στο τέλος"
+
+#: src/app/Main.cpp
+msgid "You have "
+msgstr "Έχετε την "
+
+#: src/app/Main.cpp
+msgid ". Released "
+msgstr ". Κυκλοφόρησε "
+
+#: src/app/Main.cpp
+msgid "AnyPS5 Launcher "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "No notes for this release."
+msgstr "Δεν υπάρχουν σημειώσεις για αυτή την έκδοση."
+
+#: src/app/Main.cpp
+msgid "Ready. Restart after the game closes, or it goes in place when you close the launcher."
+msgstr "Έτοιμο. Κάντε επανεκκίνηση όταν κλείσει το παιχνίδι, ή θα εφαρμοστεί όταν κλείσετε τον launcher."
+
+#: src/app/Main.cpp
+msgid "Ready. Restarting takes a second; you come back to the same game."
+msgstr "Έτοιμο. Η επανεκκίνηση παίρνει ένα δευτερόλεπτο· επιστρέφετε στο ίδιο παιχνίδι."
+
+#: src/app/Main.cpp
+msgid "Downloading..."
+msgstr "Λήψη..."
+
+#: src/app/Main.cpp
+msgid "Download failed: "
+msgstr "Η λήψη απέτυχε: "
+
+#: src/app/Main.cpp
+msgid "Getting it ready..."
+msgstr "Προετοιμασία..."
+
+#: src/app/Main.cpp
+msgid "All changes on GitHub"
+msgstr "Όλες οι αλλαγές στο GitHub"
+
+#: src/app/Main.cpp
+msgid "This release's page, in your browser"
+msgstr "Η σελίδα αυτής της έκδοσης, στον browser σας"
+
+#: src/app/Main.cpp
+msgid "Try again"
+msgstr "Ξανά"
+
+#: src/app/Main.cpp
+msgid "Later"
+msgstr "Αργότερα"
+
+#: src/app/Main.cpp
+msgid "Keep going; the update goes in place when you close the launcher."
+msgstr "Συνεχίστε· η ενημέρωση εφαρμόζεται όταν κλείσετε τον launcher."
+
+#: src/app/Main.cpp
+msgid "Restart now"
+msgstr "Επανεκκίνηση τώρα"
+
+#: src/app/Main.cpp
+msgid "Back up saves: "
+msgstr "Αντίγραφο αποθηκεύσεων: "
+
+#: src/app/Main.cpp
+msgid "Saves and trophies of profile "
+msgstr "Οι αποθηκεύσεις και τα τρόπαια του προφίλ "
+
+#: src/app/Main.cpp
+msgid " are in "
+msgstr " βρίσκονται στο "
+
+#: src/app/Main.cpp
+msgid "Restore saves: "
+msgstr "Επαναφορά αποθηκεύσεων: "
+
+#: src/app/Main.cpp
+msgid "; the saves you had are kept in "
+msgstr "· όσες είχατε φυλάχτηκαν στο "
+
+#: src/app/Main.cpp
+msgid "Shader cache cleared"
+msgstr "Η μνήμη shader καθαρίστηκε"
+
+#: src/app/Main.cpp
+msgid " builds it again at its next start."
+msgstr " θα τη φτιάξει ξανά στην επόμενη εκκίνηση."
+
+#: src/app/Main.cpp
+msgid "Can't clear the shader cache"
+msgstr "Δεν ήταν δυνατός ο καθαρισμός της μνήμης shader"
+
+#: src/app/Main.cpp
+msgid "Report saved"
+msgstr "Η αναφορά αποθηκεύτηκε"
+
+#: src/app/Main.cpp
+msgid " (read it before you share it)"
+msgstr " (διαβάστε την πριν τη μοιραστείτε)"
+
+#: src/app/Main.cpp
+msgid "Can't write the report"
+msgstr "Δεν ήταν δυνατή η εγγραφή της αναφοράς"
+
+#: src/app/Main.cpp
+msgid "Game settings: "
+msgstr "Ρυθμίσεις παιχνιδιού: "
+
+#: src/app/Main.cpp
+msgid "Applied at each start of "
+msgstr "Εφαρμόζονται σε κάθε εκκίνηση του "
+
+#: src/app/Main.cpp
+msgid " in profile "
+msgstr " στο προφίλ "
+
+#: src/app/Main.cpp
+msgid ". Unchanged settings use AnyPS5's defaults."
+msgstr ". Όσες δεν αλλάξετε έχουν τις προεπιλογές του AnyPS5."
+
+#: src/app/Main.cpp
+msgid "Display"
+msgstr "Οθόνη"
+
+#: src/app/Main.cpp
+msgid "Screen"
+msgstr "Οθόνη"
+
+#: src/app/Main.cpp
+msgid "F11 switches while playing."
+msgstr "Το F11 εναλλάσσει την ώρα του παιχνιδιού."
+
+#: src/app/Main.cpp
+msgid "Window"
+msgstr "Παράθυρο"
+
+#: src/app/Main.cpp src/core/InputMapping.cpp
+msgid "Full screen"
+msgstr "Πλήρης οθόνη"
+
+#: src/app/Main.cpp
+msgid "Where the window opens."
+msgstr "Πού ανοίγει το παράθυρο."
+
+#: src/app/Main.cpp
+msgid "First display"
+msgstr "Πρώτη οθόνη"
+
+#: src/app/Main.cpp
+msgid "Display "
+msgstr "Οθόνη "
+
+#: src/app/Main.cpp
+msgid "Resolution class the game sees"
+msgstr "Κατηγορία ανάλυσης που βλέπει το παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "Some games pick their render size from it. The window size never changes it."
+msgstr "Κάποια παιχνίδια διαλέγουν από αυτή το μέγεθος απόδοσης. Το μέγεθος του παραθύρου δεν την αλλάζει."
+
+#: src/app/Main.cpp
+msgid "The display's"
+msgstr "Της οθόνης"
+
+#: src/app/Main.cpp
+msgid "Vertical sync"
+msgstr "Κατακόρυφος συγχρονισμός"
+
+#: src/app/Main.cpp
+msgid "Off can tear; the two middle ones keep whole frames without waiting."
+msgstr "Το Ανενεργό μπορεί να σκίζει την εικόνα· οι δύο μεσαίες κρατούν ολόκληρα καρέ χωρίς αναμονή."
+
+#: src/app/Main.cpp
+msgid "On"
+msgstr "Ενεργό"
+
+#: src/app/Main.cpp
+msgid "Latest frame, no wait"
+msgstr "Τελευταίο καρέ, χωρίς αναμονή"
+
+#: src/app/Main.cpp
+msgid "Mailbox, no wait"
+msgstr "Mailbox, χωρίς αναμονή"
+
+#: src/app/Main.cpp
+msgid "Off"
+msgstr "Ανενεργό"
+
+#: src/app/Main.cpp
+msgid "Frame rate limit"
+msgstr "Όριο καρέ"
+
+#: src/app/Main.cpp
+msgid "Frames per second, like 30 or 59.94. Empty: no limit."
+msgstr "Καρέ ανά δευτερόλεπτο, π.χ. 30 ή 59.94. Κενό: χωρίς όριο."
+
+#: src/app/Main.cpp
+msgid "no limit"
+msgstr "χωρίς όριο"
+
+#: src/app/Main.cpp
+msgid "From 0.5 to 1000000, at most three decimals"
+msgstr "Από 0.5 έως 1000000, το πολύ τρία δεκαδικά"
+
+#: src/app/Main.cpp
+msgid "Upscaling"
+msgstr "Κλιμάκωση"
+
+#: src/app/Main.cpp
+msgid "FSR 1 sharpens a picture smaller than the window; otherwise it does nothing."
+msgstr "Το FSR 1 οξύνει μια εικόνα μικρότερη από το παράθυρο· αλλιώς δεν κάνει τίποτα."
+
+#: src/app/Main.cpp
+msgid "Bilinear"
+msgstr "Διγραμμική"
+
+#: src/app/Main.cpp
+msgid "FSR 1"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "sharpness %.1f (0 sharpest)"
+msgstr "οξύτητα %.1f (0 η πιο οξεία)"
+
+#: src/app/Main.cpp
+msgid "AnyPS5 version"
+msgstr "Έκδοση AnyPS5"
+
+#: src/app/Main.cpp
+msgid "Install and play this game with a version other than the selected one, for example one it's known to run on."
+msgstr "Εγκατάσταση και παιχνίδι με άλλη έκδοση από την επιλεγμένη, για παράδειγμα μία με την οποία ξέρετε ότι τρέχει."
+
+#: src/app/Main.cpp
+msgid "The selected one ("
+msgstr "Η επιλεγμένη ("
+
+#: src/app/Main.cpp
+msgid "After Save the game shows Reinstall: install it again to use this version."
+msgstr "Μετά την Αποθήκευση το παιχνίδι δείχνει Επανεγκατάσταση: εγκαταστήστε το ξανά για να χρησιμοποιήσει αυτή την έκδοση."
+
+#: src/app/Main.cpp src/core/InputMapping.cpp
+msgid "Performance overlay"
+msgstr "Ένδειξη επιδόσεων"
+
+#: src/app/Main.cpp
+msgid "Frames per second, frame times, memory; F10 cycles it while playing."
+msgstr "Καρέ ανά δευτερόλεπτο, χρόνοι καρέ, μνήμη· το F10 την εναλλάσσει την ώρα του παιχνιδιού."
+
+#: src/app/Main.cpp
+msgid "At start"
+msgstr "Στην εκκίνηση"
+
+#: src/app/Main.cpp
+msgid "Page 1"
+msgstr "Σελίδα 1"
+
+#: src/app/Main.cpp
+msgid "Page 2"
+msgstr "Σελίδα 2"
+
+#: src/app/Main.cpp
+msgid "Corner"
+msgstr "Γωνία"
+
+#: src/app/Main.cpp
+msgid "Top left"
+msgstr "Πάνω αριστερά"
+
+#: src/app/Main.cpp
+msgid "Top right"
+msgstr "Πάνω δεξιά"
+
+#: src/app/Main.cpp
+msgid "Bottom left"
+msgstr "Κάτω αριστερά"
+
+#: src/app/Main.cpp
+msgid "Bottom right"
+msgstr "Κάτω δεξιά"
+
+#: src/app/Main.cpp
+msgid "Sound, vibration and language"
+msgstr "Ήχος, δόνηση και γλώσσα"
+
+#: src/app/Main.cpp
+msgid "Volume"
+msgstr "Ένταση"
+
+#: src/app/Main.cpp
+msgid "F5 and F6 change it while playing."
+msgstr "Τα F5 και F6 την αλλάζουν την ώρα του παιχνιδιού."
+
+#: src/app/Main.cpp
+msgid "Mute when the game isn't in front"
+msgstr "Σίγαση όταν το παιχνίδι δεν είναι μπροστά"
+
+#: src/app/Main.cpp
+msgid "Controller vibration"
+msgstr "Δόνηση χειριστηρίου"
+
+#: src/app/Main.cpp
+msgid "0 turns it off."
+msgstr "Το 0 την απενεργοποιεί."
+
+#: src/app/Main.cpp
+msgid "Game language"
+msgstr "Γλώσσα παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "Instead of the profile's console language."
+msgstr "Αντί για τη γλώσσα κονσόλας του προφίλ."
+
+#: src/app/Main.cpp
+msgid "Profile's ("
+msgstr "Του προφίλ ("
+
+#: src/app/Main.cpp
+msgid "Profile's"
+msgstr "Του προφίλ"
+
+#: src/app/Main.cpp
+msgid "Shader cache"
+msgstr "Μνήμη shader"
+
+#: src/app/Main.cpp
+msgid "Compiled shaders, so later starts don't stutter. Safe to clear; it's rebuilt."
+msgstr "Μεταγλωττισμένοι shaders, ώστε οι επόμενες εκκινήσεις να μην κολλάνε. Ο καθαρισμός είναι ασφαλής· ξαναφτιάχνεται."
+
+#: src/app/Main.cpp
+msgid "Keep a shader cache"
+msgstr "Διατήρηση μνήμης shader"
+
+#: src/app/Main.cpp
+msgid "Clear shader cache"
+msgstr "Καθαρισμός μνήμης shader"
+
+#: src/app/Main.cpp
+msgid "measuring..."
+msgstr "μέτρηση..."
+
+#: src/app/Main.cpp
+msgid "Saves and trophies"
+msgstr "Αποθηκεύσεις και τρόπαια"
+
+#: src/app/Main.cpp
+msgid "Back up now"
+msgstr "Αντίγραφο τώρα"
+
+#: src/app/Main.cpp
+msgid "Open backups folder"
+msgstr "Άνοιγμα φακέλου αντιγράφων"
+
+#: src/app/Main.cpp
+msgid "Looking for backups..."
+msgstr "Αναζήτηση αντιγράφων..."
+
+#: src/app/Main.cpp
+msgid "No backups yet."
+msgstr "Δεν υπάρχουν ακόμα αντίγραφα."
+
+#: src/app/Main.cpp
+msgid "Restore"
+msgstr "Επαναφορά"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Put the saves and trophies of %s back?"
+msgstr "Να επανέλθουν οι αποθηκεύσεις και τα τρόπαια του %s;"
+
+#: src/app/Main.cpp
+msgid "What the profile has now is backed up first."
+msgstr "Ό,τι έχει τώρα το προφίλ φυλάγεται πρώτα σε αντίγραφο."
+
+#: src/app/Main.cpp
+msgid "Cancel"
+msgstr "Ακύρωση"
+
+#: src/app/Main.cpp
+msgid "Share"
+msgstr "Κοινοποίηση"
+
+#: src/app/Main.cpp
+msgid "One file with this game's settings and its own controls, to keep or give to someone."
+msgstr "Ένα αρχείο με τις ρυθμίσεις και τους χειρισμούς αυτού του παιχνιδιού, για να το κρατήσετε ή να το δώσετε σε κάποιον."
+
+#: src/app/Main.cpp
+msgid "Export..."
+msgstr "Εξαγωγή..."
+
+#: src/app/Main.cpp
+msgid "AnyPS5 Launcher game settings"
+msgstr "Ρυθμίσεις παιχνιδιού AnyPS5 Launcher"
+
+#: src/app/Main.cpp
+msgid "Import..."
+msgstr "Εισαγωγή..."
+
+#: src/app/Main.cpp
+msgid "Reset all"
+msgstr "Επαναφορά όλων"
+
+#: src/app/Main.cpp
+msgid "Save"
+msgstr "Αποθήκευση"
+
+#: src/app/Main.cpp
+msgid "the frame rate limit isn't a number AnyPS5 takes"
+msgstr "το όριο καρέ δεν είναι αριθμός που δέχεται το AnyPS5"
+
+#: src/app/Main.cpp
+msgid "Game settings saved"
+msgstr "Οι ρυθμίσεις παιχνιδιού αποθηκεύτηκαν"
+
+#: src/app/Main.cpp
+msgid " uses them from its next start."
+msgstr " τις χρησιμοποιεί από την επόμενη εκκίνηση."
+
+#: src/app/Main.cpp
+msgid "Exported"
+msgstr "Εξήχθη"
+
+#: src/app/Main.cpp
+msgid "Can't export: "
+msgstr "Δεν ήταν δυνατή η εξαγωγή: "
+
+#: src/app/Main.cpp
+msgid " isn't an AnyPS5 Launcher game settings file"
+msgstr " δεν είναι αρχείο ρυθμίσεων παιχνιδιού του AnyPS5 Launcher"
+
+#: src/app/Main.cpp
+msgid "Imported"
+msgstr "Εισήχθη"
+
+#: src/app/Main.cpp
+msgid "From "
+msgstr "Από "
+
+#: src/app/Main.cpp
+msgid "The controls are saved; press Save to keep the settings."
+msgstr "Οι χειρισμοί αποθηκεύτηκαν· πατήστε Αποθήκευση για να κρατήσετε τις ρυθμίσεις."
+
+#: src/app/Main.cpp
+msgid "Can't import: "
+msgstr "Δεν ήταν δυνατή η εισαγωγή: "
+
+#: src/app/Main.cpp
+msgid "Screenshots: "
+msgstr "Στιγμιότυπα: "
+
+#: src/app/Main.cpp
+msgid "F12 while playing saves one. "
+msgstr "Το F12 την ώρα του παιχνιδιού αποθηκεύει ένα. "
+
+#: src/app/Main.cpp
+msgid " picture"
+msgstr " εικόνα"
+
+#: src/app/Main.cpp
+msgid " pictures"
+msgstr " εικόνες"
+
+#: src/app/Main.cpp
+msgid "Open folder"
+msgstr "Άνοιγμα φακέλου"
+
+#: src/app/Main.cpp
+msgid "Open"
+msgstr "Άνοιγμα"
+
+#: src/app/Main.cpp
+msgid "Delete"
+msgstr "Διαγραφή"
+
+#: src/app/Main.cpp
+msgid "Can't delete"
+msgstr "Δεν ήταν δυνατή η διαγραφή"
+
+#: src/app/Main.cpp
+msgid "All"
+msgstr "Όλα"
+
+#: src/app/Main.cpp
+msgid "Loading..."
+msgstr "Φόρτωση..."
+
+#: src/app/Main.cpp
+msgid "No screenshots yet. Press F12 while the game plays."
+msgstr "Δεν υπάρχουν ακόμα στιγμιότυπα. Πατήστε F12 την ώρα του παιχνιδιού."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Starting%s  %.0f s"
+msgstr "Εκκίνηση%s  %.0f δ"
+
+#: src/app/Main.cpp
+msgid "The first start of a game takes longest: shaders are compiled."
+msgstr "Η πρώτη εκκίνηση ενός παιχνιδιού αργεί περισσότερο: μεταγλωττίζονται οι shaders."
+
+#: src/app/Main.cpp
+msgid "Hide"
+msgstr "Απόκρυψη"
+
+#: src/app/Main.cpp
+msgid "Trophy "
+msgstr "Τρόπαιο "
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s: %s earned"
+msgstr "%s: κερδήθηκαν %s"
+
+#: src/app/Main.cpp
+msgid "Reading the trophy list..."
+msgstr "Ανάγνωση της λίστας τροπαίων..."
+
+#: src/app/Main.cpp
+msgid "No trophy list in the game files (sce_sys/trophy2 or sce_sys/trophy)."
+msgstr "Δεν υπάρχει λίστα τροπαίων στα αρχεία του παιχνιδιού (sce_sys/trophy2 ή sce_sys/trophy)."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d of %d earned  ·  %d%%"
+msgstr "%d από %d κερδισμένα  ·  %d%%"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d trophies"
+msgstr "%d τρόπαια"
+
+#: src/app/Main.cpp
+msgid "The PS4 trophy key in Settings doesn't open this list. Check that it's your console's key (32 hex digits)."
+msgstr "Το κλειδί τροπαίων PS4 των Ρυθμίσεων δεν ανοίγει αυτή τη λίστα. Ελέγξτε ότι είναι το κλειδί της κονσόλας σας (32 δεκαεξαδικά ψηφία)."
+
+#: src/app/Main.cpp
+msgid "This PS4 game's trophy list is encrypted. Add your console's PS4 trophy key in Settings > Games to see the names and grades."
+msgstr "Η λίστα τροπαίων αυτού του παιχνιδιού PS4 είναι κρυπτογραφημένη. Προσθέστε το κλειδί τροπαίων PS4 της κονσόλας σας στις Ρυθμίσεις > Παιχνίδια για να δείτε ονόματα και βαθμίδες."
+
+#: src/app/Main.cpp
+msgid "Open Settings"
+msgstr "Άνοιγμα Ρυθμίσεων"
+
+#: src/app/Main.cpp
+msgid "Trophies: "
+msgstr "Τρόπαια: "
+
+#: src/app/Main.cpp
+msgid " earned, "
+msgstr " κερδισμένα, "
+
+#: src/app/Main.cpp
+msgid "%. Kept per profile ("
+msgstr "%. Φυλάγονται ανά προφίλ ("
+
+#: src/app/Main.cpp
+msgid "); the list updates when the game closes."
+msgstr ")· η λίστα ενημερώνεται όταν κλείσει το παιχνίδι."
+
+#: src/app/Main.cpp
+msgid "This game has no trophy list in its files (sce_sys/trophy2 or sce_sys/trophy)."
+msgstr "Αυτό το παιχνίδι δεν έχει λίστα τροπαίων στα αρχεία του (sce_sys/trophy2 ή sce_sys/trophy)."
+
+#: src/app/Main.cpp
+msgid "Earned"
+msgstr "Κερδισμένα"
+
+#: src/app/Main.cpp
+msgid "Not earned"
+msgstr "Μη κερδισμένα"
+
+#: src/app/Main.cpp
+msgid "Show hidden trophies"
+msgstr "Εμφάνιση κρυφών τροπαίων"
+
+#: src/app/Main.cpp
+msgid "Hidden trophy"
+msgstr "Κρυφό τρόπαιο"
+
+#: src/app/Main.cpp
+msgid "Keep playing to find out what it is."
+msgstr "Συνεχίστε να παίζετε για να μάθετε ποιο είναι."
+
+#: src/app/Main.cpp
+msgid "%llu/%llu"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "this game"
+msgstr "αυτό το παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "all games"
+msgstr "όλα τα παιχνίδια"
+
+#: src/app/Main.cpp
+msgid " takes a keyboard key only."
+msgstr " δέχεται μόνο πλήκτρο πληκτρολογίου."
+
+#: src/app/Main.cpp
+msgid "The mouse wheel can only press pad buttons."
+msgstr "Η ροδέλα του ποντικιού πατά μόνο κουμπιά χειριστηρίου."
+
+#: src/app/Main.cpp
+msgid "Reset"
+msgstr "Επαναφορά"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s: click, then press the key you want"
+msgstr "%s: κάντε κλικ και πατήστε το πλήκτρο που θέλετε"
+
+#: src/app/Main.cpp
+msgid "Press a key...  Esc cancels"
+msgstr "Πατήστε ένα πλήκτρο...  Το Esc ακυρώνει"
+
+#: src/app/Main.cpp
+msgid "Press a key, click or turn the wheel...  Esc cancels"
+msgstr "Πατήστε πλήκτρο, κάντε κλικ ή γυρίστε τη ροδέλα...  Το Esc ακυρώνει"
+
+#: src/app/Main.cpp
+msgid "Click to remove"
+msgstr "Κλικ για αφαίρεση"
+
+#: src/app/Main.cpp
+msgid "An action keeps at least one key; click the row to change it"
+msgstr "Κάθε ενέργεια κρατά τουλάχιστον ένα πλήκτρο· κάντε κλικ στη γραμμή για να το αλλάξετε"
+
+#: src/app/Main.cpp
+msgid ""
+"\n"
+"Also used by:"
+msgstr ""
+"\n"
+"Χρησιμοποιείται και από:"
+
+#: src/app/Main.cpp
+msgid "Add another key or mouse button"
+msgstr "Προσθήκη άλλου πλήκτρου ή κουμπιού ποντικιού"
+
+#: src/app/Main.cpp
+msgid "Back to the keys of all games"
+msgstr "Πίσω στα πλήκτρα όλων των παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "Back to AnyPS5's built-in keys"
+msgstr "Πίσω στα ενσωματωμένα πλήκτρα του AnyPS5"
+
+#: src/app/Main.cpp
+msgid "Controls: "
+msgstr "Χειρισμοί: "
+
+#: src/app/Main.cpp
+msgid "Controls for all games"
+msgstr "Χειρισμοί για όλα τα παιχνίδια"
+
+#: src/app/Main.cpp
+msgid "Click a row, then press the key you want for it; Esc cancels. Changes here are for "
+msgstr "Κάντε κλικ σε μια γραμμή και πατήστε το πλήκτρο που θέλετε· το Esc ακυρώνει. Οι αλλαγές εδώ ισχύουν μόνο για το "
+
+#: src/app/Main.cpp
+msgid " only; the keys of every game are in Settings. A connected controller keeps its own buttons. AnyPS5 reads these at the game's next start, or at once with F1."
+msgstr "· τα πλήκτρα όλων των παιχνιδιών είναι στις Ρυθμίσεις. Ένα συνδεδεμένο χειριστήριο κρατά τα δικά του κουμπιά. Το AnyPS5 τα διαβάζει στην επόμενη εκκίνηση του παιχνιδιού, ή αμέσως με το F1."
+
+#: src/app/Main.cpp
+msgid "Click a row, then press the key you want for it; Esc cancels. These keys are for every game of profile "
+msgstr "Κάντε κλικ σε μια γραμμή και πατήστε το πλήκτρο που θέλετε· το Esc ακυρώνει. Αυτά τα πλήκτρα ισχύουν για κάθε παιχνίδι του προφίλ "
+
+#: src/app/Main.cpp
+msgid "; a game can still change some in its own Controls. A connected controller keeps its own buttons."
+msgstr "· κάθε παιχνίδι μπορεί να αλλάξει κάποια στους δικούς του Χειρισμούς. Ένα συνδεδεμένο χειριστήριο κρατά τα δικά του κουμπιά."
+
+#: src/app/Main.cpp
+msgid "Sticks and mouse"
+msgstr "Μοχλοί και ποντίκι"
+
+#: src/app/Main.cpp
+msgid "Change"
+msgstr "Αλλαγή"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Other lines in the file are kept as they are (%d), such as controller button swaps."
+msgstr "Οι άλλες γραμμές του αρχείου μένουν όπως είναι (%d), όπως οι εναλλαγές κουμπιών χειριστηρίου."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d key(s) do two things at once (shown in amber); hover one to see which."
+msgstr "%d πλήκτρα κάνουν δύο πράγματα ταυτόχρονα (με πορτοκαλί)· περάστε το ποντίκι από πάνω για να δείτε ποια."
+
+#: src/app/Main.cpp
+msgid "This game uses the keys of all games again"
+msgstr "Αυτό το παιχνίδι χρησιμοποιεί ξανά τα πλήκτρα όλων των παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "Every game uses AnyPS5's built-in keys again (games with their own controls keep them)"
+msgstr "Όλα τα παιχνίδια χρησιμοποιούν ξανά τα ενσωματωμένα πλήκτρα του AnyPS5 (όσα έχουν δικούς τους χειρισμούς τους κρατούν)"
+
+#: src/app/Main.cpp
+msgid "Controls saved"
+msgstr "Οι χειρισμοί αποθηκεύτηκαν"
+
+#: src/app/Main.cpp
+msgid " uses them from its next start (or press F1 in the game)."
+msgstr " τους χρησιμοποιεί από την επόμενη εκκίνηση (ή πατήστε F1 μέσα στο παιχνίδι)."
+
+#: src/app/Main.cpp
+msgid "Every game of profile "
+msgstr "Κάθε παιχνίδι του προφίλ "
+
+#: src/app/Main.cpp
+msgid "Title ID"
+msgstr "Κωδικός τίτλου"
+
+#: src/app/Main.cpp
+msgid "The game's version"
+msgstr "Η έκδοση του παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "A .zar archive: the launcher reads it without unpacking"
+msgstr "Αρχείο .zar: ο launcher το διαβάζει χωρίς αποσυμπίεση"
+
+#: src/app/Main.cpp
+msgid "A game folder"
+msgstr "Φάκελος παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "Another copy of this game is in the list"
+msgstr "Υπάρχει κι άλλο αντίγραφο αυτού του παιχνιδιού στη λίστα"
+
+#: src/app/Main.cpp
+msgid "Play"
+msgstr "Παίξτε"
+
+#: src/app/Main.cpp
+msgid "Convert SELF to ELF"
+msgstr "Μετατροπή SELF σε ELF"
+
+#: src/app/Main.cpp
+msgid "Needed before Install; the originals are zipped first."
+msgstr "Χρειάζεται πριν την Εγκατάσταση· τα αρχικά φυλάγονται πρώτα σε zip."
+
+#: src/app/Main.cpp
+msgid "Status"
+msgstr "Κατάσταση"
+
+#: src/app/Main.cpp
+msgid "Store"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "What's new"
+msgstr "Τι νέο υπάρχει"
+
+#: src/app/Main.cpp
+msgid "Files"
+msgstr "Αρχεία"
+
+#: src/app/Main.cpp
+msgid "The game is inside a folder of the archive"
+msgstr "Το παιχνίδι βρίσκεται μέσα σε φάκελο του αρχείου"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "eboot.bin: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "eboot.elf: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "modules: %d ELF"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "modules: %d ELF, %d SELF"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Installing..."
+msgstr "Εγκατάσταση..."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Installed %s"
+msgstr "Εγκαταστάθηκε %s"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Reinstall: %s"
+msgstr "Επανεγκατάσταση: %s"
+
+#: src/app/Main.cpp
+msgid "Not installed"
+msgstr "Δεν είναι εγκατεστημένο"
+
+#: src/app/Main.cpp
+msgid "Played less than a minute"
+msgstr "Παίχτηκε λιγότερο από ένα λεπτό"
+
+#: src/app/Main.cpp
+msgid "Played "
+msgstr "Παίχτηκε "
+
+#: src/app/Main.cpp
+msgid "  ·  last "
+msgstr "  ·  τελευταία "
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d session with profile %s, counted from when the game's window shows"
+msgstr "%d φορά με το προφίλ %s, μετρώντας από τη στιγμή που εμφανίζεται το παράθυρο του παιχνιδιού"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%d sessions with profile %s, counted from when the game's window shows"
+msgstr "%d φορές με το προφίλ %s, μετρώντας από τη στιγμή που εμφανίζεται το παράθυρο του παιχνιδιού"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Last run: %s"
+msgstr "Τελευταία εκτέλεση: %s"
+
+#: src/app/Main.cpp
+msgid "Make a report"
+msgstr "Δημιουργία αναφοράς"
+
+#: src/app/Main.cpp
+msgid "One text file for a GitHub issue: system, versions, settings, the reason and the end of the log (your user name and home folder removed)"
+msgstr "Ένα αρχείο κειμένου για αναφορά στο GitHub: σύστημα, εκδόσεις, ρυθμίσεις, η αιτία και το τέλος του log (χωρίς το όνομα χρήστη και τον προσωπικό σας φάκελο)"
+
+#: src/app/Main.cpp
+msgid "Open an issue"
+msgstr "Αναφορά στο GitHub"
+
+#: src/app/Main.cpp
+msgid "Opens a new issue on github.com/boykopovar/AnyPS5 with the facts filled in; you check it and submit it"
+msgstr "Ανοίγει νέα αναφορά στο github.com/boykopovar/AnyPS5 με τα στοιχεία συμπληρωμένα· την ελέγχετε και την υποβάλλετε"
+
+#: src/app/Main.cpp
+msgid "Open log"
+msgstr "Άνοιγμα log"
+
+#: src/app/Main.cpp
+msgid "The game's newest log, in the app that opens .log files"
+msgstr "Το νεότερο log του παιχνιδιού, στην εφαρμογή που ανοίγει τα αρχεία .log"
+
+#: src/app/Main.cpp
+msgid "Runs the converted game with profile "
+msgstr "Τρέχει το μετατρεμμένο παιχνίδι με το προφίλ "
+
+#: src/app/Main.cpp
+msgid "Trophies..."
+msgstr "Τρόπαια..."
+
+#: src/app/Main.cpp
+msgid "Controls..."
+msgstr "Χειρισμοί..."
+
+#: src/app/Main.cpp
+msgid "Game settings..."
+msgstr "Ρυθμίσεις παιχνιδιού..."
+
+#: src/app/Main.cpp
+msgid "Copy link"
+msgstr "Αντιγραφή συνδέσμου"
+
+#: src/app/Main.cpp
+msgid "Play: "
+msgstr "Παιχνίδι: "
+
+#: src/app/Main.cpp
+msgid "Show: "
+msgstr "Εμφάνιση: "
+
+#: src/app/Main.cpp
+msgid "Screenshots..."
+msgstr "Στιγμιότυπα..."
+
+#: src/app/Main.cpp
+msgid "Not while a game runs"
+msgstr "Όχι όσο εκτελείται παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "No saves or trophies of this game in profile "
+msgstr "Δεν υπάρχουν αποθηκεύσεις ή τρόπαια αυτού του παιχνιδιού στο προφίλ "
+
+#: src/app/Main.cpp
+msgid " yet"
+msgstr " ακόμα"
+
+#: src/app/Main.cpp
+msgid "Zips the saves and trophies of profile "
+msgstr "Συμπιέζει τις αποθηκεύσεις και τα τρόπαια του προφίλ "
+
+#: src/app/Main.cpp
+msgid " into "
+msgstr " στο "
+
+#: src/app/Main.cpp
+msgid "Open last log"
+msgstr "Άνοιγμα τελευταίου log"
+
+#: src/app/Main.cpp
+msgid "No logs yet"
+msgstr "Δεν υπάρχουν ακόμα logs"
+
+#: src/app/Main.cpp
+msgid "Run the game once first"
+msgstr "Τρέξτε πρώτα μία φορά το παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "One text file for a GitHub issue: system, versions, settings, the last run's reason and the end of its log, with your user name and home folder removed"
+msgstr "Ένα αρχείο κειμένου για αναφορά στο GitHub: σύστημα, εκδόσεις, ρυθμίσεις, η αιτία της τελευταίας εκτέλεσης και το τέλος του log της, χωρίς το όνομα χρήστη και τον προσωπικό σας φάκελο"
+
+#: src/app/Main.cpp
+msgid "Not while the game runs"
+msgstr "Όχι όσο εκτελείται το παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "No shader cache"
+msgstr "Δεν υπάρχει μνήμη shader"
+
+#: src/app/Main.cpp
+msgid "Deletes "
+msgstr "Διαγράφει το "
+
+#: src/app/Main.cpp
+msgid "; AnyPS5 builds it again (the next start is slower)"
+msgstr "· το AnyPS5 τη φτιάχνει ξανά (η επόμενη εκκίνηση αργεί περισσότερο)"
+
+#: src/app/Main.cpp
+msgid "Relinks the game again in "
+msgstr "Κάνει ξανά relink το παιχνίδι στο "
+
+#: src/app/Main.cpp
+msgid "The game already sits in "
+msgstr "Το παιχνίδι βρίσκεται ήδη στο "
+
+#: src/app/Main.cpp
+msgid "; nothing is moved."
+msgstr "· τίποτα δεν μετακινείται."
+
+#: src/app/Main.cpp
+msgid "Moves the game's files into "
+msgstr "Μετακινεί τα αρχεία του παιχνιδιού στο "
+
+#: src/app/Main.cpp
+msgid " (a rename, nothing is copied), then relinks."
+msgstr " (μετονομασία, τίποτα δεν αντιγράφεται), και μετά κάνει relink."
+
+#: src/app/Main.cpp
+msgid "Moves the .zar unchanged to "
+msgstr "Μετακινεί το .zar αναλλοίωτο στο "
+
+#: src/app/Main.cpp
+msgid " and extracts only eboot, sce_sys and the modules into "
+msgstr " και εξάγει μόνο το eboot, το sce_sys και τα modules στο "
+
+#: src/app/Main.cpp
+msgid ", then relinks."
+msgstr ", και μετά κάνει relink."
+
+#: src/app/Main.cpp
+msgid "Reinstall with AnyPS5"
+msgstr "Επανεγκατάσταση με το AnyPS5"
+
+#: src/app/Main.cpp
+msgid "Install with AnyPS5"
+msgstr "Εγκατάσταση με το AnyPS5"
+
+#: src/app/Main.cpp
+msgid " The exe goes into "
+msgstr " Το exe μπαίνει στο "
+
+#: src/app/Main.cpp
+msgid "; the relinker writes <module>.guest.prx beside each module. Nothing is linked."
+msgstr "· ο relinker γράφει <module>.guest.prx δίπλα σε κάθε module. Δεν δημιουργούνται συνδέσεις αρχείων."
+
+#: src/app/Main.cpp
+msgid "Open saves folder"
+msgstr "Άνοιγμα φακέλου αποθηκεύσεων"
+
+#: src/app/Main.cpp
+msgid "Open logs folder"
+msgstr "Άνοιγμα φακέλου logs"
+
+#: src/app/Main.cpp
+msgid "Open game folder"
+msgstr "Άνοιγμα φακέλου παιχνιδιού"
+
+#: src/app/Main.cpp
+msgid "Not set up for AnyPS5"
+msgstr "Δεν έχει ρυθμιστεί για το AnyPS5"
+
+#: src/app/Main.cpp
+msgid "moves the .zar back to "
+msgstr "επιστρέφει το .zar στο "
+
+#: src/app/Main.cpp
+msgid "<its old name>"
+msgstr "<το παλιό του όνομα>"
+
+#: src/app/Main.cpp
+msgid " and deletes the extracted files"
+msgstr " και διαγράφει τα αρχεία που εξήχθησαν"
+
+#: src/app/Main.cpp
+msgid "moves the game's files out of app0 back into "
+msgstr "επιστρέφει τα αρχεία του παιχνιδιού από το app0 στο "
+
+#: src/app/Main.cpp
+msgid "Remove install"
+msgstr "Αφαίρεση εγκατάστασης"
+
+#: src/app/Main.cpp
+msgid "Deletes the exe and the relinker's outputs, "
+msgstr "Διαγράφει το exe και ό,τι έγραψε ο relinker, "
+
+#: src/app/Main.cpp
+msgid ". Saves stay in the profile."
+msgstr ". Οι αποθηκεύσεις μένουν στο προφίλ."
+
+#: src/app/Main.cpp
+msgid "The files are inside the archive; Install unwraps them while extracting"
+msgstr "Τα αρχεία είναι μέσα στο αρχείο· η Εγκατάσταση τα μετατρέπει κατά την εξαγωγή"
+
+#: src/app/Main.cpp
+msgid "eboot.bin and the modules are already ELF"
+msgstr "Το eboot.bin και τα modules είναι ήδη ELF"
+
+#: src/app/Main.cpp
+msgid " (eboot.bin and "
+msgstr " (eboot.bin και "
+
+#: src/app/Main.cpp
+msgid " modules)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " module)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid " (eboot.bin)"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "First stores the originals in "
+msgstr "Πρώτα φυλάει τα αρχικά στο "
+
+#: src/app/Main.cpp
+msgid ""
+", with their MD5, and checks the zip.\n"
+"Then replaces eboot.bin, the SELF modules (sce_module, sce_modules, prx, the title's module folders) and extra executables with their ELF.\n"
+"Same conversion as AnyPS5's unwrap_self.py. Install needs this done first."
+msgstr ""
+", μαζί με το MD5 τους, και ελέγχει το zip.\n"
+"Μετά αντικαθιστά το eboot.bin, τα SELF modules (sce_module, sce_modules, prx, οι φάκελοι modules του τίτλου) και τα επιπλέον εκτελέσιμα με το ELF τους.\n"
+"Ίδια μετατροπή με το unwrap_self.py του AnyPS5. Η Εγκατάσταση τη χρειάζεται πρώτα."
+
+#: src/app/Main.cpp
+msgid "Only for game folders"
+msgstr "Μόνο για φακέλους παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "No "
+msgstr "Δεν υπάρχει "
+
+#: src/app/Main.cpp
+msgid "Restore original SELF files"
+msgstr "Επαναφορά αρχικών αρχείων SELF"
+
+#: src/app/Main.cpp
+msgid "Puts every file from "
+msgstr "Επαναφέρει κάθε αρχείο από το "
+
+#: src/app/Main.cpp
+msgid " back, each checked against its MD5, then deletes the zip."
+msgstr ", ελέγχοντας το MD5 του καθενός, και μετά διαγράφει το zip."
+
+#: src/app/Main.cpp
+msgid "This game is already a folder"
+msgstr "Αυτό το παιχνίδι είναι ήδη φάκελος"
+
+#: src/app/Main.cpp
+msgid "Remove the install first"
+msgstr "Αφαιρέστε πρώτα την εγκατάσταση"
+
+#: src/app/Main.cpp
+msgid "Convert .zar to folder"
+msgstr "Μετατροπή .zar σε φάκελο"
+
+#: src/app/Main.cpp
+msgid "Extracts to "
+msgstr "Εξάγει στο "
+
+#: src/app/Main.cpp
+msgid ". The .zar is kept."
+msgstr ". Το .zar διατηρείται."
+
+#: src/app/Main.cpp
+msgid "This game is already a .zar"
+msgstr "Αυτό το παιχνίδι είναι ήδη .zar"
+
+#: src/app/Main.cpp
+msgid " already exists next to the folder"
+msgstr " υπάρχει ήδη δίπλα στον φάκελο"
+
+#: src/app/Main.cpp
+msgid "Convert folder to .zar"
+msgstr "Μετατροπή φακέλου σε .zar"
+
+#: src/app/Main.cpp
+msgid "Packs into "
+msgstr "Πακετάρει στο "
+
+#: src/app/Main.cpp
+msgid ". The folder is kept."
+msgstr ". Ο φάκελος διατηρείται."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Playing %s"
+msgstr "Παίζεται το %s"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "profile %s"
+msgstr "προφίλ %s"
+
+#: src/app/Main.cpp
+msgid "Scroll or click to pick a game; double-click to play; \"...\" beside Play for every action."
+msgstr "Κύλιση ή κλικ για επιλογή παιχνιδιού· διπλό κλικ για παιχνίδι· το \"...\" δίπλα στο Παίξτε για όλες τις ενέργειες."
+
+#: src/app/Main.cpp
+msgid "Select a game to see it; double-click to play; right-click for every action."
+msgstr "Επιλέξτε ένα παιχνίδι για να το δείτε· διπλό κλικ για παιχνίδι· δεξί κλικ για όλες τις ενέργειες."
+
+#: src/app/Main.cpp
+msgid "New profile"
+msgstr "Νέο προφίλ"
+
+#: src/app/Main.cpp
+msgid "Each profile has its own saves, trophies, input mapping and screenshots."
+msgstr "Κάθε προφίλ έχει δικές του αποθηκεύσεις, τρόπαια, χειρισμούς και στιγμιότυπα."
+
+#: src/app/Main.cpp
+msgid "Games still show the player name \"Player\": AnyPS5 doesn't let it be changed yet."
+msgstr "Τα παιχνίδια δείχνουν ακόμα το όνομα παίκτη \"Player\": το AnyPS5 δεν επιτρέπει ακόμα να αλλάξει."
+
+#: src/app/Main.cpp
+msgid "profile name"
+msgstr "όνομα προφίλ"
+
+#: src/app/Main.cpp
+msgid "Create"
+msgstr "Δημιουργία"
+
+#: src/app/Main.cpp
+msgid "That profile already exists"
+msgstr "Αυτό το προφίλ υπάρχει ήδη"
+
+#: src/app/Main.cpp
+msgid "a game is running"
+msgstr "εκτελείται παιχνίδι"
+
+#: src/app/Main.cpp
+msgid " still has the profile's saves beside its exe; restart the launcher to put them back"
+msgstr " έχει ακόμα τις αποθηκεύσεις του προφίλ δίπλα στο exe του· κάντε επανεκκίνηση του launcher για να επιστρέψουν"
+
+#: src/app/Main.cpp
+msgid "Edit profile"
+msgstr "Επεξεργασία προφίλ"
+
+#: src/app/Main.cpp
+msgid "Saves, trophies, controls and screenshots stay with the profile."
+msgstr "Αποθηκεύσεις, τρόπαια, χειρισμοί και στιγμιότυπα μένουν με το προφίλ."
+
+#: src/app/Main.cpp
+msgid "Games still see the player as \"Player\"."
+msgstr "Τα παιχνίδια βλέπουν ακόμα τον παίκτη ως \"Player\"."
+
+#: src/app/Main.cpp
+msgid "Console language"
+msgstr "Γλώσσα κονσόλας"
+
+#: src/app/Main.cpp
+msgid "The language games start in."
+msgstr "Η γλώσσα με την οποία ξεκινούν τα παιχνίδια."
+
+#: src/app/Main.cpp
+msgid "Delete profile..."
+msgstr "Διαγραφή προφίλ..."
+
+#: src/app/Main.cpp
+msgid "It's the only profile"
+msgstr "Είναι το μόνο προφίλ"
+
+#: src/app/Main.cpp
+msgid "Not now: "
+msgstr "Όχι τώρα: "
+
+#: src/app/Main.cpp
+msgid "the profile can't be renamed now: "
+msgstr "το προφίλ δεν μετονομάζεται τώρα: "
+
+#: src/app/Main.cpp
+msgid "Delete profile?"
+msgstr "Διαγραφή προφίλ;"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Delete the profile \"%s\"?"
+msgstr "Να διαγραφεί το προφίλ \"%s\";"
+
+#: src/app/Main.cpp
+msgid "Its saves, trophies, controls and screenshots go to the Recycle Bin."
+msgstr "Οι αποθηκεύσεις, τα τρόπαια, οι χειρισμοί και τα στιγμιότυπά του πάνε στον Κάδο Ανακύκλωσης."
+
+#: src/app/Main.cpp
+msgid "Its saves, trophies, controls and screenshots are deleted for good."
+msgstr "Οι αποθηκεύσεις, τα τρόπαια, οι χειρισμοί και τα στιγμιότυπά του διαγράφονται οριστικά."
+
+#: src/app/Main.cpp
+msgid "Keep it"
+msgstr "Να μείνει"
+
+#: src/app/Main.cpp
+msgid "not now: "
+msgstr "όχι τώρα: "
+
+#: src/app/Main.cpp
+msgid "it's the only profile"
+msgstr "είναι το μόνο προφίλ"
+
+#: src/app/Main.cpp
+msgid "couldn't switch to "
+msgstr "δεν ήταν δυνατή η αλλαγή στο "
+
+#: src/app/Main.cpp
+msgid "Profile deleted"
+msgstr "Το προφίλ διαγράφηκε"
+
+#: src/app/Main.cpp
+msgid "\" is gone; now using "
+msgstr "\" διαγράφηκε· τώρα χρησιμοποιείται το "
+
+#: src/app/Main.cpp
+msgid "your own build"
+msgstr "δικό σας build"
+
+#: src/app/Main.cpp
+msgid "Installed games converted with another version show \"Reinstall\"."
+msgstr "Τα εγκατεστημένα παιχνίδια που μετατράπηκαν με άλλη έκδοση δείχνουν \"Επανεγκατάσταση\"."
+
+#: src/app/Main.cpp
+msgid "Download AnyPS5 "
+msgstr "Λήψη AnyPS5 "
+
+#: src/app/Main.cpp
+msgid "Downloaded to "
+msgstr "Κατέβηκε στο "
+
+#: src/app/Main.cpp
+msgid " and selected"
+msgstr " και επιλέχθηκε"
+
+#: src/app/Main.cpp
+msgid "The launcher needs AnyPS5's relinker and runtime to install and play games."
+msgstr "Ο launcher χρειάζεται τον relinker και το runtime του AnyPS5 για να εγκαθιστά και να τρέχει παιχνίδια."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Download the latest release of %s?"
+msgstr "Να κατέβει η τελευταία έκδοση του %s;"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "The relinker and the runtime libraries of the same release, into %s."
+msgstr "Ο relinker και οι βιβλιοθήκες runtime της ίδιας έκδοσης, στο %s."
+
+#: src/app/Main.cpp
+msgid "Download the latest"
+msgstr "Λήψη της τελευταίας"
+
+#: src/app/Main.cpp
+msgid "Choose a version..."
+msgstr "Επιλογή έκδοσης..."
+
+#: src/app/Main.cpp
+msgid "Not now"
+msgstr "Όχι τώρα"
+
+#: src/app/Main.cpp
+msgid "A name for this build"
+msgstr "Ένα όνομα για αυτό το build"
+
+#: src/app/Main.cpp
+msgid "Ready"
+msgstr "Έτοιμο"
+
+#: src/app/Main.cpp
+msgid "Not usable"
+msgstr "Μη χρησιμοποιήσιμο"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s, %zu runtime libraries%s"
+msgstr "%s, %zu βιβλιοθήκες runtime%s"
+
+#: src/app/Main.cpp
+msgid ""
+"\n"
+"relinker "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "Your own build  ·  "
+msgstr "Δικό σας build  ·  "
+
+#, c-format
+#: src/app/Main.cpp
+msgid "·  %s"
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "In use"
+msgstr "Σε χρήση"
+
+#: src/app/Main.cpp
+msgid "Use"
+msgstr "Χρήση"
+
+#: src/app/Main.cpp
+msgid "Wait for the game or the job to end"
+msgstr "Περιμένετε να τελειώσει το παιχνίδι ή η εργασία"
+
+#: src/app/Main.cpp
+msgid "Games installed from now on are relinked with this one"
+msgstr "Τα παιχνίδια που εγκαθίστανται από εδώ και πέρα γίνονται relink με αυτή"
+
+#: src/app/Main.cpp
+msgid "More"
+msgstr "Περισσότερα"
+
+#: src/app/Main.cpp
+msgid "Rename"
+msgstr "Μετονομασία"
+
+#: src/app/Main.cpp
+msgid "Release page"
+msgstr "Σελίδα έκδοσης"
+
+#: src/app/Main.cpp
+msgid "Forget"
+msgstr "Αφαίρεση από τη λίστα"
+
+#: src/app/Main.cpp
+msgid "Use another version first"
+msgstr "Επιλέξτε πρώτα άλλη έκδοση"
+
+#: src/app/Main.cpp
+msgid "Takes it off the list; the folder stays"
+msgstr "Τη βγάζει από τη λίστα· ο φάκελος μένει"
+
+#: src/app/Main.cpp
+msgid "Deletes the downloaded folder"
+msgstr "Διαγράφει τον φάκελο που κατέβηκε"
+
+#: src/app/Main.cpp
+msgid "Download  ·  999.9 MiB"
+msgstr "Λήψη  ·  999.9 MiB"
+
+#: src/app/Main.cpp
+msgid "Latest"
+msgstr "Τελευταία"
+
+#: src/app/Main.cpp
+msgid "Pre-release"
+msgstr "Προέκδοση"
+
+#: src/app/Main.cpp
+msgid "not for this system"
+msgstr "όχι για αυτό το σύστημα"
+
+#: src/app/Main.cpp
+msgid "Download  ·  "
+msgstr "Λήψη  ·  "
+
+#: src/app/Main.cpp
+msgid "The selected version relinks games at Install. Games keep the version they were converted with until you reinstall them."
+msgstr "Η επιλεγμένη έκδοση κάνει relink τα παιχνίδια στην Εγκατάσταση. Τα παιχνίδια κρατούν την έκδοση με την οποία μετατράπηκαν μέχρι να τα επανεγκαταστήσετε."
+
+#: src/app/Main.cpp
+msgid "None yet. Download a release below, or add your own build."
+msgstr "Καμία ακόμα. Κατεβάστε μια έκδοση παρακάτω ή προσθέστε δικό σας build."
+
+#: src/app/Main.cpp
+msgid "Get another version"
+msgstr "Άλλη έκδοση"
+
+#: src/app/Main.cpp
+msgid "Load releases"
+msgstr "Φόρτωση εκδόσεων"
+
+#: src/app/Main.cpp
+msgid "Download a release"
+msgstr "Λήψη έκδοσης"
+
+#: src/app/Main.cpp
+msgid "From boykopovar/AnyPS5, or a fork that publishes releases the same way."
+msgstr "Από το boykopovar/AnyPS5, ή από fork που δημοσιεύει εκδόσεις με τον ίδιο τρόπο."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s has no releases. Build it and add it under \"Your own build\"."
+msgstr "Το %s δεν έχει εκδόσεις. Κάντε build και προσθέστε το στο \"Δικό σας build\"."
+
+#: src/app/Main.cpp
+msgid "Add a fork"
+msgstr "Προσθήκη fork"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Its releases need relinker-<tag>%s and prx-%s-<tag>%s, as AnyPS5 publishes them."
+msgstr "Οι εκδόσεις του χρειάζονται relinker-<tag>%s και prx-%s-<tag>%s, όπως τα δημοσιεύει το AnyPS5."
+
+#: src/app/Main.cpp
+msgid "Add and load"
+msgstr "Προσθήκη και φόρτωση"
+
+#: src/app/Main.cpp
+msgid "owner/repo, as on GitHub"
+msgstr "owner/repo, όπως στο GitHub"
+
+#: src/app/Main.cpp
+msgid "Choose a relinker..."
+msgstr "Επιλογή relinker..."
+
+#: src/app/Main.cpp
+msgid "Choose an AnyPS5 folder..."
+msgstr "Επιλογή φακέλου AnyPS5..."
+
+#: src/app/Main.cpp
+msgid "Your own build"
+msgstr "Δικό σας build"
+
+#: src/app/Main.cpp
+msgid "An AnyPS5 clone after a build (build\\core\\relinker), or a release with its libs\\ folder beside the relinker. A fork you built works the same way."
+msgstr "Ένα clone του AnyPS5 μετά από build (build\\core\\relinker), ή μια έκδοση με τον φάκελο libs\\ δίπλα στον relinker. Ένα fork που φτιάξατε δουλεύει με τον ίδιο τρόπο."
+
+#: src/app/Main.cpp
+msgid "Reinstall all"
+msgstr "Επανεγκατάσταση όλων"
+
+#: src/app/Main.cpp
+msgid "Reinstall all ("
+msgstr "Επανεγκατάσταση όλων ("
+
+#: src/app/Main.cpp
+msgid "Every installed game uses the relinker it was converted with"
+msgstr "Κάθε εγκατεστημένο παιχνίδι χρησιμοποιεί τον relinker με τον οποίο μετατράπηκε"
+
+#: src/app/Main.cpp
+msgid "Installs again, one after another, every game converted with another AnyPS5 than the one it uses now"
+msgstr "Εγκαθιστά ξανά, το ένα μετά το άλλο, κάθε παιχνίδι που μετατράπηκε με άλλο AnyPS5 από αυτό που χρησιμοποιεί τώρα"
+
+#: src/app/Main.cpp
+msgid "Close"
+msgstr "Κλείσιμο"
+
+#: src/app/Main.cpp
+msgid "Where your games are, and where the launcher keeps its own files."
+msgstr "Πού είναι τα παιχνίδια σας και πού κρατά ο launcher τα δικά του αρχεία."
+
+#: src/app/Main.cpp
+msgid "How games are converted, and what the launcher looks up about them."
+msgstr "Πώς μετατρέπονται τα παιχνίδια και τι αναζητά ο launcher για αυτά."
+
+#: src/app/Main.cpp
+msgid "Appearance"
+msgstr "Εμφάνιση"
+
+#: src/app/Main.cpp
+msgid "How the launcher looks. A theme shows at once; Save keeps it."
+msgstr "Πώς φαίνεται ο launcher. Το θέμα εμφανίζεται αμέσως· η Αποθήκευση το κρατά."
+
+#: src/app/Main.cpp
+msgid "Keys for every game of this profile, and the pads the launcher sees."
+msgstr "Πλήκτρα για κάθε παιχνίδι αυτού του προφίλ και τα χειριστήρια που βλέπει ο launcher."
+
+#: src/app/Main.cpp
+msgid "Saves"
+msgstr "Αποθηκεύσεις"
+
+#: src/app/Main.cpp
+msgid "Keep saves and trophies the same on your other PCs."
+msgstr "Ίδιες αποθηκεύσεις και τρόπαια και στους άλλους υπολογιστές σας."
+
+#: src/app/Main.cpp
+msgid "While playing"
+msgstr "Στο παιχνίδι"
+
+#: src/app/Main.cpp
+msgid "What the launcher does while a game runs."
+msgstr "Τι κάνει ο launcher όσο τρέχει ένα παιχνίδι."
+
+#: src/app/Main.cpp
+msgid "About"
+msgstr "Σχετικά"
+
+#: src/app/Main.cpp
+msgid "This launcher's version and its updates."
+msgstr "Η έκδοση αυτού του launcher και οι ενημερώσεις του."
+
+#: src/app/Main.cpp
+msgid "Hide the key"
+msgstr "Απόκρυψη κλειδιού"
+
+#: src/app/Main.cpp
+msgid "Show the key"
+msgstr "Εμφάνιση κλειδιού"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Profile %s"
+msgstr "Προφίλ %s"
+
+#: src/app/Main.cpp
+msgid "Check for updates"
+msgstr "Έλεγχος για ενημερώσεις"
+
+#: src/app/Main.cpp
+msgid "Launcher on GitHub"
+msgstr "Ο launcher στο GitHub"
+
+#: src/app/Main.cpp
+msgid "AnyPS5 on GitHub"
+msgstr "Το AnyPS5 στο GitHub"
+
+#: src/app/Main.cpp
+msgid "Update to v00.00.00"
+msgstr "Ενημέρωση σε v00.00.00"
+
+#: src/app/Main.cpp
+msgid "PS5 games"
+msgstr "Παιχνίδια PS5"
+
+#: src/app/Main.cpp
+msgid "Scanned for game folders and .zar archives."
+msgstr "Σαρώνεται για φακέλους παιχνιδιών και αρχεία .zar."
+
+#: src/app/Main.cpp
+msgid "the folder that holds your PS5 games"
+msgstr "ο φάκελος με τα παιχνίδια PS5 σας"
+
+#: src/app/Main.cpp
+msgid "PS4 games"
+msgstr "Παιχνίδια PS4"
+
+#: src/app/Main.cpp
+msgid "Optional: a second folder, for your PS4 games. Both show in the library together."
+msgstr "Προαιρετικά: δεύτερος φάκελος, για τα παιχνίδια PS4. Εμφανίζονται και οι δύο μαζί στη βιβλιοθήκη."
+
+#: src/app/Main.cpp
+msgid "the folder that holds your PS4 games"
+msgstr "ο φάκελος με τα παιχνίδια PS4 σας"
+
+#: src/app/Main.cpp
+msgid "Logs and shader caches; safe to delete, it is rebuilt."
+msgstr "Logs και μνήμες shader· η διαγραφή είναι ασφαλής, ξαναφτιάχνονται."
+
+#: src/app/Main.cpp
+msgid "Userdata"
+msgstr "Δεδομένα χρήστη"
+
+#: src/app/Main.cpp
+msgid "Profiles, saves and trophies: back this up. Keep it on the same drive as your games, so saves move instantly for each run."
+msgstr "Προφίλ, αποθηκεύσεις και τρόπαια: κρατήστε αντίγραφο. Βάλτε τον στον ίδιο δίσκο με τα παιχνίδια, ώστε οι αποθηκεύσεις να μετακινούνται αμέσως σε κάθε εκτέλεση."
+
+#: src/app/Main.cpp
+msgid "Converting"
+msgstr "Μετατροπή"
+
+#: src/app/Main.cpp
+msgid "Converts games at Install. Now: "
+msgstr "Μετατρέπει τα παιχνίδια στην Εγκατάσταση. Τώρα: "
+
+#: src/app/Main.cpp
+msgid "Manage..."
+msgstr "Διαχείριση..."
+
+#: src/app/Main.cpp
+msgid "an Intel CPU"
+msgstr "επεξεργαστή Intel"
+
+#: src/app/Main.cpp
+msgid "a CPU that isn't Intel"
+msgstr "επεξεργαστή που δεν είναι Intel"
+
+#: src/app/Main.cpp
+msgid "This PC has "
+msgstr "Αυτός ο υπολογιστής έχει "
+
+#: src/app/Main.cpp
+msgid "On by default for Intel CPUs."
+msgstr "Ενεργή από προεπιλογή για επεξεργαστές Intel."
+
+#: src/app/Main.cpp
+msgid "Off by default; Intel CPUs need it."
+msgstr "Ανενεργή από προεπιλογή· τη χρειάζονται οι επεξεργαστές Intel."
+
+#: src/app/Main.cpp
+msgid " Changed from the default."
+msgstr " Αλλαγμένη από την προεπιλογή."
+
+#: src/app/Main.cpp
+msgid " Applies to games you install from now on."
+msgstr " Ισχύει για τα παιχνίδια που εγκαθιστάτε από εδώ και πέρα."
+
+#: src/app/Main.cpp
+msgid "Intel flag (--to-intel)"
+msgstr "Σημαία Intel (--to-intel)"
+
+#: src/app/Main.cpp
+msgid "PS4 trophy lists are encrypted. Your console's trophy key (32 hex digits) opens them; the launcher doesn't include one."
+msgstr "Οι λίστες τροπαίων PS4 είναι κρυπτογραφημένες. Τις ανοίγει το κλειδί τροπαίων της κονσόλας σας (32 δεκαεξαδικά ψηφία)· ο launcher δεν περιέχει κανένα."
+
+#: src/app/Main.cpp
+msgid "Set. PS4 trophy lists show their names and grades."
+msgstr "Ορίστηκε. Οι λίστες τροπαίων PS4 δείχνουν ονόματα και βαθμίδες."
+
+#: src/app/Main.cpp
+msgid "Not a key: it needs 32 hex digits (0-9, A-F)."
+msgstr "Δεν είναι κλειδί: χρειάζεται 32 δεκαεξαδικά ψηφία (0-9, A-F)."
+
+#: src/app/Main.cpp
+msgid "PS4 trophy key"
+msgstr "Κλειδί τροπαίων PS4"
+
+#: src/app/Main.cpp
+msgid "Online"
+msgstr "Διαδίκτυο"
+
+#: src/app/Main.cpp
+msgid "Look up game updates"
+msgstr "Αναζήτηση ενημερώσεων παιχνιδιών"
+
+#: src/app/Main.cpp
+msgid "Asks PROSPEROPatches.com (PS5) or ORBISPatches.com (PS4) for the selected game's region, publisher and newest update, with update notes for PS4 games. Only the title ID is sent; answers are kept for a day."
+msgstr "Ρωτά το PROSPEROPatches.com (PS5) ή το ORBISPatches.com (PS4) για την περιοχή, τον εκδότη και τη νεότερη ενημέρωση του επιλεγμένου παιχνιδιού, με σημειώσεις ενημερώσεων για τα παιχνίδια PS4. Στέλνεται μόνο ο κωδικός τίτλου· οι απαντήσεις κρατιούνται για μία μέρα."
+
+#: src/app/Main.cpp
+msgid "Library view"
+msgstr "Προβολή βιβλιοθήκης"
+
+#: src/app/Main.cpp
+msgid "Launcher language"
+msgstr "Γλώσσα του launcher"
+
+#: src/app/Main.cpp
+msgid "The language of the launcher's own texts. Games start in the profile's console language (Edit profile). Applies when you save."
+msgstr "Η γλώσσα των κειμένων του launcher. Τα παιχνίδια ξεκινούν στη γλώσσα κονσόλας του προφίλ (Επεξεργασία προφίλ). Ισχύει μετά την αποθήκευση."
+
+#: src/app/Main.cpp
+msgid "Keyboard and mouse"
+msgstr "Πληκτρολόγιο και ποντίκι"
+
+#: src/app/Main.cpp
+msgid "Keys for all games"
+msgstr "Πλήκτρα για όλα τα παιχνίδια"
+
+#: src/app/Main.cpp
+msgid "Every game of this profile starts from these. A game can change some of them for itself under Controls in its details."
+msgstr "Κάθε παιχνίδι αυτού του προφίλ ξεκινά από αυτά. Ένα παιχνίδι μπορεί να αλλάξει κάποια για τον εαυτό του στους Χειρισμούς των λεπτομερειών του."
+
+#: src/app/Main.cpp
+msgid "Edit..."
+msgstr "Επεξεργασία..."
+
+#: src/app/Main.cpp
+msgid "Controllers"
+msgstr "Χειριστήρια"
+
+#: src/app/Main.cpp
+msgid "Pads the launcher sees now. Games read them through AnyPS5; the launcher can be used with one too (✕ plays, △ opens a game's actions)."
+msgstr "Τα χειριστήρια που βλέπει τώρα ο launcher. Τα παιχνίδια τα διαβάζουν μέσω του AnyPS5· και ο launcher χειρίζεται με ένα (το ✕ ξεκινά το παιχνίδι, το △ ανοίγει τις ενέργειές του)."
+
+#: src/app/Main.cpp
+msgid "Save sync"
+msgstr "Συγχρονισμός αποθηκεύσεων"
+
+#: src/app/Main.cpp
+msgid "Through a folder your PCs all see (OneDrive, Dropbox, a USB stick, a network share). Before a game starts newer saves come in; after it ends this PC's go out. Whatever gets replaced is kept in the save backups first."
+msgstr "Μέσω ενός φακέλου που βλέπουν όλοι οι υπολογιστές σας (OneDrive, Dropbox, USB stick, κοινόχρηστος φάκελος δικτύου). Πριν ξεκινήσει ένα παιχνίδι έρχονται οι νεότερες αποθηκεύσεις· όταν τελειώσει, φεύγουν αυτές του υπολογιστή. Ό,τι αντικαθίσταται φυλάγεται πρώτα στα αντίγραφα."
+
+#: src/app/Main.cpp
+msgid "Sync folder"
+msgstr "Φάκελος συγχρονισμού"
+
+#: src/app/Main.cpp
+msgid "Empty: off."
+msgstr "Κενό: ανενεργό."
+
+#: src/app/Main.cpp
+msgid "e.g. C:\\Users\\you\\OneDrive\\AnyPS5 saves"
+msgstr "π.χ. C:\\Users\\you\\OneDrive\\AnyPS5 saves"
+
+#: src/app/Main.cpp
+msgid "On: saves of each profile go to <folder>\\<profile>\\<title ID>"
+msgstr "Ενεργό: οι αποθηκεύσεις κάθε προφίλ πάνε στο <φάκελος>\\<προφίλ>\\<κωδικός τίτλου>"
+
+#: src/app/Main.cpp
+msgid "Backup"
+msgstr "Αντίγραφο"
+
+#: src/app/Main.cpp
+msgid "Back up saves to a zip"
+msgstr "Αντίγραφο αποθηκεύσεων σε zip"
+
+#: src/app/Main.cpp
+msgid "One zip with the saves and trophies of every game, in a folder per profile and game (<profile>\\<title ID>\\_sd, _sd_mem, _trophy), the same layout as a game's own backups. Keep it anywhere: another drive, a USB stick, the cloud."
+msgstr "Ένα zip με τις αποθηκεύσεις και τα τρόπαια κάθε παιχνιδιού, σε φάκελο ανά προφίλ και παιχνίδι (<προφίλ>\\<κωδικός τίτλου>\\_sd, _sd_mem, _trophy), με την ίδια διάταξη όπως τα αντίγραφα κάθε παιχνιδιού. Κρατήστε το όπου θέλετε: σε άλλο δίσκο, σε USB stick, στο cloud."
+
+#: src/app/Main.cpp
+msgid "This profile ("
+msgstr "Αυτό το προφίλ ("
+
+#: src/app/Main.cpp
+msgid "All profiles ("
+msgstr "Όλα τα προφίλ ("
+
+#: src/app/Main.cpp
+msgid "Back up to a zip..."
+msgstr "Αντίγραφο σε zip..."
+
+#: src/app/Main.cpp
+msgid "AnyPS5 saves "
+msgstr ""
+
+#: src/app/Main.cpp
+msgid "all profiles"
+msgstr "όλα τα προφίλ"
+
+#: src/app/Main.cpp
+msgid "Zip archive"
+msgstr "Αρχείο zip"
+
+#: src/app/Main.cpp
+msgid "After the game closes: its saves are with it while it runs."
+msgstr "Μετά το κλείσιμο του παιχνιδιού: όσο τρέχει, οι αποθηκεύσεις του είναι μαζί του."
+
+#: src/app/Main.cpp
+msgid "Backing up..."
+msgstr "Δημιουργία αντιγράφου..."
+
+#: src/app/Main.cpp
+msgid "Minimize the launcher"
+msgstr "Ελαχιστοποίηση του launcher"
+
+#: src/app/Main.cpp
+msgid "Once the game's window shows. It comes back when the game ends."
+msgstr "Μόλις εμφανιστεί το παράθυρο του παιχνιδιού. Επανέρχεται όταν τελειώσει το παιχνίδι."
+
+#: src/app/Main.cpp
+msgid "Trophy cards"
+msgstr "Κάρτες τροπαίων"
+
+#: src/app/Main.cpp
+msgid "A card at the top of the game's window when a trophy is earned. It never takes the keyboard or the mouse from the game."
+msgstr "Μια κάρτα στο πάνω μέρος του παραθύρου του παιχνιδιού όταν κερδίζεται τρόπαιο. Δεν παίρνει ποτέ το πληκτρολόγιο ή το ποντίκι από το παιχνίδι."
+
+#: src/app/Main.cpp
+msgid "Play a sound with it"
+msgstr "Με ήχο"
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Version %s  ·  GPL-2.0"
+msgstr "Έκδοση %s  ·  GPL-2.0"
+
+#: src/app/Main.cpp
+msgid "Update to "
+msgstr "Ενημέρωση σε "
+
+#: src/app/Main.cpp
+msgid "See "
+msgstr "Δείτε την "
+
+#: src/app/Main.cpp
+msgid "Checking..."
+msgstr "Έλεγχος..."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "%s is out."
+msgstr "Κυκλοφόρησε η %s."
+
+#: src/app/Main.cpp
+msgid "Up to date."
+msgstr "Ενημερωμένο."
+
+#: src/app/Main.cpp
+msgid "Not checked yet."
+msgstr "Δεν έχει ελεγχθεί ακόμα."
+
+#: src/app/Main.cpp
+msgid "Check for updates at start"
+msgstr "Έλεγχος για ενημερώσεις στην εκκίνηση"
+
+#: src/app/Main.cpp
+msgid "Looks at github.com/leskal/AnyPS5-Launcher/releases and downloads a new version in the background."
+msgstr "Κοιτάζει το github.com/leskal/AnyPS5-Launcher/releases και κατεβάζει νέα έκδοση στο παρασκήνιο."
+
+#: src/app/Main.cpp
+msgid "Links"
+msgstr "Σύνδεσμοι"
+
+#: src/app/Main.cpp
+msgid "Links like anyps5://play/PPSA01234 start a game from anywhere: a shortcut, a browser, another app. Copy link is in a game's actions."
+msgstr "Σύνδεσμοι όπως anyps5://play/PPSA01234 ξεκινούν ένα παιχνίδι από οπουδήποτε: συντόμευση, browser, άλλη εφαρμογή. Η Αντιγραφή συνδέσμου είναι στις ενέργειες κάθε παιχνιδιού."
+
+#: src/app/Main.cpp
+msgid "Changes take effect when you save."
+msgstr "Οι αλλαγές ισχύουν μετά την αποθήκευση."
+
+#, c-format
+#: src/app/Main.cpp
+msgid "Saved in %s"
+msgstr "Αποθηκεύεται στο %s"
+
+#: src/app/Main.cpp
+msgid "the "
+msgstr "ο φάκελος "
+
+#: src/app/Main.cpp
+msgid " folder is inside a games folder ("
+msgstr " είναι μέσα σε φάκελο παιχνιδιών ("
+
+#: src/app/Main.cpp
+msgid "); choose another place"
+msgstr ")· επιλέξτε άλλη θέση"
+
+#: src/app/Main.cpp
+msgid "Could not save: "
+msgstr "Δεν ήταν δυνατή η αποθήκευση: "
+
+#, c-format
+#: src/app/Main.cpp
+msgid "SDL_Init failed: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "SDL_CreateWindow failed: %s"
+msgstr ""
+
+#, c-format
+#: src/app/Main.cpp
+msgid "SDL_CreateRenderer failed: %s"
+msgstr ""
+
+#: src/core/Diagnosis.cpp
+msgid "You stopped the game"
+msgstr "Σταματήσατε το παιχνίδι"
+
+#: src/core/Diagnosis.cpp
+msgid "Needs a system function AnyPS5 doesn't have yet"
+msgstr "Χρειάζεται λειτουργία συστήματος που δεν έχει ακόμα το AnyPS5"
+
+#: src/core/Diagnosis.cpp
+msgid "Nothing to fix on your side: the game needs a newer AnyPS5. Make a report to share it."
+msgstr "Δεν χρειάζεται να διορθώσετε κάτι: το παιχνίδι θέλει νεότερο AnyPS5. Δημιουργήστε αναφορά για να το μοιραστείτε."
+
+#: src/core/Diagnosis.cpp
+msgid "Uses graphics AnyPS5 can't draw yet"
+msgstr "Χρησιμοποιεί γραφικά που το AnyPS5 δεν σχεδιάζει ακόμα"
+
+#: src/core/Diagnosis.cpp
+msgid "The game needs a newer AnyPS5. Make a report to share it."
+msgstr "Το παιχνίδι θέλει νεότερο AnyPS5. Δημιουργήστε αναφορά για να το μοιραστείτε."
+
+#: src/core/Diagnosis.cpp
+msgid "Stopped on an engine error"
+msgstr "Σταμάτησε σε σφάλμα της μηχανής"
+
+#: src/core/Diagnosis.cpp
+msgid "Closed normally"
+msgstr "Έκλεισε κανονικά"
+
+#: src/core/Diagnosis.cpp
+msgid "A module is missing"
+msgstr "Λείπει ένα module"
+
+#: src/core/Diagnosis.cpp
+msgid "Reinstall the game. If it stays, AnyPS5 doesn't provide this module yet."
+msgstr "Επανεγκαταστήστε το παιχνίδι. Αν συνεχίσει, το AnyPS5 δεν έχει ακόμα αυτό το module."
+
+#: src/core/Diagnosis.cpp
+msgid "The GPU ran out of memory"
+msgstr "Η κάρτα γραφικών έμεινε χωρίς μνήμη"
+
+#: src/core/Diagnosis.cpp
+msgid "Close other programs that use the GPU, or lower the game's own graphics settings."
+msgstr "Κλείστε άλλα προγράμματα που χρησιμοποιούν την κάρτα γραφικών, ή χαμηλώστε τις ρυθμίσεις γραφικών του παιχνιδιού."
+
+#: src/core/Diagnosis.cpp
+msgid "The GPU stopped"
+msgstr "Η κάρτα γραφικών σταμάτησε"
+
+#: src/core/Diagnosis.cpp
+msgid "Update the graphics driver. If it keeps happening at the same place, make a report."
+msgstr "Ενημερώστε τον οδηγό της κάρτας γραφικών. Αν συμβαίνει στο ίδιο σημείο, δημιουργήστε αναφορά."
+
+#: src/core/Diagnosis.cpp
+msgid "The system ran out of memory"
+msgstr "Το σύστημα έμεινε χωρίς μνήμη"
+
+#: src/core/Diagnosis.cpp
+msgid "Close other programs, or let Windows grow the page file (System > About > Advanced system settings)."
+msgstr "Κλείστε άλλα προγράμματα, ή αφήστε τα Windows να μεγαλώσουν το αρχείο σελιδοποίησης (Σύστημα > Πληροφορίες > Ρυθμίσεις συστήματος για προχωρημένους)."
+
+#: src/core/Diagnosis.cpp
+msgid "The crash is in NVIDIA's shader compiler: update the graphics driver."
+msgstr "Η κατάρρευση είναι στον μεταγλωττιστή shader της NVIDIA: ενημερώστε τον οδηγό της κάρτας γραφικών."
+
+#: src/core/Diagnosis.cpp
+msgid "Stopped on an error"
+msgstr "Σταμάτησε σε σφάλμα"
+
+#: src/core/Diagnosis.cpp
+msgid "Ended"
+msgstr "Τελείωσε"
+
+#: src/core/Diagnosis.cpp
+msgid "Closed"
+msgstr "Έκλεισε"
+
+#: src/core/InputMapping.cpp
+msgid "Buttons"
+msgstr "Κουμπιά"
+
+#: src/core/InputMapping.cpp
+msgid "Cross"
+msgstr "Σταυρός"
+
+#: src/core/InputMapping.cpp
+msgid "Circle"
+msgstr "Κύκλος"
+
+#: src/core/InputMapping.cpp
+msgid "Square"
+msgstr "Τετράγωνο"
+
+#: src/core/InputMapping.cpp
+msgid "Triangle"
+msgstr "Τρίγωνο"
+
+#: src/core/InputMapping.cpp
+msgid "L1"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "R1"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "L2"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "R2"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "L3"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "R3"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Options"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "D-pad"
+msgstr "Κατευθυντικά"
+
+#: src/core/InputMapping.cpp
+msgid "Up"
+msgstr "Πάνω"
+
+#: src/core/InputMapping.cpp
+msgid "Down"
+msgstr "Κάτω"
+
+#: src/core/InputMapping.cpp
+msgid "Left"
+msgstr "Αριστερά"
+
+#: src/core/InputMapping.cpp
+msgid "Right"
+msgstr "Δεξιά"
+
+#: src/core/InputMapping.cpp
+msgid "Left stick"
+msgstr "Αριστερός μοχλός"
+
+#: src/core/InputMapping.cpp
+msgid "Right stick"
+msgstr "Δεξιός μοχλός"
+
+#: src/core/InputMapping.cpp
+msgid "Touchpad and motion"
+msgstr "Touchpad και κίνηση"
+
+#: src/core/InputMapping.cpp
+msgid "Touchpad left"
+msgstr "Touchpad αριστερά"
+
+#: src/core/InputMapping.cpp
+msgid "Touchpad right"
+msgstr "Touchpad δεξιά"
+
+#: src/core/InputMapping.cpp
+msgid "Shake"
+msgstr "Κούνημα"
+
+#: src/core/InputMapping.cpp
+msgid "Slow stick (held)"
+msgstr "Αργός μοχλός (κρατημένο)"
+
+#: src/core/InputMapping.cpp
+msgid "AnyPS5"
+msgstr ""
+
+#: src/core/InputMapping.cpp
+msgid "Mouse moves the stick"
+msgstr "Το ποντίκι κινεί τον μοχλό"
+
+#: src/core/InputMapping.cpp
+msgid "Screenshot"
+msgstr "Στιγμιότυπο"
+
+#: src/core/InputMapping.cpp
+msgid "Controller status"
+msgstr "Κατάσταση χειριστηρίου"
+
+#: src/core/InputMapping.cpp
+msgid "Volume down"
+msgstr "Ένταση κάτω"
+
+#: src/core/InputMapping.cpp
+msgid "Volume up"
+msgstr "Ένταση πάνω"
+
+#: src/core/InputMapping.cpp
+msgid "Mute"
+msgstr "Σίγαση"
+
+#: src/core/InputMapping.cpp
+msgid "Reload these controls"
+msgstr "Επαναφόρτωση χειρισμών"
+
+#: src/core/InputMapping.cpp
+msgid "Left stick dead zone (%)"
+msgstr "Νεκρή ζώνη αριστερού μοχλού (%)"
+
+#: src/core/InputMapping.cpp
+msgid "How much of a controller stick's travel reads as centered. Raise it for a drifting stick."
+msgstr "Πόση από τη διαδρομή του μοχλού διαβάζεται ως κέντρο. Αυξήστε τη για μοχλό που ολισθαίνει."
+
+#: src/core/InputMapping.cpp
+msgid "Right stick dead zone (%)"
+msgstr "Νεκρή ζώνη δεξιού μοχλού (%)"
+
+#: src/core/InputMapping.cpp
+msgid "The same for the right stick."
+msgstr "Το ίδιο για τον δεξιό μοχλό."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse sensitivity"
+msgstr "Ευαισθησία ποντικιού"
+
+#: src/core/InputMapping.cpp
+msgid "How fast the mouse turns the stick while \"Mouse moves the stick\" is on."
+msgstr "Πόσο γρήγορα το ποντίκι γυρίζει τον μοχλό όσο είναι ενεργό το \"Το ποντίκι κινεί τον μοχλό\"."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse vertical speed"
+msgstr "Κατακόρυφη ταχύτητα ποντικιού"
+
+#: src/core/InputMapping.cpp
+msgid "Multiplies up and down mouse movement, for games that pitch slower or faster than they turn."
+msgstr "Πολλαπλασιάζει την πάνω-κάτω κίνηση του ποντικιού, για παιχνίδια που κοιτάζουν πάνω-κάτω πιο αργά ή πιο γρήγορα απ' ό,τι γυρίζουν."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse response curve"
+msgstr "Καμπύλη απόκρισης ποντικιού"
+
+#: src/core/InputMapping.cpp
+msgid "Above 1 gives finer control at low speed; below 1 reaches large tilts sooner."
+msgstr "Πάνω από 1 δίνει πιο λεπτό έλεγχο σε χαμηλή ταχύτητα· κάτω από 1 φτάνει νωρίτερα σε μεγάλες κλίσεις."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse minimum tilt"
+msgstr "Ελάχιστη κλίση ποντικιού"
+
+#: src/core/InputMapping.cpp
+msgid "The smallest tilt any mouse movement gives. Set it just above the game's own dead zone."
+msgstr "Η μικρότερη κλίση που δίνει οποιαδήποτε κίνηση του ποντικιού. Βάλτε τη λίγο πάνω από τη νεκρή ζώνη του ίδιου του παιχνιδιού."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse maximum speed"
+msgstr "Μέγιστη ταχύτητα ποντικιού"
+
+#: src/core/InputMapping.cpp
+msgid "The fastest tracked speed, as a multiple of full tilt."
+msgstr "Η μεγαλύτερη ταχύτητα που μετριέται, ως πολλαπλάσιο της πλήρους κλίσης."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse smoothing (ms)"
+msgstr "Εξομάλυνση ποντικιού (ms)"
+
+#: src/core/InputMapping.cpp
+msgid "0 follows every mouse report directly."
+msgstr "Το 0 ακολουθεί απευθείας κάθε κίνηση του ποντικιού."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse stop delay (ms)"
+msgstr "Καθυστέρηση στάσης ποντικιού (ms)"
+
+#: src/core/InputMapping.cpp
+msgid "How soon the stick centers after the mouse stops."
+msgstr "Πόσο σύντομα κεντράρει ο μοχλός όταν σταματήσει το ποντίκι."
+
+#: src/core/InputMapping.cpp
+msgid "Mouse drives"
+msgstr "Το ποντίκι κινεί"
+
+#: src/core/InputMapping.cpp
+msgid "Which stick the mouse moves."
+msgstr "Ποιον μοχλό κινεί το ποντίκι."
+
+#: src/core/InputMapping.cpp
+msgid "Slow stick tilt"
+msgstr "Κλίση αργού μοχλού"
+
+#: src/core/InputMapping.cpp
+msgid "How far keyboard stick keys tilt while \"Slow stick\" is held."
+msgstr "Πόσο γέρνουν τα πλήκτρα μοχλού όσο κρατιέται το \"Αργός μοχλός\"."
+
+#: src/core/InputMapping.cpp
+msgid "Keyboard stick ramp (ms)"
+msgstr "Σταδιακή κλίση μοχλού από πλήκτρα (ms)"
+
+#: src/core/InputMapping.cpp
+msgid "How long a key takes to tilt a stick fully. 0 tilts at once."
+msgstr "Πόση ώρα χρειάζεται ένα πλήκτρο για να γείρει πλήρως τον μοχλό. Το 0 τον γέρνει αμέσως."
+
+#: src/core/InputMapping.cpp
+msgid "Trigger ramp (ms)"
+msgstr "Σταδιακή σκανδάλη (ms)"
+
+#: src/core/InputMapping.cpp
+msgid "How long a key takes to press L2 or R2 fully, for racing games."
+msgstr "Πόση ώρα χρειάζεται ένα πλήκτρο για να πατήσει πλήρως το L2 ή το R2, για παιχνίδια αγώνων."
+
+#: src/core/Metadata.cpp
+msgid "Europe"
+msgstr "Ευρώπη"
+
+#: src/core/Metadata.cpp
+msgid "USA"
+msgstr "ΗΠΑ"
+
+#: src/core/Metadata.cpp
+msgid "Japan"
+msgstr "Ιαπωνία"
+
+#: src/core/Metadata.cpp
+msgid "Asia"
+msgstr "Ασία"
+
+#: src/core/Metadata.cpp
+msgid "Korea"
+msgstr "Κορέα"
+
+#: src/core/Metadata.cpp
+msgid "Internal"
+msgstr "Εσωτερική"
+
+#: src/core/Trophies.cpp
+msgid "Platinum"
+msgstr "Πλατινένιο"
+
+#: src/core/Trophies.cpp
+msgid "Gold"
+msgstr "Χρυσό"
+
+#: src/core/Trophies.cpp
+msgid "Silver"
+msgstr "Ασημένιο"
+
+#: src/core/Trophies.cpp
+msgid "Bronze"
+msgstr "Χάλκινο"
